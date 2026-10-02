@@ -105,20 +105,21 @@ func TestResolveSelectionOverridesAndCWDallback(t *testing.T) {
 	cfg := Config{
 		DefaultWorkspace: "personal",
 		Workspaces: []Workspace{
-			{Name: "personal", Paths: []string{"/configured"}, MaxDepth: 9, IgnoreDirs: []string{"skip"}},
-			{Name: "work", Paths: []string{"/work"}, MaxDepth: 2},
+			{Name: "personal", Paths: []string{filepath.Join(t.TempDir(), "configured")}, MaxDepth: 9, IgnoreDirs: []string{"skip"}},
+			{Name: "work", Paths: []string{filepath.Join(t.TempDir(), "work")}, MaxDepth: 2},
 		},
 	}
 	cwd := filepath.Join(t.TempDir(), "run")
-	w, err := cfg.Resolve("", []string{"relative", "/absolute"}, cwd)
+	absoluteRoot := filepath.Join(t.TempDir(), "absolute")
+	w, err := cfg.Resolve("", []string{"relative", absoluteRoot}, cwd)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.Name != "personal" || w.MaxDepth != 9 || len(w.Paths) != 2 || w.Paths[0] != filepath.Join(cwd, "relative") || w.Paths[1] != "/absolute" {
+	if w.Name != "personal" || w.MaxDepth != 9 || len(w.Paths) != 2 || w.Paths[0] != filepath.Join(cwd, "relative") || w.Paths[1] != absoluteRoot {
 		t.Fatalf("positional roots should override only paths: %+v", w)
 	}
 	w, err = cfg.Resolve("work", nil, cwd)
-	if err != nil || w.Name != "work" || w.Paths[0] != "/work" {
+	if err != nil || w.Name != "work" || len(w.Paths) != 1 || w.Paths[0] != cfg.Workspaces[1].Paths[0] {
 		t.Fatalf("explicit workspace selection = %+v, %v", w, err)
 	}
 	if _, err := cfg.Resolve("unknown", nil, cwd); err == nil || !strings.Contains(err.Error(), "unknown workspace") {
@@ -134,14 +135,15 @@ func TestResolveSelectionOverridesAndCWDallback(t *testing.T) {
 func TestResolveExpandsTildeInCLIPaths(t *testing.T) {
 	base := t.TempDir()
 	t.Setenv("HOME", base)
-	w, err := (Config{}).Resolve("", []string{"~/projects", "~someone/project"}, "/ignored")
+	cwd := filepath.Join(t.TempDir(), "ignored")
+	w, err := (Config{}).Resolve("", []string{"~/projects", "~someone/project"}, cwd)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if w.Paths[0] != filepath.Join(base, "projects") {
 		t.Fatalf("tilde path = %q", w.Paths[0])
 	}
-	if w.Paths[1] != filepath.Join("/ignored", "~someone", "project") {
+	if w.Paths[1] != filepath.Join(cwd, "~someone", "project") {
 		t.Fatalf("arbitrary shell tilde expansion occurred: %q", w.Paths[1])
 	}
 }
