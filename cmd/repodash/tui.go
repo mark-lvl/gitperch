@@ -47,5 +47,5 @@ func runTUI(ctx context.Context, cfg config.Config, ws config.Workspace, noColor
 		}
 		return 1
 	}
-	return 0
+	return model.ExitCode()
 }

@@ -5,7 +5,8 @@ Implementation follows [plan.md](plan.md) in separately committed milestones.
 
 ## Development
 
-Go 1.27.1 and the system Git CLI are required. Bootstrap was performed with
+Building from source requires Go 1.27.1; running a built binary requires the
+system Git CLI, not Go. Bootstrap was performed with
 Go 1.27.1 (official Linux amd64 archive, SHA-256
 `63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445`)
 and Git 2.43.0. The module name is local (`repodash`); no remote or license has
@@ -36,6 +37,10 @@ configured `GOBIN` (or `$(go env GOPATH)/bin`). Add that directory to `PATH` if
 you want to invoke `repodash` from any directory. This is a local build
 workflow; no published release artifact is provided.
 
+`make release-linux` prepares a static, versioned Linux amd64 binary under
+`dist/` and prints its SHA-256. `VERSION=0.1.0` is the default; this target does
+not publish anything. See the [draft release notes](docs/release-notes-v0.1.0.md).
+
 ## Read-only status (M2)
 
 ```sh
@@ -61,6 +66,10 @@ symlink ancestors are skipped. Descendants named `node_modules`, `vendor`,
 
 Missing or inaccessible roots print warnings while valid roots continue.
 Exit codes: 0 completed, 1 partial failure, 2 invalid invocation, 130 interrupted.
+In the TUI, a failed/cancelled/uncertain batch remains an exit-code-1 failure
+even after dismissing its displayed results. Policy skips alone are not failures.
+Ctrl+C exits with 130 while browsing; in previews or active batches it requests
+cancellation instead of exiting immediately.
 Git command output is capped at 4 MiB per stream,
 with a 15-second default deadline. Repository-routing environment variables are
 removed. Background Git has closed stdin, disabled terminal/askpass authentication,

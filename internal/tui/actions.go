@@ -52,6 +52,11 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 			return true, nil
 		}
 		m.preview = &msg.preview
+		for _, target := range msg.preview.Targets {
+			if target.PreflightFailed {
+				m.actionFailed = true
+			}
+		}
 		m.previewCursor = 0
 		m.previewLineOffset = 0
 		return true, nil
@@ -69,6 +74,9 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 		m.events = nil
 		for _, result := range msg.results {
 			m.results[result.Path] = result
+			if result.State == app.Failed || result.State == app.OutcomeUnknown || result.State == app.Cancelled {
+				m.actionFailed = true
+			}
 		}
 		if m.actionCancel != nil {
 			m.actionCancel()
@@ -76,6 +84,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 		}
 		m.message = "Batch finished; results remain in d details"
 		if msg.err != nil {
+			m.actionFailed = true
 			m.message += " · " + msg.err.Error()
 		}
 		m.preview = nil

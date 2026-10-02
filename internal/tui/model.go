@@ -52,6 +52,8 @@ type Model struct {
 	actionGeneration  uint64
 	events            chan app.Event
 	results           map[string]app.Event
+	interrupted       bool
+	actionFailed      bool
 }
 
 type snapshotMsg struct {
@@ -192,6 +194,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.previewKey(key)
 	}
 	if key == "ctrl+c" {
+		m.interrupted = true
 		if m.loadCancel != nil {
 			m.loadCancel()
 			m.loadCancel = nil
@@ -322,6 +325,23 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.launchLazyGit()
 	}
 	return nil
+}
+
+// ExitCode reports command interruption or partial/operation failure after the
+// dashboard closes. Dismissing displayed results does not erase a failed batch.
+func (m *Model) ExitCode() int {
+	if m.interrupted {
+		return 130
+	}
+	if m.actionFailed || m.loadErr != "" || len(m.warnings) > 0 {
+		return 1
+	}
+	for _, row := range m.rows {
+		if row.Status.Error != "" {
+			return 1
+		}
+	}
+	return 0
 }
 
 func (m *Model) launchShell() tea.Cmd {

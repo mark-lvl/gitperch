@@ -82,6 +82,7 @@ func (a *Actions) planOne(ctx context.Context, action Action, path string, expec
 		}
 		if err == nil {
 			err = a.service.Fetch(ctx, path, p.fetch)
+			p.display.PreflightFailed = err != nil
 			if err == nil {
 				a.markFetched(path)
 			}

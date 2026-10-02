@@ -152,6 +152,20 @@ func TestCancelledBeforePushDoesNotStart(t *testing.T) {
 	}
 }
 
+func TestFailedSyncPreflightIsNotBenignPolicySkip(t *testing.T) {
+	repo, _ := actionTestRepoWithRemote(t)
+	actionTestMakeLocalCommit(t, repo, "outgoing")
+	actionGit(t, repo, "remote", "set-url", "origin", filepath.Join(t.TempDir(), "missing.git"))
+	a, _, p := actionPrepareSync(t, repo, Push)
+	if p.Targets[0].Eligible || !p.Targets[0].PreflightFailed {
+		t.Fatalf("failed fetch was not recorded: %+v", p)
+	}
+	results, err := a.Execute(context.Background(), p.ID, nil)
+	if err != nil || results[0].State != Failed {
+		t.Fatalf("failed preflight reported benign skip: %+v, %v", results, err)
+	}
+}
+
 type serialPushGit struct {
 	gitcli.Service
 	mu                  sync.Mutex

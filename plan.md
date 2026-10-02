@@ -1,6 +1,6 @@
 # repodash — implementation plan
 
-Status: implementation in progress. The user requested all milestones, overriding the first-session M1 stopping point. Checked items below record verified work.
+Status: M0–M7 implemented and locally verified. The user requested all milestones, overriding the first-session M1 stopping point. Checked items below record verified work; remaining platform/publication limitations are recorded in the log.
 
 ## 1. Goal
 
@@ -284,11 +284,11 @@ Gate: no unrelated branch or tag changes; no force push, automatic stash, merge 
 
 ### M7 — v0.1 release readiness
 
-- [ ] Document installation, configuration, keys, safety boundaries, auth troubleshooting, and limitations.
-- [ ] Add a reproducible demo workspace and manual WSL smoke checklist.
-- [ ] Run formatting, test, race, vet, and build gates.
-- [ ] Build Linux amd64 release artifact first. Expand platform CI before claiming macOS/Windows support.
-- [ ] Add release automation only when useful; license selection and publication require an explicit project decision.
+- [x] Document installation, configuration, keys, safety boundaries, auth troubleshooting, and limitations.
+- [x] Add a reproducible demo workspace and manual WSL smoke checklist.
+- [x] Run formatting, test, race, vet, and build gates.
+- [x] Build Linux amd64 release artifact first. Expand platform CI before claiming macOS/Windows support.
+- [x] Add release automation only when useful; license selection and publication require an explicit project decision.
 
 Gate: the complete discover → inspect → select → preview → synchronize → inspect workflow works. Prepare release notes; do not publish automatically.
 
@@ -334,3 +334,5 @@ Consult these when implementing the relevant milestone; verify exact installed-v
 | M5 | 2026-10-02 | `make fmt test race vet build` passed. Local bare-remote and fake-service tests verify immutable executable previews, explicit selection, single active batch, common-dir serialization, mixed success/failure, changed plans, ambiguous/unusual refspec skips, cancellation/deadline events, and tag-pruning overrides. TUI tests pass 20 race runs. WSL2 PTY selected 10 demo repos, reviewed 9 eligible targets plus a skip, confirmed fetch, observed 8 successes/1 missing-remote failure/1 no-remote skip, and refreshed behind/diverged counts. `scripts/demo.sh` creates these disposable scenarios. Official Git fetch/config docs consulted. | M6 push/pull remain. External processes can still race after revalidation; cancelled fetch may partially update refs. Successful actual LazyGit launch remains untested. |
 | M6 | 2026-10-02 | `make fmt test race vet build` passed. Disposable bare-remote tests verify conventional target resolution, dirty push exclusion, exact-OID push/FF pull, refused unsafe states and target config, remote-race non-force rejection, changed plans, unrelated branch/annotated-tag protection, shared-worktree serialization, and timeout/cancellation/output-limit uncertainty without retry. TUI two-confirmation tests pass 25 race runs. WSL2 PTY on `/tmp/repodash-demo.EynfaP` verified behind pull and ahead push: HEAD/remote unchanged before second confirmation, then exactly equal to reviewed OIDs. README and smoke checklist updated. | Fetch preflight uses a separate reviewed scope and confirmation; final push/pull needs a second confirmation. External tools/hooks can still race; no rollback. Linux/WSL only; M7 release artifact and final audit pending. |
 | M4 follow-up | 2026-10-02 | Official LazyGit 0.65.1 Linux amd64 archive SHA-256 `02beacbcda0fa342e50ae3480ba8147307353af3fb28e1d5f790e02329c201a6` verified against its release checksums. `script -q -e -c 'bin/repodash --no-color /tmp/repodash-demo.EynfaP/workspace/behind' /dev/null` with a temporary PATH/XDG config opened LazyGit, showed the correct worktree, quit/restored/refreshed successfully. Child shell `pwd`, exit, actual terminal sizes 80×24→30×10→80×24 via `stty`, and Ctrl+C cleanup passed. | Direct harness PTY lacks a controlling `/dev/tty`; using `script` resolved this without an application change. Physical Windows Terminal interaction remains untested; no claim of Windows/macOS support. |
+| M6 edge regressions | 2026-10-02 | Short/full/wildcard selected-branch mappings preserve unrelated refs; differing remote.pushDefault/destination, unsupported push.default, mirror yes/no/bare booleans, equal/ahead-only pull, staged dirtiness, diverged push, pruned upstream, changed tracking commits, changed branch/HEAD/config/operation, and changed fetch-scope state are tested with isolated local remotes. No preflight fetch occurs after the reviewed scope changes. | Conventional mappings only; triangular and arbitrary refspec workflows remain intentionally unsupported. |
+| M7 | 2026-10-02 | `make fmt test race vet build release-linux`, fresh `go test -count=1 -race ./...`, formatting and diff checks passed. Source installation, config, keys, auth/safety limits, reproducible demo and full WSL smoke checklist documented. Final audit aligned TUI failure/interruption exit codes with the CLI; preflight fetch failures are failures rather than benign policy skips. Static Linux amd64 `dist/repodash_0.1.0_linux_amd64` reports version 0.1.0 and valid schema-1 JSON for all 10 demo rows. Controlling WSL PTY verified release-binary failed-fetch exit 1 and Ctrl+C exit 130. SHA-256: `74db00624fca6675f67c460ac4039fc104022828d3d5f4a616048bb38bdf22e1`. Release notes prepared in `docs/release-notes-v0.1.0.md`; local build target only, no publication automation needed. | Primary validation: Ubuntu 24.04.5 LTS, WSL2 kernel 6.18.33.1, Git 2.43.0, Go 1.27.1. Remote CI and physical Windows Terminal remain unrun; macOS/Windows/386 support not advertised. License/module publication URL remain undecided. No remote created, no project push or release publication. |

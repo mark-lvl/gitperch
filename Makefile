@@ -1,6 +1,7 @@
 GO ?= go
+VERSION ?= 0.1.0
 
-.PHONY: fmt test race vet build check
+.PHONY: fmt test race vet build check release-linux
 fmt:
 	$(GO) fmt ./...
 test:
@@ -11,4 +12,8 @@ vet:
 	$(GO) vet ./...
 build:
 	$(GO) build -o bin/repodash ./cmd/repodash
+release-linux:
+	mkdir -p dist
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$(VERSION)" -o dist/repodash_$(VERSION)_linux_amd64 ./cmd/repodash
+	sha256sum dist/repodash_$(VERSION)_linux_amd64
 check: test vet build

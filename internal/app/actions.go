@@ -39,16 +39,17 @@ type ActionGit interface {
 }
 
 type Target struct {
-	Path          string
-	Action        Action
-	Remote        string
-	URL           string // Display-safe; executable targets are stored privately.
-	Branch        string
-	Scope         string
-	Commit        string
-	Eligible      bool
-	Reason        string
-	DirtyExcluded bool
+	Path            string
+	Action          Action
+	Remote          string
+	URL             string // Display-safe; executable targets are stored privately.
+	Branch          string
+	Scope           string
+	Commit          string
+	Eligible        bool
+	Reason          string
+	DirtyExcluded   bool
+	PreflightFailed bool
 }
 type Preview struct {
 	ID      uint64
@@ -218,6 +219,9 @@ func (a *Actions) executeOne(ctx context.Context, p plannedTarget, emit func(Eve
 	result := Event{Path: p.display.Path}
 	if !p.display.Eligible {
 		result.State = Skipped
+		if p.display.PreflightFailed {
+			result.State = Failed
+		}
 		result.Message = p.display.Reason
 		return result
 	}
