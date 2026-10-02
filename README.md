@@ -23,6 +23,19 @@ toolchain lives in `/tmp/repodash-toolchain/go`; use
 `PATH=/tmp/repodash-toolchain/go/bin:$PATH` and `GOCACHE=/tmp/repodash-gocache`
 when running the commands above. A normal installation of Go needs neither override.
 
+To build and install the local binary:
+
+```sh
+make build
+./bin/repodash --help
+go install ./cmd/repodash
+```
+
+`make build` creates `bin/repodash`; `go install` places `repodash` in Go's
+configured `GOBIN` (or `$(go env GOPATH)/bin`). Add that directory to `PATH` if
+you want to invoke `repodash` from any directory. This is a local build
+workflow; no published release artifact is provided.
+
 ## Read-only status (M2)
 
 ```sh
@@ -113,6 +126,8 @@ are small model operations, so no Bubbles components are needed.
 | Esc | Leave filtering / clear filter |
 | r | Refresh local status |
 | f | Preview selected repositories for fetch |
+| p | Review fetch scope, then preview and push eligible commits |
+| l | Review fetch scope, then preview and fast-forward pull |
 | Enter | Open a child shell in the highlighted worktree |
 | g | Open LazyGit in the highlighted worktree |
 | ? | Toggle help |
@@ -123,7 +138,7 @@ Child tools temporarily take over the terminal; the dashboard restores and
 refreshes after exit. The child shell does not change the parent shell's
 directory. Missing LazyGit is reported visibly. Highlighted errors and root
 warnings remain visible. [WSL smoke checklist](docs/tui-smoke.md) documents manual
-checks. Push and pull will be added in M6.
+checks.
 
 ## Fetch preview and execution (M5)
 
@@ -156,3 +171,58 @@ The script prints its new `/tmp/repodash-demo.*` directory and leaves it availab
 for inspection. It includes clean, behind, ahead, dirty, diverged, detached,
 unborn, missing-upstream, failed-remote, and linked-worktree scenarios. Tracking
 comparisons deliberately start stale for some rows; fetch reveals current state.
+
+## Push and fast-forward pull (M6)
+
+Select repositories with Space or `a`, then press `p` to push or `l` to
+fast-forward pull. Both actions use two confirmations. The first screen is an
+immutable Fetch scope preview: review the eligible fetch targets, then press
+Enter to fetch those targets. Repodash compares refreshed state and presents a
+second, final preview showing the exact push branch/commit or pull commit. Press
+Enter again to execute; Esc cancels either preview. Repositories skipped during
+fetch remain skipped. `d` shows full per-repository outcomes after the batch.
+
+Push sends only the reviewed existing local branch commit(s) to the displayed
+destination. Dirty files do not prevent pushing commits already in the branch,
+and the preview explicitly says uncommitted changes are excluded. It requires a
+known ahead-only comparison and a conventional upstream. Detached/unborn
+branches, no upstream, behind or diverged histories, uncertain comparisons,
+multiple push URLs, triangular push remotes, mirror/force settings, and
+unsupported or ambiguous refspecs are skipped with reasons. Push does not
+implicitly follow tags or recurse into submodules. Remote changes after the
+final check can still make Git reject the push; repodash does not force or
+retry.
+
+Fast-forward pull requires a clean index and worktree. It fetches first, then
+offers the exact fetched commit for review. The final integration is
+fast-forward-only with autostash disabled. Dirty, conflicted, detached/unborn,
+diverged, or operation-in-progress worktrees are skipped. Equal or ahead-only
+branches have nothing to integrate. Pull updates tracked source files through
+Git, but repodash does not stage files or create commits.
+
+Both workflows revalidate repository state and target configuration before the
+final operation. Batches are best effort per repository, not transactions; a
+failure does not roll back other repositories. If a push times out or is
+cancelled after it starts, its remote outcome can be unknown. Repodash will not
+retry it automatically. Check the remote and local tracking status before
+deciding whether to try again. External Git processes can race with repodash
+after revalidation, and configured Git hooks still run.
+
+`action_timeout_seconds` defaults to 120 seconds and can be changed in the
+TOML config. A deadline limits how long repodash waits; it cannot guarantee
+that a remote did not receive a push before the connection ended.
+
+## Authentication and limits
+
+Background Git commands have no interactive terminal or askpass prompt. Normal
+Git credential helpers and SSH agents are available; authenticate in a normal
+shell first. SSH runs in batch mode, and custom `GIT_SSH_COMMAND` overrides are
+not used, so configure hosts and keys in SSH config. A failed authentication
+appears as a per-repository action failure. Git hooks and helpers run with your
+normal user permissions; repodash is not a sandbox for untrusted repositories.
+
+The dashboard does not stage, commit, stash, reset, clean, rebase, resolve
+conflicts, create branches, configure upstreams, or force push. It does not
+support triangular push workflows, multiple push URLs, arbitrary push
+refspecs, or headless bulk mutation. See [plan.md](plan.md) for the full v0.1
+scope and action policy.

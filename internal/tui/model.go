@@ -44,6 +44,7 @@ type Model struct {
 	preparing         bool
 	running           bool
 	preview           *app.Preview
+	syncIntent        app.Action
 	previewCursor     int
 	previewLineOffset int
 	actionCancel      context.CancelFunc
@@ -304,9 +305,15 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			}
 		}
 	case "f", "p", "l":
-		if m.actions == nil || key != "f" {
+		if m.actions == nil {
 			m.message = "This action is not available yet"
 			return nil
+		}
+		m.syncIntent = ""
+		if key == "p" {
+			m.syncIntent = app.Push
+		} else if key == "l" {
+			m.syncIntent = app.Pull
 		}
 		return m.preparePreview(app.Fetch)
 	case "enter":
@@ -448,7 +455,7 @@ func (m *Model) View() tea.View {
 	if m.help {
 		detail = append(detail,
 			"j/k or arrows move · Space select · a select all visible · / filter",
-			"r refresh · d full details · Enter shell · g LazyGit · f fetch preview · q quit/cancel",
+			"r refresh · d details · Enter shell · g LazyGit · f fetch · p push · l FF pull · q quit/cancel",
 		)
 	} else {
 		indices := m.visibleRows()

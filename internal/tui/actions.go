@@ -125,6 +125,7 @@ func (m *Model) previewKey(key string) tea.Cmd {
 	case "esc", "q", "ctrl+c":
 		m.actions.Discard(m.preview.ID)
 		m.preview = nil
+		m.syncIntent = ""
 		if m.actionCancel != nil {
 			m.actionCancel()
 			m.actionCancel = nil
@@ -153,6 +154,20 @@ func (m *Model) confirmPreview() tea.Cmd {
 		m.actionCancel()
 	}
 	m.actionCancel = cancel
+	m.actionCtx = ctx
+	if m.syncIntent != "" {
+		id, action, actions := m.preview.ID, m.syncIntent, m.actions
+		m.syncIntent = ""
+		m.preview = nil
+		m.preparing = true
+		m.actionGeneration++
+		generation := m.actionGeneration
+		m.message = "Fetching reviewed scope before final synchronization preview"
+		return func() tea.Msg {
+			preview, err := actions.PrepareSync(ctx, id, action)
+			return previewMsg{generation: generation, preview: preview, err: err}
+		}
+	}
 	m.running = true
 	m.results = map[string]app.Event{}
 	id, generation, actions := m.preview.ID, m.actionGeneration, m.actions
@@ -191,6 +206,9 @@ func (m *Model) previewView() tea.View {
 		}
 	}
 	header := fmt.Sprintf("Preview: %d targets · %d eligible · j/k targets · PgUp/Dn details", len(p.Targets), eligible)
+	if m.syncIntent != "" {
+		header = fmt.Sprintf("Fetch scope before %s: %d targets · j/k review", m.syncIntent, len(p.Targets))
+	}
 	var lines []string
 	if len(p.Targets) > 0 {
 		target := p.Targets[min(m.previewCursor, len(p.Targets)-1)]
@@ -213,6 +231,9 @@ func (m *Model) previewView() tea.View {
 		}
 	}
 	footer := "Enter confirms batch · Esc cancels · best effort, no rollback"
+	if m.syncIntent != "" {
+		footer = "Enter fetches reviewed scope; final push/pull needs a second confirmation · Esc cancels"
+	}
 	page := max(1, height-2)
 	offset := min(m.previewLineOffset, max(0, len(lines)-page))
 	lines = append([]string{header}, lines[offset:min(len(lines), offset+page)]...)

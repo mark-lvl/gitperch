@@ -7,14 +7,17 @@ import (
 	gitcli "repodash/internal/git"
 	"repodash/internal/repository"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
 
 type Action string
 
-const Fetch Action = "fetch"
+const (
+	Fetch Action = "fetch"
+	Push  Action = "push"
+	Pull  Action = "fast-forward pull"
+)
 
 type State string
 
@@ -61,6 +64,9 @@ type plannedTarget struct {
 	display  Target
 	metadata gitcli.Metadata
 	fetch    gitcli.FetchTarget
+	upstream gitcli.UpstreamTarget
+	push     gitcli.PushTarget
+	commit   string
 }
 
 // Actions owns one pending preview or batch at a time. Returned previews are
@@ -82,7 +88,7 @@ func NewActions(service ActionGit, workers int) *Actions {
 }
 
 func (a *Actions) Plan(ctx context.Context, action Action, paths []string) (Preview, error) {
-	if action != Fetch {
+	if action != Fetch && action != Push && action != Pull {
 		return Preview{}, fmt.Errorf("unsupported action %q", action)
 	}
 	if len(paths) == 0 {
@@ -117,21 +123,7 @@ func (a *Actions) Plan(ctx context.Context, action Action, paths []string) (Prev
 			continue
 		}
 		seen[path] = true
-		p := plannedTarget{display: Target{Path: path, Action: action}}
-		m, err := a.service.Metadata(ctx, path)
-		p.metadata = m
-		if err == nil {
-			p.fetch, err = a.service.ResolveFetch(ctx, path, m)
-		}
-		if err != nil {
-			p.display.Reason = gitcli.SafeText(err.Error())
-		} else {
-			p.display.Eligible = true
-			p.display.Remote = p.fetch.Remote
-			p.display.URL = gitcli.SafeText(p.fetch.URL)
-			p.display.Scope = strings.Join(m.Values("remote."+p.fetch.Remote+".fetch"), ", ")
-			p.display.Reason = "Prune remote-tracking branches; do not fetch/prune tags or recurse into submodules"
-		}
+		p := a.planOne(ctx, action, path, nil)
 		planned = append(planned, p)
 	}
 	if err := ctx.Err(); err != nil {
@@ -254,6 +246,9 @@ func (a *Actions) executeOne(ctx context.Context, p plannedTarget, emit func(Eve
 			err = errors.New("fetch target changed since preview")
 		}
 	}
+	if err == nil && p.display.Action != Fetch {
+		err = a.revalidateSync(ctx, p, current)
+	}
 	if err != nil {
 		result.State = Skipped
 		if ctx.Err() != nil {
@@ -262,19 +257,34 @@ func (a *Actions) executeOne(ctx context.Context, p plannedTarget, emit func(Eve
 		result.Message = gitcli.SafeText(err.Error())
 		return result
 	}
-	emit(Event{Path: p.display.Path, State: Running, Message: "Fetching " + p.display.Remote})
-	err = a.service.Fetch(ctx, p.display.Path, p.fetch)
+	emit(Event{Path: p.display.Path, State: Running, Message: string(p.display.Action) + " " + p.display.Remote})
+	switch p.display.Action {
+	case Fetch:
+		err = a.service.Fetch(ctx, p.display.Path, p.fetch)
+	case Push:
+		err = a.service.(SyncGit).Push(ctx, p.display.Path, p.push)
+	case Pull:
+		err = a.service.(SyncGit).FastForward(ctx, p.display.Path, p.commit)
+	}
 	if err != nil {
 		result.State = Failed
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			result.State = Cancelled
+			if p.display.Action == Push || p.display.Action == Pull {
+				result.State = OutcomeUnknown
+			}
+		}
+		if errors.Is(err, gitcli.ErrOutputLimit) && p.display.Action != Fetch {
+			result.State = OutcomeUnknown
 		}
 		result.Message = gitcli.SafeText(err.Error())
 		return result
 	}
-	a.markFetched(p.display.Path)
+	if p.display.Action == Fetch {
+		a.markFetched(p.display.Path)
+	}
 	result.State = Succeeded
-	result.Message = "Fetched " + p.display.Remote
+	result.Message = string(p.display.Action) + " completed for " + p.display.Remote
 	result.Status = a.service.Inspect(ctx, p.display.Path)
 	return result
 }

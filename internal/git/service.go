@@ -20,3 +20,19 @@ func (s Service) ResolveFetch(ctx context.Context, path string, m Metadata) (Fet
 func (s Service) Fetch(ctx context.Context, path string, target FetchTarget) error {
 	return s.Write.Fetch(ctx, path, target)
 }
+
+func (s Service) ResolveUpstream(ctx context.Context, path string, m Metadata) (UpstreamTarget, error) {
+	return s.Read.ResolveUpstream(ctx, path, m)
+}
+func (s Service) ResolvePush(ctx context.Context, path string, m Metadata, upstream UpstreamTarget) (PushTarget, error) {
+	return s.Read.ResolvePush(ctx, path, m, upstream)
+}
+func (s Service) UpstreamCommit(ctx context.Context, path string, upstream UpstreamTarget) (string, error) {
+	return s.Read.UpstreamCommit(ctx, path, upstream)
+}
+func (s Service) Push(ctx context.Context, path string, target PushTarget) error {
+	return s.Write.Push(ctx, path, target)
+}
+func (s Service) FastForward(ctx context.Context, path, commit string) error {
+	return s.Write.FastForward(ctx, path, commit)
+}

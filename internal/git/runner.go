@@ -13,6 +13,8 @@ import (
 
 const DefaultOutputLimit = 4 << 20
 
+var ErrOutputLimit = errors.New("Git output exceeded capture limit")
+
 type Runner struct {
 	Executable  string
 	Timeout     time.Duration
@@ -68,7 +70,7 @@ func (r Runner) Run(ctx context.Context, path string, args ...string) (Output, e
 		return out, ctx.Err()
 	}
 	if stdout.exceeded || stderr.exceeded {
-		return out, errors.New("Git output exceeded capture limit")
+		return out, ErrOutputLimit
 	}
 	if err != nil {
 		command := args[0]
