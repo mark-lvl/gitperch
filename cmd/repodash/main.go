@@ -32,6 +32,7 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	configPath := fs.String("config", "", "explicit TOML configuration path")
 	workspace := fs.String("workspace", "", "configured workspace name")
 	depth := fs.Int("max-depth", 4, "override maximum descendant depth (root is zero)")
+	noColor := fs.Bool("no-color", false, "disable dashboard color")
 	fs.Usage = func() {
 		fmt.Fprintln(errOut, "Usage: repodash [OPTIONS] [ROOT ...]\n       repodash status [OPTIONS] [ROOT ...]\nTerminal dashboard for local Git repositories.")
 		fs.PrintDefaults()
@@ -93,10 +94,13 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 		ws.MaxDepth = *depth
 	}
 	if !statusMode {
-		fmt.Fprintln(errOut, "Interactive dashboard is under development. Run repodash status [ROOT ...] for read-only output.")
-		return 2
+		if *asJSON {
+			fmt.Fprintln(errOut, "--json requires status")
+			return 2
+		}
+		return runTUI(ctx, cfg, ws, *noColor, out, errOut)
 	}
-	result, err := discovery.Scan(ctx, discovery.Options{Roots: ws.Paths, MaxDepth: ws.MaxDepth, IgnoreDirs: ws.IgnoreDirs})
+	snapshot, err := app.Load(ctx, discovery.Options{Roots: ws.Paths, MaxDepth: ws.MaxDepth, IgnoreDirs: ws.IgnoreDirs}, gitcli.Runner{Timeout: time.Duration(cfg.StatusTimeoutSeconds) * time.Second}, cfg.StatusWorkers)
 	if err != nil {
 		fmt.Fprintln(errOut, gitcli.SafeText(err.Error()))
 		if ctx.Err() != nil {
@@ -104,16 +108,9 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 		}
 		return 2
 	}
-	rows, err := app.Inspect(ctx, result.Repositories, gitcli.Runner{Timeout: time.Duration(cfg.StatusTimeoutSeconds) * time.Second}, cfg.StatusWorkers)
-	if err != nil {
-		fmt.Fprintln(errOut, err)
-		if ctx.Err() != nil {
-			return 130
-		}
-		return 1
-	}
+	rows := snapshot.Rows
 	if *asJSON {
-		err = app.WriteJSON(out, rows, result.Warnings)
+		err = app.WriteJSON(out, rows, snapshot.Warnings)
 	} else {
 		err = app.WriteTable(out, rows)
 	}
@@ -121,10 +118,10 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, err)
 		return 1
 	}
-	for _, warning := range result.Warnings {
+	for _, warning := range snapshot.Warnings {
 		fmt.Fprintf(errOut, "warning: %s: %s\n", gitcli.SafeText(warning.Path), gitcli.SafeText(warning.Message))
 	}
-	if len(result.Warnings) > 0 {
+	if len(snapshot.Warnings) > 0 {
 		return 1
 	}
 	for _, row := range rows {

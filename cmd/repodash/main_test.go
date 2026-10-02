@@ -88,3 +88,15 @@ func TestWorkspaceCLIAndExitCodes(t *testing.T) {
 		t.Fatalf("cancel exit=%d", code)
 	}
 }
+
+func TestDefaultRequiresTerminalAndJSONRequiresStatus(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	var out, errOut bytes.Buffer
+	if code := run(nil, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "repodash status") {
+		t.Fatalf("default: exit %d, %s", code, &errOut)
+	}
+	errOut.Reset()
+	if code := run([]string{"--json"}, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "requires status") {
+		t.Fatalf("json: exit %d, %s", code, &errOut)
+	}
+}

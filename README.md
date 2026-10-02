@@ -48,7 +48,7 @@ symlink ancestors are skipped. Descendants named `node_modules`, `vendor`,
 
 Missing or inaccessible roots print warnings while valid roots continue.
 Exit codes: 0 completed, 1 partial failure, 2 invalid invocation, 130 interrupted.
-No Git mutations or TUI yet. Git command output is capped at 4 MiB per stream,
+Git command output is capped at 4 MiB per stream,
 with a 15-second default deadline. Repository-routing environment variables are
 removed. Background Git has closed stdin, disabled terminal/askpass authentication,
 and SSH BatchMode. Normal credential helpers and SSH agents remain available;
@@ -90,3 +90,36 @@ at 64. Invalid TOML, duplicate or unknown workspaces, negative depths,
 nonpositive workers/timeouts, and duration overflow are rejected. Inspection
 runs concurrently while rows retain name/path ordering. One inspection failure
 does not stop other rows. Configuration uses pinned go-toml v2.4.3.
+
+## Interactive dashboard (M4)
+
+```sh
+repodash /path/to/projects
+repodash --workspace personal
+repodash --no-color /path/to/projects
+NO_COLOR=1 repodash /path/to/projects
+```
+
+The default command requires terminal input and output; use `status` when piping.
+Bubble Tea v2.0.10 and Lip Gloss v2.0.6 power the dashboard. Filtering and selection
+are small model operations, so no Bubbles components are needed.
+
+| Key | Behavior |
+| --- | --- |
+| j/k, arrows | Move highlight |
+| Space | Toggle selection |
+| a | Select/deselect all visible rows |
+| / | Edit name/path/branch filter; changing it clears selection |
+| Esc | Leave filtering / clear filter |
+| r | Refresh local status |
+| Enter | Open a child shell in the highlighted worktree |
+| g | Open LazyGit in the highlighted worktree |
+| ? | Toggle help |
+| d | Read full repository diagnostics and all root warnings; j/k scroll |
+| q, Ctrl+C | Quit |
+
+Child tools temporarily take over the terminal; the dashboard restores and
+refreshes after exit. The child shell does not change the parent shell's
+directory. Missing LazyGit is reported visibly. Highlighted errors and root
+warnings remain visible. [WSL smoke checklist](docs/tui-smoke.md) documents manual
+checks. Network actions will be added in M5/M6.

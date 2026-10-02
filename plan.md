@@ -257,10 +257,10 @@ Gate: scan and inspect a generated multi-repository workspace without exceeding 
 
 ### M4 — Read-only TUI
 
-- [ ] Introduce pinned Bubble Tea/Lip Gloss dependencies and required Bubbles components.
-- [ ] Implement table, navigation, selection, filter, help, refresh, resize, and error detail.
-- [ ] Implement child-shell and LazyGit launching.
-- [ ] Test selection/filter rules, empty states, and stale-response rejection.
+- [x] Introduce pinned Bubble Tea/Lip Gloss dependencies and required Bubbles components.
+- [x] Implement table, navigation, selection, filter, help, refresh, resize, and error detail.
+- [x] Implement child-shell and LazyGit launching.
+- [x] Test selection/filter rules, empty states, and stale-response rejection.
 
 Gate: manually exercise the TUI in WSL2, including tool launch/return and Ctrl+C. If WSL2 is unavailable, record that verification as pending rather than claiming it passed.
 
@@ -330,3 +330,4 @@ Consult these when implementing the relevant milestone; verify exact installed-v
 | M2 | 2026-10-02 | `make fmt test vet build` passed. Binary NUL fixtures captured with Git 2.43.0 and parsed alongside fresh disposable repositories; rename/conflict/submodule/unusual-name cases passed. Local bare remote verifies known comparison and deleted-upstream unknown state. Runner tests verify env isolation, cancellation, deadline, and capture overflow. Table/JSON failure isolation tested. Official Git status format consulted. | Status reflects local refs only; network actions and TUI pending. Authentication requires helpers/agents; arbitrary Git SSH command overrides disabled. |
 | M3 | 2026-10-02 | `make fmt test race vet build` passed. Fake service tests cover concurrency bound, 64-worker cap, slow/failing repos, cancellation and sorting. CLI generated 24 disposable repositories, exercised TOML/default workspace/positional override and exit codes. One local WSL2 discover+inspect+JSON observation: 24.7 ms (not a performance guarantee). go-toml v2.4.3 API verified and pinned. | TUI and network actions remain. CI has not run remotely; WSL2 kernel detected locally. |
 | M2/M3 regressions | 2026-10-02 | Additional race-tested scenarios prove dirty inspection preserves index bytes/mtime, unavailable remote does not affect local status, invalid/nested Git metadata stays visibly failed, and inherited config routing is stripped. Explicit config tilde expansion and empty CLI roots tested. | 386 config test binary compiles but cannot execute in this container (`bad system call`). No 32-bit support claim. |
+| M4 | 2026-10-02 | `make fmt test race vet build` passed. Bubble Tea v2.0.10/Lip Gloss v2.0.6 actual APIs consulted and pinned; no Bubbles component needed. Model tests cover selection/filter clearing, path identity, stale loads, quit cancellation, Ctrl+C in filter/help, empty/narrow/safe views, scrollable full diagnostics, missing LazyGit and child-return refresh. WSL2 PTY exercised selection/filter/help/details/refresh, shell `pwd` and exit/restore, missing LazyGit, q from help, Ctrl+C from filter and NO_COLOR. | Actual LazyGit is absent; its successful launch/return remains untested (ExecProcess shell lifecycle passed). PTY child shells lack job control in this test harness; Windows Terminal physical resize/interactive job control not claimed. Network actions remain M5/M6. |

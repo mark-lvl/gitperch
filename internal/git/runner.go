@@ -77,7 +77,24 @@ func (r Runner) Run(ctx context.Context, path string, args ...string) (Output, e
 }
 
 func cleanEnvironment(env []string) []string {
-	blocked := map[string]bool{"GIT_DIR": true, "GIT_WORK_TREE": true, "GIT_INDEX_FILE": true, "GIT_COMMON_DIR": true, "GIT_OBJECT_DIRECTORY": true, "GIT_ALTERNATE_OBJECT_DIRECTORIES": true, "GIT_NAMESPACE": true, "GIT_CEILING_DIRECTORIES": true, "GIT_CONFIG": true, "GIT_CONFIG_PARAMETERS": true, "GIT_CONFIG_COUNT": true, "GIT_TERMINAL_PROMPT": true, "GIT_ASKPASS": true, "SSH_ASKPASS": true, "SSH_ASKPASS_REQUIRE": true, "GIT_SSH_COMMAND": true}
+	env = ChildEnvironment(env)
+	blocked := map[string]bool{"GIT_TERMINAL_PROMPT": true, "GIT_ASKPASS": true, "SSH_ASKPASS": true, "SSH_ASKPASS_REQUIRE": true, "GIT_SSH_COMMAND": true}
+	result := make([]string, 0, len(env))
+	for _, item := range env {
+		key, _, _ := strings.Cut(item, "=")
+		if !blocked[key] {
+			result = append(result, item)
+		}
+	}
+	// Preserve SSH_AUTH_SOCK and normal credential helpers. BatchMode prevents
+	// SSH passwords/passphrases; authenticate with an agent in a normal shell.
+	return append(result, "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=/bin/false", "SSH_ASKPASS=/bin/false", "SSH_ASKPASS_REQUIRE=never", "GIT_SSH_COMMAND=ssh -oBatchMode=yes")
+}
+
+// ChildEnvironment removes inherited repository routing while retaining normal
+// interactive authentication for a user-launched shell or LazyGit.
+func ChildEnvironment(env []string) []string {
+	blocked := map[string]bool{"GIT_DIR": true, "GIT_WORK_TREE": true, "GIT_INDEX_FILE": true, "GIT_COMMON_DIR": true, "GIT_OBJECT_DIRECTORY": true, "GIT_ALTERNATE_OBJECT_DIRECTORIES": true, "GIT_NAMESPACE": true, "GIT_CEILING_DIRECTORIES": true, "GIT_CONFIG": true, "GIT_CONFIG_PARAMETERS": true, "GIT_CONFIG_COUNT": true}
 	result := make([]string, 0, len(env))
 	for _, item := range env {
 		key, _, _ := strings.Cut(item, "=")
@@ -85,7 +102,5 @@ func cleanEnvironment(env []string) []string {
 			result = append(result, item)
 		}
 	}
-	// Preserve SSH_AUTH_SOCK and normal credential helpers. BatchMode prevents
-	// SSH passwords/passphrases; authenticate with an agent in a normal shell.
-	return append(result, "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=/bin/false", "SSH_ASKPASS=/bin/false", "SSH_ASKPASS_REQUIRE=never", "GIT_SSH_COMMAND=ssh -oBatchMode=yes")
+	return result
 }
