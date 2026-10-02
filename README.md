@@ -23,15 +23,23 @@ toolchain lives in `/tmp/repodash-toolchain/go`; use
 `PATH=/tmp/repodash-toolchain/go/bin:$PATH` and `GOCACHE=/tmp/repodash-gocache`
 when running the commands above. A normal installation of Go needs neither override.
 
-## Discovery (M1)
+## Read-only status (M2)
 
 ```sh
 go run ./cmd/repodash status .
 go run ./cmd/repodash status --max-depth 4 /path/to/projects
+go run ./cmd/repodash status --json /path/to/projects
 ```
 
-This milestone prints **discovery only**, with quoted absolute paths to distinguish
-duplicate names and escape terminal controls. Root depth is zero. Scanning stops
+The table shows independent changes, untracked entries, conflicts, branch, upstream,
+and locally known ahead/behind counts. `?` means no valid comparison is available;
+it never means synchronized. `changes:N` counts tracked status entries once even
+when both the index and worktree changed. Status performs no remote fetch and
+uses Git's no-optional-locks mode. JSON schema version 1 has deterministic repository
+ordering, raw path identity, inspection timestamps, and per-repository errors.
+Terminal output escapes control characters and redacts credentials in URLs.
+
+Absolute paths distinguish duplicate names. Root depth is zero. Scanning stops
 at a repository; explicitly supplied nested repositories are still eligible.
 Both `.git` directories and regular worktree `.git` files are candidates.
 Bare repositories are not candidates. Directory symlinks and roots reached via
@@ -40,4 +48,10 @@ symlink ancestors are skipped. Descendants named `node_modules`, `vendor`,
 
 Missing or inaccessible roots print warnings while valid roots continue.
 Exit codes: 0 completed, 1 partial failure, 2 invalid invocation, 130 interrupted.
-No Git mutations or TUI yet.
+No Git mutations or TUI yet. Git command output is capped at 4 MiB per stream,
+with a 15-second default deadline. Repository-routing environment variables are
+removed. Background Git has closed stdin, disabled terminal/askpass authentication,
+and SSH BatchMode. Normal credential helpers and SSH agents remain available;
+authenticate in a normal shell first. Custom `GIT_SSH_COMMAND` overrides are not
+used; put host/key settings in SSH config. Hooks/helpers still run as configured
+by Git; this tool does not sandbox repositories.

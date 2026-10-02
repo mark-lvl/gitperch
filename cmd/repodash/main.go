@@ -7,7 +7,9 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"repodash/internal/app"
 	"repodash/internal/discovery"
+	gitcli "repodash/internal/git"
 )
 
 var version = "dev"
@@ -47,6 +49,7 @@ func status(args []string, out, errOut io.Writer) int {
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	depth := fs.Int("max-depth", 4, "maximum descendant depth (root is depth zero)")
+	asJSON := fs.Bool("json", false, "emit machine-readable JSON")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -67,15 +70,30 @@ func status(args []string, out, errOut io.Writer) int {
 		}
 		return 2
 	}
-	fmt.Fprintln(out, "Discovery only — Git state not inspected yet.")
-	for _, repo := range result.Repositories {
-		fmt.Fprintf(out, "%q\t%q\n", repo.Name, repo.Path)
+	rows, err := app.Inspect(ctx, result.Repositories, gitcli.Runner{})
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return 130
+	}
+	if *asJSON {
+		err = app.WriteJSON(out, rows, result.Warnings)
+	} else {
+		err = app.WriteTable(out, rows)
+	}
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return 1
 	}
 	for _, warning := range result.Warnings {
-		fmt.Fprintf(errOut, "warning: %q: %s\n", warning.Path, warning.Message)
+		fmt.Fprintf(errOut, "warning: %s: %s\n", gitcli.SafeText(warning.Path), gitcli.SafeText(warning.Message))
 	}
 	if len(result.Warnings) > 0 {
 		return 1
+	}
+	for _, row := range rows {
+		if row.Status.Error != "" {
+			return 1
+		}
 	}
 	return 0
 }

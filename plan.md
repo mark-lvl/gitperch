@@ -238,11 +238,11 @@ Gate: deterministic, tested discovery with partial-error reporting. First coding
 
 ### M2 — Git status and plain CLI
 
-- [ ] Implement CLI runner with cancellation and timeouts.
-- [ ] Implement porcelain-v2 parser and complete status model.
-- [ ] Store real fixture outputs, including NUL delimiters, from temporary Git repositories.
-- [ ] Add parser tests for normal, staged+unstaged, renamed, conflicted, untracked, detached, unborn, dirty-submodule, and unusual-filename cases.
-- [ ] Produce a readable status table and JSON output, with per-repository errors.
+- [x] Implement CLI runner with cancellation and timeouts.
+- [x] Implement porcelain-v2 parser and complete status model.
+- [x] Store real fixture outputs, including NUL delimiters, from temporary Git repositories.
+- [x] Add parser tests for normal, staged+unstaged, renamed, conflicted, untracked, detached, unborn, dirty-submodule, and unusual-filename cases.
+- [x] Produce a readable status table and JSON output, with per-repository errors.
 
 Gate: results match Git in disposable repositories. Unknown upstream comparisons are not marked synchronized. `status` performs no network access.
 
@@ -327,3 +327,4 @@ Consult these when implementing the relevant milestone; verify exact installed-v
 | Planning | — | Plan prepared; no application code implemented | M0–M7 pending |
 | M0 | 2026-10-02 | Empty workspace inspected; no AGENTS.md found. Go 1.27.1 downloaded from go.dev with matching official SHA-256; Git 2.43.0. `make fmt test vet build` passed. Help/version and invalid invocation tests passed. | CI added but remote CI not run; Linux local validation only. M1–M7 pending. |
 | M1 | 2026-10-02 | Focused domain/discovery tests and vet passed; full test/vet/build passed. `go run ./cmd/repodash status .` reports the absolute worktree path with discovery-only label. Depth 0/1/2, ignores, explicit nested/ignored roots, overlap, duplicates, symlinks, missing/non-directory/permission-denied roots, invalid depth and cancellation covered. | Filesystem candidates await Git validation in M2. Root paths through symlink ancestors are also skipped. WSL manual validation pending. |
+| M2 | 2026-10-02 | `make fmt test vet build` passed. Binary NUL fixtures captured with Git 2.43.0 and parsed alongside fresh disposable repositories; rename/conflict/submodule/unusual-name cases passed. Local bare remote verifies known comparison and deleted-upstream unknown state. Runner tests verify env isolation, cancellation, deadline, and capture overflow. Table/JSON failure isolation tested. Official Git status format consulted. | Status reflects local refs only; network actions and TUI pending. Authentication requires helpers/agents; arbitrary Git SSH command overrides disabled. |
