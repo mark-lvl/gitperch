@@ -23,4 +23,21 @@ toolchain lives in `/tmp/repodash-toolchain/go`; use
 `PATH=/tmp/repodash-toolchain/go/bin:$PATH` and `GOCACHE=/tmp/repodash-gocache`
 when running the commands above. A normal installation of Go needs neither override.
 
-Current milestone: bootstrap. No Git mutations, TUI, or dependency packages yet.
+## Discovery (M1)
+
+```sh
+go run ./cmd/repodash status .
+go run ./cmd/repodash status --max-depth 4 /path/to/projects
+```
+
+This milestone prints **discovery only**, with quoted absolute paths to distinguish
+duplicate names and escape terminal controls. Root depth is zero. Scanning stops
+at a repository; explicitly supplied nested repositories are still eligible.
+Both `.git` directories and regular worktree `.git` files are candidates.
+Bare repositories are not candidates. Directory symlinks and roots reached via
+symlink ancestors are skipped. Descendants named `node_modules`, `vendor`,
+`target`, `.cache`, `.next`, `dist`, or `build` are ignored.
+
+Missing or inaccessible roots print warnings while valid roots continue.
+Exit codes: 0 completed, 1 partial failure, 2 invalid invocation, 130 interrupted.
+No Git mutations or TUI yet.

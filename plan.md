@@ -229,10 +229,10 @@ Gate: `go test ./...`, `go vet ./...`, and `go build ./cmd/repodash` succeed. No
 
 ### M1 — Domain and discovery
 
-- [ ] Implement domain identity and scanner options/results.
-- [ ] Implement traversal rules from section 6.
-- [ ] Add temporary-directory tests for .git directories/files, depth boundaries, ignored paths, nested repositories, overlapping roots, duplicate basenames, symlinks, missing roots, and cancellation.
-- [ ] Make `repodash status ROOT` print discovered paths, clearly labeled as discovery-only until M2.
+- [x] Implement domain identity and scanner options/results.
+- [x] Implement traversal rules from section 6.
+- [x] Add temporary-directory tests for .git directories/files, depth boundaries, ignored paths, nested repositories, overlapping roots, duplicate basenames, symlinks, missing roots, and cancellation.
+- [x] Make `repodash status ROOT` print discovered paths, clearly labeled as discovery-only until M2.
 
 Gate: deterministic, tested discovery with partial-error reporting. First coding session ends here.
 
@@ -326,3 +326,4 @@ Consult these when implementing the relevant milestone; verify exact installed-v
 | --- | --- | --- | --- |
 | Planning | — | Plan prepared; no application code implemented | M0–M7 pending |
 | M0 | 2026-10-02 | Empty workspace inspected; no AGENTS.md found. Go 1.27.1 downloaded from go.dev with matching official SHA-256; Git 2.43.0. `make fmt test vet build` passed. Help/version and invalid invocation tests passed. | CI added but remote CI not run; Linux local validation only. M1–M7 pending. |
+| M1 | 2026-10-02 | Focused domain/discovery tests and vet passed; full test/vet/build passed. `go run ./cmd/repodash status .` reports the absolute worktree path with discovery-only label. Depth 0/1/2, ignores, explicit nested/ignored roots, overlap, duplicates, symlinks, missing/non-directory/permission-denied roots, invalid depth and cancellation covered. | Filesystem candidates await Git validation in M2. Root paths through symlink ancestors are also skipped. WSL manual validation pending. |
