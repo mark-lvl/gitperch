@@ -67,6 +67,10 @@ func Load(path string, explicit bool) (Config, error) {
 			return Config{}, err
 		}
 	}
+	path, err := expandTilde(path)
+	if err != nil {
+		return Config{}, fmt.Errorf("resolve config path: %w", err)
+	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return Config{}, fmt.Errorf("resolve config path: %w", err)
@@ -181,6 +185,9 @@ func (c Config) Resolve(workspace string, roots []string, cwd string) (Workspace
 	if len(roots) > 0 {
 		selected.Paths = make([]string, 0, len(roots))
 		for _, root := range roots {
+			if root == "" {
+				return Workspace{}, errors.New("root path must not be empty")
+			}
 			p, err := resolveCLIPath(root, cwd)
 			if err != nil {
 				return Workspace{}, fmt.Errorf("root %q: %w", root, err)

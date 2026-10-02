@@ -148,6 +148,21 @@ func TestResolveExpandsTildeInCLIPaths(t *testing.T) {
 	}
 }
 
+func TestExplicitConfigTildeAndEmptyCLIRoot(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("HOME", d)
+	if err := os.WriteFile(filepath.Join(d, "config.toml"), []byte("status_workers=3"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load("~/config.toml", true)
+	if err != nil || cfg.StatusWorkers != 3 {
+		t.Fatalf("config tilde: %+v %v", cfg, err)
+	}
+	if _, err := cfg.Resolve("", []string{""}, d); err == nil {
+		t.Fatal("accepted empty CLI root")
+	}
+}
+
 func writeConfig(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.toml")
