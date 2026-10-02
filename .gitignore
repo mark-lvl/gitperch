@@ -1,0 +1,5 @@
+/repodash
+/bin/
+/dist/
+*.test
+coverage.out
