@@ -1,0 +1,156 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestLoadDefaultsAndMissingConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing.toml")
+	cfg, err := Load(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StatusWorkers != 8 || cfg.ActionWorkers != 2 || cfg.StatusTimeoutSeconds != 15 || cfg.ActionTimeoutSeconds != 120 {
+		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
+	if len(cfg.Workspaces) != 0 {
+		t.Fatalf("expected no workspaces, got %+v", cfg.Workspaces)
+	}
+	if _, err := Load(path, true); err == nil || !strings.Contains(err.Error(), "read config") {
+		t.Fatalf("explicit missing config should fail, got %v", err)
+	}
+}
+
+func TestLoadResolvesPathsAndAppliesOmittedDefaults(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("HOME", filepath.Join(base, "home"))
+	if err := os.MkdirAll(filepath.Join(base, "home"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(base, "settings", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `default_workspace = "personal"
+
+[[workspace]]
+name = "personal"
+paths = ["relative/projects", "~/work"]
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(configPath, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := cfg.Workspaces[0]
+	if w.MaxDepth != DefaultMaxDepth || len(w.IgnoreDirs) != len(defaultIgnoreDirs) {
+		t.Fatalf("omitted workspace defaults not applied: %+v", w)
+	}
+	want := []string{filepath.Join(filepath.Dir(configPath), "relative", "projects"), filepath.Join(base, "home", "work")}
+	for i := range want {
+		if w.Paths[i] != want[i] {
+			t.Errorf("path[%d] = %q, want %q", i, w.Paths[i], want[i])
+		}
+	}
+}
+
+func TestLoadWorkerCapAndExplicitValues(t *testing.T) {
+	path := writeConfig(t, `status_workers = 1000
+action_workers = 3
+status_timeout_seconds = 21
+action_timeout_seconds = 240
+`)
+	cfg, err := Load(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StatusWorkers != MaxWorkers || cfg.ActionWorkers != 3 || cfg.StatusTimeoutSeconds != 21 || cfg.ActionTimeoutSeconds != 240 {
+		t.Fatalf("explicit values not applied or workers not capped: %+v", cfg)
+	}
+}
+
+func TestLoadRejectsInvalidConfiguration(t *testing.T) {
+	cases := []struct {
+		name, body, message string
+	}{
+		{"toml", "status_workers = [", "parse config"},
+		{"unknown key", "status_worker = 8", "strict mode"},
+		{"zero status workers", "status_workers = 0", "status_workers must be positive"},
+		{"negative action workers", "action_workers = -2", "action_workers must be positive"},
+		{"zero status timeout", "status_timeout_seconds = 0", "status_timeout_seconds must be positive"},
+		{"negative action timeout", "action_timeout_seconds = -1", "action_timeout_seconds must be positive"},
+		{"timeout overflow", "status_timeout_seconds = 9223372036854775807", "maximum representable duration"},
+		{"negative depth", "[[workspace]]\nname='x'\nmax_depth=-1", "max_depth must not be negative"},
+		{"empty workspace", "[[workspace]]\nname='  '", "empty name"},
+		{"duplicate workspace", "[[workspace]]\nname='x'\n[[workspace]]\nname='x'", "duplicate workspace"},
+		{"unknown default", "default_workspace='missing'", "not configured"},
+		{"empty path", "[[workspace]]\nname='x'\npaths=['']", "empty path"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, tc.body), true)
+			if err == nil || !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("Load error = %v, want containing %q", err, tc.message)
+			}
+		})
+	}
+}
+
+func TestResolveSelectionOverridesAndCWDallback(t *testing.T) {
+	cfg := Config{
+		DefaultWorkspace: "personal",
+		Workspaces: []Workspace{
+			{Name: "personal", Paths: []string{"/configured"}, MaxDepth: 9, IgnoreDirs: []string{"skip"}},
+			{Name: "work", Paths: []string{"/work"}, MaxDepth: 2},
+		},
+	}
+	cwd := filepath.Join(t.TempDir(), "run")
+	w, err := cfg.Resolve("", []string{"relative", "/absolute"}, cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Name != "personal" || w.MaxDepth != 9 || len(w.Paths) != 2 || w.Paths[0] != filepath.Join(cwd, "relative") || w.Paths[1] != "/absolute" {
+		t.Fatalf("positional roots should override only paths: %+v", w)
+	}
+	w, err = cfg.Resolve("work", nil, cwd)
+	if err != nil || w.Name != "work" || w.Paths[0] != "/work" {
+		t.Fatalf("explicit workspace selection = %+v, %v", w, err)
+	}
+	if _, err := cfg.Resolve("unknown", nil, cwd); err == nil || !strings.Contains(err.Error(), "unknown workspace") {
+		t.Fatalf("unknown workspace should fail, got %v", err)
+	}
+	empty := Config{}
+	w, err = empty.Resolve("", nil, cwd)
+	if err != nil || len(w.Paths) != 1 || w.Paths[0] != cwd {
+		t.Fatalf("empty config should fall back to cwd: %+v, %v", w, err)
+	}
+}
+
+func TestResolveExpandsTildeInCLIPaths(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("HOME", base)
+	w, err := (Config{}).Resolve("", []string{"~/projects", "~someone/project"}, "/ignored")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Paths[0] != filepath.Join(base, "projects") {
+		t.Fatalf("tilde path = %q", w.Paths[0])
+	}
+	if w.Paths[1] != filepath.Join("/ignored", "~someone", "project") {
+		t.Fatalf("arbitrary shell tilde expansion occurred: %q", w.Paths[1])
+	}
+}
+
+func writeConfig(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}

@@ -248,10 +248,10 @@ Gate: results match Git in disposable repositories. Unknown upstream comparisons
 
 ### M3 — Workspaces and concurrent inspection
 
-- [ ] Add TOML loading, validation, defaults, and CLI overrides.
-- [ ] Add an eight-worker default inspection pool, cancellation, and stable sorting.
-- [ ] Test worker limits and slow/failing repositories with a fake Git service.
-- [ ] Define exit codes: 0 completed, 1 partial/operation failure, 2 invocation/config failure, 130 interrupted.
+- [x] Add TOML loading, validation, defaults, and CLI overrides.
+- [x] Add an eight-worker default inspection pool, cancellation, and stable sorting.
+- [x] Test worker limits and slow/failing repositories with a fake Git service.
+- [x] Define exit codes: 0 completed, 1 partial/operation failure, 2 invocation/config failure, 130 interrupted.
 
 Gate: scan and inspect a generated multi-repository workspace without exceeding concurrency limits. Race detector passes. Record a local timing observation; avoid hardware-specific performance promises.
 
@@ -328,3 +328,4 @@ Consult these when implementing the relevant milestone; verify exact installed-v
 | M0 | 2026-10-02 | Empty workspace inspected; no AGENTS.md found. Go 1.27.1 downloaded from go.dev with matching official SHA-256; Git 2.43.0. `make fmt test vet build` passed. Help/version and invalid invocation tests passed. | CI added but remote CI not run; Linux local validation only. M1–M7 pending. |
 | M1 | 2026-10-02 | Focused domain/discovery tests and vet passed; full test/vet/build passed. `go run ./cmd/repodash status .` reports the absolute worktree path with discovery-only label. Depth 0/1/2, ignores, explicit nested/ignored roots, overlap, duplicates, symlinks, missing/non-directory/permission-denied roots, invalid depth and cancellation covered. | Filesystem candidates await Git validation in M2. Root paths through symlink ancestors are also skipped. WSL manual validation pending. |
 | M2 | 2026-10-02 | `make fmt test vet build` passed. Binary NUL fixtures captured with Git 2.43.0 and parsed alongside fresh disposable repositories; rename/conflict/submodule/unusual-name cases passed. Local bare remote verifies known comparison and deleted-upstream unknown state. Runner tests verify env isolation, cancellation, deadline, and capture overflow. Table/JSON failure isolation tested. Official Git status format consulted. | Status reflects local refs only; network actions and TUI pending. Authentication requires helpers/agents; arbitrary Git SSH command overrides disabled. |
+| M3 | 2026-10-02 | `make fmt test race vet build` passed. Fake service tests cover concurrency bound, 64-worker cap, slow/failing repos, cancellation and sorting. CLI generated 24 disposable repositories, exercised TOML/default workspace/positional override and exit codes. One local WSL2 discover+inspect+JSON observation: 24.7 ms (not a performance guarantee). go-toml v2.4.3 API verified and pinned. | TUI and network actions remain. CI has not run remotely; WSL2 kernel detected locally. |

@@ -55,3 +55,38 @@ and SSH BatchMode. Normal credential helpers and SSH agents remain available;
 authenticate in a normal shell first. Custom `GIT_SSH_COMMAND` overrides are not
 used; put host/key settings in SSH config. Hooks/helpers still run as configured
 by Git; this tool does not sandbox repositories.
+
+## Workspaces (M3)
+
+On Linux/WSL, config defaults to `$XDG_CONFIG_HOME/repodash/config.toml` or
+`~/.config/repodash/config.toml`. Other platforms use Go's platform-specific
+user config directory. An absent default config scans the current directory.
+An explicitly named missing config is an error.
+
+```toml
+default_workspace = "personal"
+status_workers = 8
+action_workers = 2
+status_timeout_seconds = 15
+action_timeout_seconds = 120
+
+[[workspace]]
+name = "personal"
+paths = ["~/projects", "./experiments"]
+max_depth = 4
+ignore_dirs = ["node_modules", "vendor", "target", ".cache", ".next", "dist", "build"]
+```
+
+```sh
+repodash status --workspace personal
+repodash status --config /path/to/config.toml --json
+repodash --config /path/to/config.toml status /explicit/root
+```
+
+Positional roots override workspace paths. Config-relative roots use the config
+directory; command-line roots use the current directory. Only `~` and `~/...`
+expand. Workers default to eight for status and two for actions and are capped
+at 64. Invalid TOML, duplicate or unknown workspaces, negative depths,
+nonpositive workers/timeouts, and duration overflow are rejected. Inspection
+runs concurrently while rows retain name/path ordering. One inspection failure
+does not stop other rows. Configuration uses pinned go-toml v2.4.3.

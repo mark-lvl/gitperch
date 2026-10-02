@@ -19,7 +19,7 @@ func (failingService) Inspect(_ context.Context, path string) repository.Status 
 }
 
 func TestFailuresDoNotStopInspection(t *testing.T) {
-	rows, err := Inspect(context.Background(), []repository.Repository{{Path: "bad"}, {Path: "good"}}, failingService{})
+	rows, err := Inspect(context.Background(), []repository.Repository{{Path: "bad"}, {Path: "good"}}, failingService{}, 8)
 	if err != nil || len(rows) != 2 || rows[0].Status.Error == "" || rows[1].Status.Branch != "main" {
 		t.Fatalf("%+v %v", rows, err)
 	}
