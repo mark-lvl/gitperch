@@ -22,7 +22,8 @@ go run ./cmd/repodash --version
 `make build` writes `bin/repodash`. For this coding environment, the downloaded
 toolchain lives in `/tmp/repodash-toolchain/go`; use
 `PATH=/tmp/repodash-toolchain/go/bin:$PATH` and `GOCACHE=/tmp/repodash-gocache`
-when running the commands above. A normal installation of Go needs neither override.
+plus `GOPATH=/tmp/repodash-gopath` to reuse the downloaded dependency cache
+when running the commands above. A normal installation of Go needs none of these overrides.
 
 To build and install the local binary:
 
