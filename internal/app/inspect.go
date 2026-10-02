@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"repodash/internal/repository"
 )
@@ -18,7 +19,8 @@ type GitService interface {
 
 type Row struct {
 	repository.Repository
-	Status repository.Status `json:"status"`
+	Status    repository.Status `json:"status"`
+	LastFetch time.Time         `json:"last_successful_fetch,omitzero"`
 }
 
 // Inspect inspects repositories with a bounded worker pool. workers must be

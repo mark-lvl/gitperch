@@ -17,9 +17,11 @@ type Status struct {
 	Unborn          bool      `json:"unborn"`
 	InspectedAt     time.Time `json:"inspected_at"`
 	Error           string    `json:"error,omitempty"`
+	CommonDir       string    `json:"common_git_dir,omitempty"`
+	Operation       string    `json:"operation,omitempty"`
 }
 
 func (s Status) Dirty() bool { return s.Changes > 0 || s.Untracked > 0 || s.Conflicts > 0 }
 func (s Status) Synchronized() bool {
-	return s.Error == "" && !s.Dirty() && s.ComparisonKnown && s.Ahead == 0 && s.Behind == 0
+	return s.Error == "" && s.Operation == "" && !s.Dirty() && s.ComparisonKnown && s.Ahead == 0 && s.Behind == 0
 }

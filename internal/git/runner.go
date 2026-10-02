@@ -71,7 +71,18 @@ func (r Runner) Run(ctx context.Context, path string, args ...string) (Output, e
 		return out, errors.New("Git output exceeded capture limit")
 	}
 	if err != nil {
-		return out, fmt.Errorf("git %s: %w: %s", args[0], err, SafeText(string(out.Stderr)))
+		command := args[0]
+		for i := 0; i < len(args); i++ {
+			if args[i] == "-c" {
+				i++
+				continue
+			}
+			if !strings.HasPrefix(args[i], "-") {
+				command = args[i]
+				break
+			}
+		}
+		return out, fmt.Errorf("git %s: %w: %s", command, err, SafeText(string(out.Stderr)))
 	}
 	return out, nil
 }

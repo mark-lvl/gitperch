@@ -20,26 +20,37 @@ type loader func(context.Context) (app.Snapshot, error)
 // Model holds the dashboard state. New supplies asynchronous refresh behavior
 // through load so the view remains independent of configuration and Git setup.
 type Model struct {
-	ctx          context.Context
-	load         loader
-	noColor      bool
-	rows         []app.Row
-	warnings     []string
-	selected     map[string]bool
-	highlight    int
-	filter       string
-	filtering    bool
-	help         bool
-	details      bool
-	detailOffset int
-	message      string
-	loadErr      string
-	loading      bool
-	width        int
-	height       int
-	scroll       int
-	generation   uint64
-	loadCancel   context.CancelFunc
+	ctx               context.Context
+	load              loader
+	noColor           bool
+	rows              []app.Row
+	warnings          []string
+	selected          map[string]bool
+	highlight         int
+	filter            string
+	filtering         bool
+	help              bool
+	details           bool
+	detailOffset      int
+	message           string
+	loadErr           string
+	loading           bool
+	width             int
+	height            int
+	scroll            int
+	generation        uint64
+	loadCancel        context.CancelFunc
+	actions           *app.Actions
+	preparing         bool
+	running           bool
+	preview           *app.Preview
+	previewCursor     int
+	previewLineOffset int
+	actionCancel      context.CancelFunc
+	actionCtx         context.Context
+	actionGeneration  uint64
+	events            chan app.Event
+	results           map[string]app.Event
 }
 
 type snapshotMsg struct {
@@ -89,6 +100,9 @@ func (m *Model) refresh() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.actionMessage(msg); handled {
+		return m, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -164,6 +178,18 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	key := msg.String()
+	if m.preparing || m.running {
+		if key == "q" || key == "ctrl+c" || key == "esc" {
+			if m.actionCancel != nil {
+				m.actionCancel()
+			}
+			m.message = "Cancellation requested; waiting for outcomes"
+		}
+		return nil
+	}
+	if m.preview != nil {
+		return m.previewKey(key)
+	}
 	if key == "ctrl+c" {
 		if m.loadCancel != nil {
 			m.loadCancel()
@@ -232,6 +258,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.filter = ""
 			m.clearSelection()
 			m.highlight, m.scroll = 0, 0
+		} else {
+			m.results = nil
+			m.message = ""
 		}
 	case "/":
 		m.filtering = true
@@ -275,7 +304,11 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			}
 		}
 	case "f", "p", "l":
-		m.message = "Actions are unavailable in read-only mode"
+		if m.actions == nil || key != "f" {
+			m.message = "This action is not available yet"
+			return nil
+		}
+		return m.preparePreview(app.Fetch)
 	case "enter":
 		return m.launchShell()
 	case "g":
@@ -377,6 +410,9 @@ func (m *Model) pageSize() int {
 }
 
 func (m *Model) View() tea.View {
+	if m.preview != nil {
+		return m.previewView()
+	}
 	if m.details {
 		return m.detailsView()
 	}
@@ -384,7 +420,11 @@ func (m *Model) View() tea.View {
 	if width < 1 {
 		width = 1
 	}
-	lines := []string{m.style("repodash · read-only · ahead/behind: locally known refs", "#7DDA58", true)}
+	header := "repodash · ahead/behind: locally known refs"
+	if m.actions == nil {
+		header = "repodash · read-only · ahead/behind: locally known refs"
+	}
+	lines := []string{m.style(header, "#7DDA58", true)}
 	if m.filtering {
 		lines = append(lines, "Filter: "+gitcli.SafeText(m.filter)+"▏")
 	} else if m.filter != "" {
@@ -395,6 +435,12 @@ func (m *Model) View() tea.View {
 	if m.loading {
 		lines[1] += "  · refreshing"
 	}
+	if m.preparing {
+		lines[1] += " · preparing preview"
+	}
+	if m.running {
+		lines[1] += " · batch running (q cancels)"
+	}
 	var detail []string
 	if m.loadErr != "" {
 		detail = append(detail, "Load error: "+gitcli.SafeText(m.loadErr))
@@ -402,7 +448,7 @@ func (m *Model) View() tea.View {
 	if m.help {
 		detail = append(detail,
 			"j/k or arrows move · Space select · a select all visible · / filter",
-			"r refresh · d full details · Enter shell · g LazyGit · q quit · f/p/l unavailable",
+			"r refresh · d full details · Enter shell · g LazyGit · f fetch preview · q quit/cancel",
 		)
 	} else {
 		indices := m.visibleRows()
@@ -524,8 +570,15 @@ func (m *Model) rowLine(row app.Row, highlighted bool) string {
 	if highlighted {
 		pointer = ">"
 	}
-	line := fmt.Sprintf("%s %s %s | %s | %s | c:%d u:%d x:%d | %s | %s",
-		pointer, selected, gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), status.Changes,
+	state := status.Operation
+	if state == "" {
+		state = "idle"
+	}
+	if result, ok := m.results[row.Path]; ok {
+		state = string(result.State)
+	}
+	line := fmt.Sprintf("%s %s %s %s | %s | %s | c:%d u:%d x:%d | %s | %s",
+		pointer, selected, gitcli.SafeText(state), gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), status.Changes,
 		status.Untracked, status.Conflicts, comparison, gitcli.SafeText(strings.Join(markers, ",")))
 	return line
 }
@@ -543,6 +596,11 @@ func (m *Model) detailsView() tea.View {
 		content = append(content, "Load error: "+gitcli.SafeText(m.loadErr))
 	}
 	content = append(content, m.warnings...)
+	for _, row := range m.rows {
+		if result, ok := m.results[row.Path]; ok {
+			content = append(content, gitcli.SafeText(result.Path)+": "+string(result.State)+" · "+gitcli.SafeText(result.Message))
+		}
+	}
 	if len(content) == 0 {
 		content = append(content, "No repository details or warnings")
 	}
@@ -583,8 +641,19 @@ func (m *Model) detailLine(row app.Row) string {
 		ahead, behind = fmt.Sprint(status.Ahead), fmt.Sprint(status.Behind)
 	}
 	comparisonLabel := "locally known refs"
-	return fmt.Sprintf("Branch: %s · changes:%d untracked:%d conflicts:%d · ahead:%s behind:%s (%s) · upstream:%s",
-		gitcli.SafeText(branch), status.Changes, status.Untracked, status.Conflicts, ahead, behind, comparisonLabel, gitcli.SafeText(upstream))
+	operation := status.Operation
+	if operation == "" {
+		operation = "idle"
+	}
+	line := fmt.Sprintf("Branch: %s · changes:%d untracked:%d conflicts:%d · ahead:%s behind:%s (%s) · upstream:%s · operation:%s",
+		gitcli.SafeText(branch), status.Changes, status.Untracked, status.Conflicts, ahead, behind, comparisonLabel, gitcli.SafeText(upstream), gitcli.SafeText(operation))
+	if !row.LastFetch.IsZero() {
+		line += " · last fetch:" + row.LastFetch.Format("15:04:05")
+	}
+	if result, ok := m.results[row.Path]; ok {
+		line += " · " + string(result.State) + ": " + gitcli.SafeText(result.Message)
+	}
+	return line
 }
 
 func (m *Model) style(text, color string, bold bool) string {

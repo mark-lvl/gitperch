@@ -15,6 +15,11 @@ func (r Runner) Inspect(ctx context.Context, path string) repository.Status {
 	s.InspectedAt = time.Now().UTC()
 	if err != nil {
 		s.Error = SafeText(err.Error())
+	} else {
+		s.CommonDir, s.Operation, err = r.localMetadata(ctx, path)
+		if err != nil {
+			s.Error = SafeText(err.Error())
+		}
 	}
 	return s
 }

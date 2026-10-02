@@ -24,10 +24,17 @@ func runTUI(ctx context.Context, cfg config.Config, ws config.Workspace, noColor
 	}
 	_, envNoColor := os.LookupEnv("NO_COLOR")
 	noColor = noColor || envNoColor
+	read := gitcli.Runner{Timeout: time.Duration(cfg.StatusTimeoutSeconds) * time.Second}
+	actions := app.NewActions(gitcli.Service{Read: read, Write: gitcli.Runner{Timeout: time.Duration(cfg.ActionTimeoutSeconds) * time.Second}}, cfg.ActionWorkers)
 	load := func(ctx context.Context) (app.Snapshot, error) {
-		return app.Load(ctx, discovery.Options{Roots: ws.Paths, MaxDepth: ws.MaxDepth, IgnoreDirs: ws.IgnoreDirs}, gitcli.Runner{Timeout: time.Duration(cfg.StatusTimeoutSeconds) * time.Second}, cfg.StatusWorkers)
+		snapshot, err := app.Load(ctx, discovery.Options{Roots: ws.Paths, MaxDepth: ws.MaxDepth, IgnoreDirs: ws.IgnoreDirs}, read, cfg.StatusWorkers)
+		for i := range snapshot.Rows {
+			snapshot.Rows[i].LastFetch = actions.LastFetch(snapshot.Rows[i].Path)
+		}
+		return snapshot, err
 	}
 	model := tui.New(ctx, load, noColor)
+	model.EnableActions(actions)
 	opts := []tea.ProgramOption{tea.WithContext(ctx), tea.WithInput(os.Stdin), tea.WithOutput(out)}
 	if noColor {
 		opts = append(opts, tea.WithColorProfile(colorprofile.NoTTY))

@@ -67,6 +67,9 @@ func WriteTable(w io.Writer, rows []Row) error {
 		if s.Error != "" {
 			markers = append(markers, "error: "+s.Error)
 		}
+		if s.Operation != "" {
+			markers = append(markers, "operation: "+s.Operation)
+		}
 		if _, err := fmt.Fprintf(tw, "%s / %s\t%s\tchanges:%d\t%d\t%d\t%s\t%s\t%s\t%s\n", gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), s.Changes, s.Untracked, s.Conflicts, ahead, behind, gitcli.SafeText(s.Upstream), gitcli.SafeText(strings.Join(markers, ", "))); err != nil {
 			return err
 		}

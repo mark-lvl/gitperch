@@ -266,10 +266,10 @@ Gate: manually exercise the TUI in WSL2, including tool launch/return and Ctrl+C
 
 ### M5 — Preview and fetch
 
-- [ ] Implement explicit action plans, eligibility reasons, confirmation, progress and results.
-- [ ] Resolve remote targets and implement bounded fetch execution.
-- [ ] Serialize common Git directories and implement cancellation/timeouts.
-- [ ] Test with local bare remotes and linked worktrees.
+- [x] Implement explicit action plans, eligibility reasons, confirmation, progress and results.
+- [x] Resolve remote targets and implement bounded fetch execution.
+- [x] Serialize common Git directories and implement cancellation/timeouts.
+- [x] Test with local bare remotes and linked worktrees.
 
 Gate: one failure does not stop other eligible repositories; previews match executed targets; ambiguous configurations skip visibly.
 
@@ -331,3 +331,4 @@ Consult these when implementing the relevant milestone; verify exact installed-v
 | M3 | 2026-10-02 | `make fmt test race vet build` passed. Fake service tests cover concurrency bound, 64-worker cap, slow/failing repos, cancellation and sorting. CLI generated 24 disposable repositories, exercised TOML/default workspace/positional override and exit codes. One local WSL2 discover+inspect+JSON observation: 24.7 ms (not a performance guarantee). go-toml v2.4.3 API verified and pinned. | TUI and network actions remain. CI has not run remotely; WSL2 kernel detected locally. |
 | M2/M3 regressions | 2026-10-02 | Additional race-tested scenarios prove dirty inspection preserves index bytes/mtime, unavailable remote does not affect local status, invalid/nested Git metadata stays visibly failed, and inherited config routing is stripped. Explicit config tilde expansion and empty CLI roots tested. | 386 config test binary compiles but cannot execute in this container (`bad system call`). No 32-bit support claim. |
 | M4 | 2026-10-02 | `make fmt test race vet build` passed. Bubble Tea v2.0.10/Lip Gloss v2.0.6 actual APIs consulted and pinned; no Bubbles component needed. Model tests cover selection/filter clearing, path identity, stale loads, quit cancellation, Ctrl+C in filter/help, empty/narrow/safe views, scrollable full diagnostics, missing LazyGit and child-return refresh. WSL2 PTY exercised selection/filter/help/details/refresh, shell `pwd` and exit/restore, missing LazyGit, q from help, Ctrl+C from filter and NO_COLOR. | Actual LazyGit is absent; its successful launch/return remains untested (ExecProcess shell lifecycle passed). PTY child shells lack job control in this test harness; Windows Terminal physical resize/interactive job control not claimed. Network actions remain M5/M6. |
+| M5 | 2026-10-02 | `make fmt test race vet build` passed. Local bare-remote and fake-service tests verify immutable executable previews, explicit selection, single active batch, common-dir serialization, mixed success/failure, changed plans, ambiguous/unusual refspec skips, cancellation/deadline events, and tag-pruning overrides. TUI tests pass 20 race runs. WSL2 PTY selected 10 demo repos, reviewed 9 eligible targets plus a skip, confirmed fetch, observed 8 successes/1 missing-remote failure/1 no-remote skip, and refreshed behind/diverged counts. `scripts/demo.sh` creates these disposable scenarios. Official Git fetch/config docs consulted. | M6 push/pull remain. External processes can still race after revalidation; cancelled fetch may partially update refs. Successful actual LazyGit launch remains untested. |

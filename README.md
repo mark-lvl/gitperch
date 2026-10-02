@@ -112,6 +112,7 @@ are small model operations, so no Bubbles components are needed.
 | / | Edit name/path/branch filter; changing it clears selection |
 | Esc | Leave filtering / clear filter |
 | r | Refresh local status |
+| f | Preview selected repositories for fetch |
 | Enter | Open a child shell in the highlighted worktree |
 | g | Open LazyGit in the highlighted worktree |
 | ? | Toggle help |
@@ -122,4 +123,36 @@ Child tools temporarily take over the terminal; the dashboard restores and
 refreshes after exit. The child shell does not change the parent shell's
 directory. Missing LazyGit is reported visibly. Highlighted errors and root
 warnings remain visible. [WSL smoke checklist](docs/tui-smoke.md) documents manual
-checks. Network actions will be added in M5/M6.
+checks. Push and pull will be added in M6.
+
+## Fetch preview and execution (M5)
+
+Select repositories explicitly, press `f`, review targets with j/k (PgUp/PgDn
+scroll long details), then Enter confirms or Esc cancels. The preview names the
+worktree, exact remote URL and configured tracking refspecs, eligibility and
+reason. Fetch uses the branch's configured upstream remote or the sole remote;
+ambiguous targets are skipped. Ref mappings that could update local branches or
+tags are rejected. Fetch prunes remote-tracking branches, disables tag fetching
+and pruning, and does not recurse into submodules.
+
+After confirmation, HEAD, branch, common Git directory and configuration are
+revalidated. Changed plans are skipped. Actions sharing a common Git directory,
+including linked worktrees, run serially; separate repositories use at most
+`action_workers`. Only one preview or batch can be active. Each target keeps its
+own result, so a failure does not stop other targets. `q`/Ctrl+C during a batch
+requests cancellation and waits for outcomes. Use `d` for full results; Esc in
+normal browsing dismisses them. Successful fetch time is tracked for the session.
+Timed-out/cancelled fetches may have partially updated tracking refs; inspect or
+refresh afterward. Batches are best effort, with no rollback.
+
+For a disposable local demo (no network or personal repositories):
+
+```sh
+demo_root=$(bash scripts/demo.sh)
+bin/repodash "$demo_root/workspace"
+```
+
+The script prints its new `/tmp/repodash-demo.*` directory and leaves it available
+for inspection. It includes clean, behind, ahead, dirty, diverged, detached,
+unborn, missing-upstream, failed-remote, and linked-worktree scenarios. Tracking
+comparisons deliberately start stale for some rows; fetch reveals current state.
