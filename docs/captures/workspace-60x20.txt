@@ -1,20 +1,20 @@
- repodash  ~/dev/platform           6 repos · ! 5 attention
- All                          / search · : actions · ? help
-
- REPOSITORIES  6/6  ·  1–6
-      REPO                      STATUS             SYNC
-  [ ] api-service               ✓ clean            —
-> [ ] design-system             ◆ changed          ↑3 ↓0
-  [ ] docs                      ↓ behind           ↑0 ↓4
-  [ ] experiment                ! no upstream      —
-  [ ] mobile                    × failed           —
-  [ ] worker                    ! conflict         ↑2 ↓1
-
-
-
-────────────────────────────────────────────────────────────
- design-system · feat/tokens → origin/feat/tokens
- /home/mark/projects/design-system
- Press p to review a push. Only committed changes are incl…
-  M src/theme/tokens.go                               +8 -2
- Enter Open · d Changes · o Shell · p Push · : Actions
+╭──────────────────────────────────────────────────────────╮
+│ ◇ repodash  ~/dev/platform     [6 repos] [! 5 attention] │
+│ All repositories  Focus     Tab view · / search · ? help │
+│                                                          │
+│      REPOSITORY             STATUS            CHANGES    │
+│    ▱ api-service            ✓ clean           —          │
+│ >  ▱ design-system          ◆ changed         +12 -2     │
+│    ▱ docs                   ↓ behind          —          │
+│    ▱ experiment             ! no upstream     —          │
+│    ▱ mobile                 × failed          —          │
+│    ▱ worker                 ! conflict        1 file     │
+│ ─ Selected repository ────────────────────────────────── │
+│ design-system  feat/tokens → origin/feat/tokens          │
+│ Working tree · 3 files                                   │
+│ M  src/theme/tokens.go                            +8 -2  │
+│ M  src/components/button.go                          +4  │
+│ ↑3 ahead · locally known refs…  [ / ] scroll · Enter all │
+│ ──────────────────────────────────────────────────────── │
+│ [Enter] Open  [d] Diff  [p] Push  [:] Actions            │
+╰──────────────────────────────────────────────────────────╯

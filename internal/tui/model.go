@@ -47,6 +47,7 @@ type Model struct {
 	helpOffset        int
 	details           bool
 	detailOffset      int
+	contextOffset     int
 	message           string
 	loadErr           string
 	loading           bool
@@ -130,9 +131,16 @@ func (m *Model) refresh() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
-	// Notices can change the available row count without a resize.
+	// Notices and detail arrival can change available rows without a resize.
+	previousPath := ""
+	if row := m.highlightedRow(); row != nil {
+		previousPath = row.Path
+	}
 	defer func() {
 		m.keepHighlightVisible()
+		if row := m.highlightedRow(); row == nil || row.Path != previousPath {
+			m.contextOffset = 0
+		}
 		if extra := m.ensureDetail(); extra != nil {
 			cmd = tea.Batch(cmd, extra)
 		}
@@ -407,6 +415,14 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.scope = (m.scope + step) % len(scopes)
 		m.clearSelection()
 		m.highlight, m.scroll = 0, 0
+	case "[":
+		m.contextOffset = max(0, m.contextOffset-1)
+	case "]":
+		if row := m.highlightedRow(); row != nil {
+			if r, ok := m.detailCache[row.Path]; ok {
+				m.contextOffset = min(max(0, len(r.data.Files)-1), m.contextOffset+1)
+			}
+		}
 	case "s":
 		path := ""
 		if row := m.highlightedRow(); row != nil {

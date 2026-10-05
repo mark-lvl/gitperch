@@ -4,18 +4,22 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// ANSI colors let the terminal choose its palette; no truecolor is required.
+// Semantic colors follow the reference's dark navy/cyan hierarchy. Bubble Tea
+// converts them to the detected 256/16-color profile; truecolor is optional.
 const (
-	foreground = "7"
-	ink        = foreground
-	muted      = "8"
-	accent     = "6"
-	success    = "2"
-	working    = "6"
-	amber      = "3"
-	danger     = "1"
-	selection  = "4"
-	border     = muted
+	background  = "#080f16"
+	surface     = "#0d1824"
+	foreground  = "252"
+	ink         = foreground
+	muted       = "245"
+	accent      = "81"
+	branchColor = "141"
+	success     = "42"
+	working     = "81"
+	amber       = "214"
+	danger      = "203"
+	selection   = "#102638"
+	border      = "#284052"
 )
 
 type icons struct{ clean, changed, ahead, behind, failed, pointer, rule string }

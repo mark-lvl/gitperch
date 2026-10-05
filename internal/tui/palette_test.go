@@ -49,7 +49,7 @@ func TestContextFooter(t *testing.T) {
 	for _, tc := range []struct {
 		index           int
 		present, absent string
-	}{{0, "Enter Open", "p Push"}, {1, "p Push", "l Pull"}, {2, "l Pull", "p Push"}, {5, "d Changes", "p Push"}} {
+	}{{0, "[Enter] Open", "[p] Push"}, {1, "[p] Push", "[l] Pull"}, {2, "[l] Pull", "[p] Push"}, {5, "[d] Diff", "[p] Push"}} {
 		m.highlight = tc.index
 		footer := m.footer()
 		if !strings.Contains(footer, tc.present) || strings.Contains(footer, tc.absent) {

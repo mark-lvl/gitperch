@@ -16,14 +16,15 @@ func TestMissionLayout(t *testing.T) {
 	} {
 		m := New(nil, nil, true)
 		m.width, m.height = tc.w, tc.h
+		m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
 		l := m.layout()
-		if l.split != tc.split || (l.bottom > 1) != tc.preview {
+		if l.split != tc.split || (l.bottom > 2) != tc.preview {
 			t.Fatalf("%+v: %+v", tc, l)
 		}
 		if strings.Contains(m.tableHeader(l.listWidth), "BRANCH") != tc.branch {
 			t.Fatalf("columns at %d", tc.w)
 		}
-		if l.slots < 5 {
+		if l.slots < 4 {
 			t.Fatalf("list too small: %+v", l)
 		}
 	}

@@ -1,45 +1,22 @@
- repodash  ~/dev/platform                                                                                                               6 repos · ! 5 attention
- All                                                                                                                              / search · : actions · ? help
-
- REPOSITORIES  6/6  ·  1–6                                                                                                  │  ATTENTION
-      REPO                                           BRANCH                         STATUS                     SYNC         │
-  [ ] api-service                                    main                           ✓ clean                    —            │  mobile
-> [ ] design-system                                  feat/tokens                    ◆ changed                  ↑3 ↓0        │  × failed
-  [ ] docs                                           main                           ↓ behind                   ↑0 ↓4        │
-  [ ] experiment                                     prototype                      ! no upstream              —            │  worker
-  [ ] mobile                                         main                           × failed                   —            │  ! conflict
-  [ ] worker                                         main                           ! conflict                 ↑2 ↓1        │
-                                                                                                                            │  design-system
-                                                                                                                            │  ◆ changed
-                                                                                                                            │
-                                                                                                                            │  Tab Focus / All
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-                                                                                                                            │
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- design-system · feat/tokens → origin/feat/tokens
- /home/mark/projects/design-system
- Press p to review a push. Only committed changes are included.
-  M src/theme/tokens.go                                                                                                                                   +8 -2
-  M src/components/button.go                                                                                                                              +4 -0
- ?? tests/theme_test.go
- Enter Open · d Changes · o Shell · p Push · : Actions
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ◇ repodash  ~/dev/platform                                                                                                         [6 repos] [! 5 attention] │
+│ All repositories  Focus                                                                                                         Tab view · / search · ? help │
+│                                                                                                                                                              │
+│      REPOSITORY                       BRANCH                                   STATUS            CHANGES    SYNC                                             │
+│    ▱ api-service                      main                                     ✓ clean           —          —                                                │
+│ >  ▱ design-system                    feat/tokens                              ◆ changed         +12 -2     ↑3                                               │
+│    ▱ docs                             main                                     ↓ behind          —          ↓4                                               │
+│    ▱ experiment                       prototype                                ! no upstream     —          —                                                │
+│    ▱ mobile                           main                                     × failed          —          —                                                │
+│    ▱ worker                           main                                     ! conflict        1 file     ↑2 ↓1                                            │
+│ ─ Selected repository ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── │
+│ design-system  feat/tokens → origin/feat/tokens                                                                                                              │
+│ /home/mark/projects/design-system                                                                                                                            │
+│ Working tree · 3 files                                                                 Recent commits                                                        │
+│ M  src/theme/tokens.go                                                        +8 -2  │ 29ac81  Add semantic theme tokens                                     │
+│ M  src/components/button.go                                                      +4  │ fe2034  Refactor shared components                                    │
+│ ?  tests/theme_test.go                                                               │                                                                       │
+│ ↑3 ahead · locally known refs                                                                                                                                │
+│ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── │
+│ [Enter] Open  [d] Diff  [p] Push  [Space] Select  [o] Shell  [:] Actions                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

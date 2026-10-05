@@ -23,9 +23,17 @@ func TestWorkspaceRenderCaptures(t *testing.T) {
 			m.EnableActions(app.NewActions(newActionFake(false), 1))
 			m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
 			m.highlight = 1
-			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: " M", Path: "src/components/button.go", Added: 4}, {Code: "??", Path: "tests/theme_test.go"}}}}
+			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Commits: []gitcli.Commit{{OID: "29ac81", Subject: "Add semantic theme tokens"}, {OID: "fe2034", Subject: "Refactor shared components"}}, Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: " M", Path: "src/components/button.go", Added: 4}, {Code: "??", Path: "tests/theme_test.go"}}}}
 			m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
 			content := m.View().Content
+			if os.Getenv("UPDATE_RENDERS") == "1" {
+				m.noColor = false
+				path := filepath.Join(os.TempDir(), fmt.Sprintf("repodash-%dx%d.ansi", size[0], size[1]))
+				if err := os.WriteFile(path, []byte(m.View().Content), 0644); err != nil {
+					t.Fatal(err)
+				}
+				m.noColor = true
+			}
 			// Trim trailing padding to keep checked-in artifacts readable.
 			lines := strings.Split(content, "\n")
 			for i := range lines {

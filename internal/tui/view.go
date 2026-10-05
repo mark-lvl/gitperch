@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -67,28 +66,39 @@ func hasIssue(row app.Row) bool {
 }
 
 type dashboardLayout struct {
-	split                                                     bool
+	split                                                     bool // wide selected preview: changes alongside recent commits
 	listWidth, inspectorWidth, body, slots, rowHeight, bottom int
 }
 
-// One shared layout controls both rendering and keyboard pagination.
+// Geometry follows content as well as the viewport. A small workspace must not
+// create a screenful of blank rows between repositories and their context.
 func (m *Model) layout() dashboardLayout {
 	w, h := max(1, m.width), max(1, m.height)
-	l := dashboardLayout{listWidth: w, rowHeight: 1, bottom: 1}
-	// Header, view/search line, table title, and footer have fixed reservations.
+	l := dashboardLayout{listWidth: max(1, w-4), rowHeight: 1, bottom: 2}
+	preview := 0
 	if h >= 20 {
-		l.bottom += min(7, max(4, h/4))
+		desired := 6
+		if row := m.highlightedRow(); row != nil {
+			count := max(row.Status.Changes, row.Status.Conflicts) + row.Status.Untracked
+			if result, ok := m.detailCache[row.Path]; ok {
+				count = len(result.data.Files)
+				if w >= 120 {
+					count = max(count, len(result.data.Commits))
+				}
+			}
+			desired = max(6, count+5)
+		}
+		preview = min(desired, 12, max(6, h/3))
 	}
+	notice := 0
 	if m.notice() != "" {
-		l.bottom++
+		notice = 1
 	}
-	l.body = max(1, h-3-l.bottom)
-	l.slots = max(1, l.body-2)
-	l.split = w >= 120 && h >= 20
-	if l.split {
-		l.inspectorWidth = min(34, w/4)
-		l.listWidth = w - l.inspectorWidth - 3
-	}
+	capacity := max(1, h-7-preview-notice)
+	l.body = min(max(4, len(m.visibleRows())+1), capacity)
+	l.slots = max(1, l.body-1)
+	l.bottom += preview + notice
+	l.split = w >= 120 && preview > 0
 	return l
 }
 
@@ -108,32 +118,29 @@ func (m *Model) View() tea.View {
 	if m.width < 60 || m.height < 12 {
 		return m.screen([]string{"Terminal too small", "Minimum recommended size: 60x12", "Resize terminal · q quit"})
 	}
+	return m.screen(m.workspaceLines())
+}
+
+func (m *Model) workspaceLines() []string {
 	l := m.layout()
-	lines := []string{m.summaryLine(), m.searchLine(), ""}
-	list := m.repositoryList(l)
-	if l.split {
-		attention := m.attentionPanel(l.inspectorWidth, l.body)
-		for i := 0; i < l.body; i++ {
-			lines = append(lines, cell(list[i], l.listWidth)+m.style(" │ ", border, false)+cell(attention[i], l.inspectorWidth))
-		}
-	} else {
-		lines = append(lines, list...)
-	}
-	previewHeight := l.bottom - 1
+	w := l.listWidth
+	lines := []string{m.summaryLineAt(w), m.searchLineAt(w), ""}
+	lines = append(lines, m.repositoryList(l)...)
+	previewHeight := l.bottom - 2
 	if m.notice() != "" {
 		previewHeight--
 	}
 	if previewHeight > 0 {
-		lines = append(lines, fitLines(m.compactInspector(), previewHeight)...)
+		lines = append(lines, m.selectedPreview(w, previewHeight)...)
 	}
 	if notice := m.notice(); notice != "" {
-		lines = append(lines, m.style(" "+notice, amber, false))
+		lines = append(lines, m.style(cell(notice, w), amber, false))
 	}
-	lines = append(lines, m.footer())
-	return m.screen(lines)
+	lines = append(lines, m.rule(w), m.footer())
+	return m.frame(lines, m.width)
 }
 
-func (m *Model) summaryLine() string {
+func (m *Model) summaryLineAt(w int) string {
 	attention := 0
 	for _, row := range m.rows {
 		if m.attentionRank(row) > 0 {
@@ -141,129 +148,138 @@ func (m *Model) summaryLine() string {
 		}
 	}
 	location := m.workspace
-	if location == "" && m.highlightedRow() != nil {
-		location = gitcli.SafeText(m.highlightedRow().Path)
+	if location == "" {
+		if row := m.highlightedRow(); row != nil {
+			location = row.Path
+		}
 	}
-	summary := fmt.Sprintf("%d repos · ! %d attention", len(m.rows), attention)
+	location = gitcli.SafeText(location)
+	right := m.badge(fmt.Sprintf("%d repos", len(m.rows)), muted)
+	if attention > 0 {
+		right += " " + m.badge(fmt.Sprintf("! %d attention", attention), amber)
+	}
+	activity := ""
 	if m.loading {
-		summary += " · loading"
+		activity = "refreshing"
 	}
 	if m.preparing {
-		summary += " · review"
+		activity = "preparing"
 	}
 	if m.running {
-		summary += " · " + m.progressLabel()
+		activity = m.progressLabel()
 	}
-	locationWidth := m.width - ansi.StringWidth(summary) - ansi.StringWidth(" repodash   ") - 2
-	left := m.style(" repodash", accent, true)
-	if locationWidth > 4 {
-		left += "  " + m.style(truncatePath(location, locationWidth), muted, false)
+	if activity != "" && w >= 100 {
+		right += "  " + m.style(activity, working, false)
 	}
-	return m.between(left, summary+" ", m.width)
-
+	brand := m.style("◇ repodash", accent, true)
+	locationWidth := w - ansi.StringWidth(brand) - ansi.StringWidth(right) - 5
+	left := brand
+	if locationWidth > 3 {
+		left += "  " + m.style(truncatePath(location, locationWidth), accent, false)
+	}
+	return m.between(left, right, w)
 }
-
-func (m *Model) attentionPanel(w, h int) []string {
-	lines := []string{m.style(" ATTENTION", amber, true), ""}
-	count := 0
-	indices := make([]int, len(m.rows))
-	for i := range m.rows {
-		indices[i] = i
-	}
-	sort.SliceStable(indices, func(i, j int) bool { return m.attentionRank(m.rows[indices[i]]) > m.attentionRank(m.rows[indices[j]]) })
-	for _, i := range indices {
-		row := m.rows[i]
-		if m.attentionRank(row) == 0 {
-			continue
+func (m *Model) badge(text, color string) string {
+	return m.style("["+text+"]", color, false)
+}
+func (m *Model) searchLineAt(w int) string {
+	if m.filtering || m.filter != "" {
+		query := gitcli.SafeText(m.filter)
+		if m.filtering {
+			query += "▏"
 		}
-		label, color := m.primaryStatus(row)
-		lines = append(lines, " "+m.style(cell(gitcli.SafeText(row.Name), w-2), color, false), " "+m.style(cell(label, w-2), muted, false), "")
-		count++
-		if count == 3 {
-			break
+		return m.between(m.style("/ "+truncatePath(query, max(1, w-25)), accent, true), m.style("Esc clear · Enter open", muted, false), w)
+	}
+	all, focus := m.style("All repositories", muted, false), m.style("Focus", muted, false)
+	if m.scope == 0 {
+		all = m.style("All repositories", accent, true)
+	} else if m.scope == 1 {
+		focus = m.style("Focus", accent, true)
+	}
+	left := all + "  " + focus
+	if m.scope > 1 {
+		left += "  " + m.style(scopes[m.scope], accent, true)
+	}
+	if m.scope == 1 {
+		hidden := 0
+		for _, row := range m.rows {
+			if m.attentionRank(row) == 0 {
+				hidden++
+			}
 		}
+		left += m.style(fmt.Sprintf(" · %d healthy hidden", hidden), muted, false)
 	}
-	if count == 0 {
-		lines = append(lines, " No attention needed.")
-	}
-	lines = append(lines, m.style(" Tab Focus / All", muted, false))
-	return fitLines(lines, h)
+	return m.between(left, m.style("Tab view · / search · ? help", muted, false), w)
 }
-
-func (m *Model) searchLine() string {
-	query := ""
-	if m.filtering {
-		query = " / " + gitcli.SafeText(m.filter) + "▏"
-	} else if m.filter != "" {
-		query = " / " + gitcli.SafeText(m.filter) + " · Esc clear"
-	}
-	label := scopes[m.scope]
-	if m.scope == 1 {
-		label = "Focus"
-	}
-	hidden := ""
-	if m.scope == 1 {
-		hidden = fmt.Sprintf(" · %d healthy hidden", len(m.rows)-len(m.visibleRows()))
-	}
-	return m.between(" "+m.style(label, accent, true)+hidden+query, m.style("/ search · : actions · ? help ", muted, false), m.width)
-}
-
 func (m *Model) repositoryList(l dashboardLayout) []string {
 	indices := m.visibleRows()
-	header := fmt.Sprintf(" REPOSITORIES  %d/%d", len(indices), len(m.rows))
-	if len(indices) > 0 {
-		header += fmt.Sprintf("  ·  %d–%d", m.scroll+1, min(len(indices), m.scroll+l.slots))
-	}
-	// View is side-effect free; Update owns scroll position.
-	lines := []string{m.style(header, muted, true), m.tableHeader(l.listWidth)}
+	lines := []string{m.tableHeader(l.listWidth)}
 	if len(indices) == 0 {
-		title, hint := "No repositories discovered", "Check workspace paths; press r to scan again."
+		title, hint := "No repositories discovered", "Check workspace paths; r scans again."
 		if m.loading {
 			title, hint = "Scanning your workspace…", "Repository status will appear here."
 		} else if m.filter != "" {
-			title, hint = "No repositories match this filter", "Press Esc to clear your search."
+			title, hint = "No repositories match this filter", "Esc clears your search."
 		} else if m.scope != 0 {
-			title, hint = "No repositories in this view", "Press Tab to explore another view."
+			title, hint = "Nothing needs attention in this view", "Tab returns to all repositories."
 		}
-		lines = append(lines, "", " "+m.style(title, ink, true), " "+hint)
+		lines = append(lines, "", m.style(title, ink, true), m.style(hint, muted, false))
 	}
-	end := min(len(indices), m.scroll+l.slots)
-	for pos := m.scroll; pos < end; pos++ {
-		row := m.rows[indices[pos]]
-		line := m.tableRow(row, pos == m.highlight, l.listWidth)
-		lines = append(lines, line)
-		if l.rowHeight == 2 {
-			path := "      " + gitcli.SafeText(row.Path)
-			lines = append(lines, m.style(cell(path, l.listWidth), muted, false))
-		}
+	for pos := m.scroll; pos < min(len(indices), m.scroll+l.slots); pos++ {
+		lines = append(lines, m.tableRow(m.rows[indices[pos]], pos == m.highlight, l.listWidth))
 	}
 	return fitLines(lines, l.body)
 }
 
-// Columns share their geometry with row rendering. Medium/narrow widths move
-// branch context into the preview rather than crushing every column.
-func columnWidths(w int) (int, int, int) {
-	if w < 120 {
-		return max(8, w-35), 0, 18
+type tableColumns struct{ name, branch, status, changes, sync int }
+
+func columns(w int) tableColumns {
+	c := tableColumns{status: 17, changes: 10}
+	if w >= 80 {
+		c.branch = min(40, w/3)
+		c.sync = 9
 	}
-	available := w - 9
-	return available * 32 / 100, available * 25 / 100, available * 23 / 100
+	// Two marker cells, a repository glyph, and a gap between visible columns.
+	gaps := 2
+	if c.branch > 0 {
+		gaps++
+	}
+	if c.sync > 0 {
+		gaps++
+	}
+	c.name = max(6, w-5-c.branch-c.status-c.changes-c.sync-gaps)
+	if c.branch > 0 {
+		c.name = min(32, c.name)
+	}
+	return c
 }
 func (m *Model) tableHeader(w int) string {
-	name, branch, status := columnWidths(w)
-	if w >= 90 {
-		branch = max(18, w/4)
-		name = max(10, w-branch-status-21)
+	c := columns(w)
+	line := "     " + cell("REPOSITORY", c.name) + " "
+	if c.branch > 0 {
+		line += cell("BRANCH", c.branch) + " "
 	}
-	header := "      " + cell("REPO", name) + " "
-	if branch > 0 {
-		header += cell("BRANCH", branch) + " "
+	line += cell("STATUS", c.status) + " " + cell("CHANGES", c.changes)
+	if c.sync > 0 {
+		line += " " + cell("SYNC", c.sync)
 	}
-	return m.style(header+cell("STATUS", status)+" SYNC", muted, false)
+	return m.style(cell(line, w), muted, false)
 }
 func (m *Model) primaryStatus(row app.Row) (string, string) {
 	s := row.Status
 	icons := m.symbols()
+	if result, ok := m.results[row.Path]; ok {
+		switch result.State {
+		case app.Failed, app.OutcomeUnknown:
+			return icons.failed + " failed", danger
+		case app.Running:
+			return "● running", working
+		case app.Queued:
+			return "◐ queued", muted
+		case app.Cancelled:
+			return "! cancelled", amber
+		}
+	}
 	switch {
 	case s.Error != "":
 		return icons.failed + " failed", danger
@@ -292,39 +308,82 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 	}
 }
 func (m *Model) tableRow(row app.Row, highlighted bool, w int) string {
-	pointer, checkbox := " ", "[ ]"
+	pointer, mark := " ", " "
 	if highlighted {
 		pointer = m.symbols().pointer
 	}
 	if m.selected[row.Path] {
-		checkbox = "[x]"
+		mark = "●"
+		if m.iconMode == "ascii" {
+			mark = "*"
+		}
 	}
-	name, branch, status := columnWidths(w)
-	if w >= 90 {
-		branch = max(18, w/4)
-		name = max(10, w-branch-status-21)
+	repoIcon := "▱"
+	if m.iconMode == "nerd" {
+		repoIcon = "\uf07b"
 	}
+	if m.iconMode == "ascii" {
+		repoIcon = "/"
+	}
+	c := columns(w)
 	label, color := m.primaryStatus(row)
-	if result, ok := m.results[row.Path]; ok {
-		label = string(result.State)
-		color = resultColor(result.State)
+	line := m.style(pointer+mark, accent, true) + " " + m.style(repoIcon, amber, false) + " " + m.style(cell(gitcli.SafeText(row.Name), c.name), ink, highlighted) + " "
+	if c.branch > 0 {
+		line += m.style(cell(truncateMiddle(branchLabel(row), c.branch), c.branch), branchColor, false) + " "
 	}
-	sync := "—"
-	if row.Status.ComparisonKnown && (row.Status.Ahead > 0 || row.Status.Behind > 0) {
-		sync = fmt.Sprintf("%s%d %s%d", m.symbols().ahead, row.Status.Ahead, m.symbols().behind, row.Status.Behind)
+	line += m.style(cell(label, c.status), color, false) + " " + m.changeCell(row, c.changes)
+	if c.sync > 0 {
+		line += " " + m.style(cell(m.trackingCounts(row), c.sync), muted, false)
 	}
-	if m.iconMode == "ascii" && sync == "—" {
-		sync = "-"
-	}
-	line := pointer + " " + checkbox + " " + cell(gitcli.SafeText(row.Name), name) + " "
-	if branch > 0 {
-		line += m.style(cell(truncateMiddle(branchLabel(row), branch), branch), muted, false) + " "
-	}
-	line += m.style(cell(label, status), color, false) + " " + m.style(sync, muted, false)
+	line = cell(line, w)
 	if highlighted && !m.noColor {
-		return lipgloss.NewStyle().Background(lipgloss.Color(selection)).Foreground(lipgloss.Color(ink)).Bold(true).Render(cell(line, w))
+		return backgroundText(line, selection)
 	}
-	return cell(line, w)
+	return line
+}
+func (m *Model) trackingCounts(row app.Row) string {
+	s := row.Status
+	if !s.ComparisonKnown {
+		return "—"
+	}
+	parts := []string{}
+	if s.Ahead > 0 {
+		parts = append(parts, fmt.Sprintf("%s%d", m.symbols().ahead, s.Ahead))
+	}
+	if s.Behind > 0 {
+		parts = append(parts, fmt.Sprintf("%s%d", m.symbols().behind, s.Behind))
+	}
+	if len(parts) == 0 {
+		return "—"
+	}
+	return strings.Join(parts, " ")
+}
+func (m *Model) changeCell(row app.Row, w int) string {
+	if result, ok := m.detailCache[row.Path]; ok && result.err == nil {
+		added, deleted := 0, 0
+		for _, f := range result.data.Files {
+			added += f.Added
+			deleted += f.Deleted
+		}
+		if added > 0 || deleted > 0 {
+			return cell(m.delta(added, deleted), w)
+		}
+	}
+	files := max(row.Status.Changes, row.Status.Conflicts) + row.Status.Untracked
+	if files > 0 {
+		return m.style(cell(fileCount(files), w), muted, false)
+	}
+	return m.style(cell("—", w), muted, false)
+}
+func (m *Model) delta(added, deleted int) string {
+	parts := []string{}
+	if added > 0 {
+		parts = append(parts, m.style(fmt.Sprintf("+%d", added), success, false))
+	}
+	if deleted > 0 {
+		parts = append(parts, m.style(fmt.Sprintf("-%d", deleted), danger, false))
+	}
+	return strings.Join(parts, " ")
 }
 
 func branchLabel(row app.Row) string {
@@ -434,23 +493,6 @@ func (m *Model) guidance(row app.Row) string {
 	return nextStep(row)
 }
 
-func (m *Model) compactInspector() []string {
-	lines := []string{m.rule(m.width)}
-	if row := m.highlightedRow(); row != nil {
-		context := branchLabel(*row)
-		if row.Status.Upstream != "" {
-			context += " → " + gitcli.SafeText(row.Status.Upstream)
-		}
-		lines = append(lines, " "+m.style(gitcli.SafeText(row.Name), accent, true)+" · "+truncateMiddle(context, max(10, m.width-ansi.StringWidth(row.Name)-5)))
-		lines = append(lines, m.style(" "+truncatePath(gitcli.SafeText(row.Path), m.width-2), muted, false))
-		lines = append(lines, " "+cell(m.guidance(*row), m.width-2))
-		lines = append(lines, m.previewLines(*row)...)
-	} else {
-		lines = append(lines, " Highlight a repository to see its details.")
-	}
-	return lines
-}
-
 func (m *Model) notice() string {
 	if m.loadErr != "" {
 		return "Load error: " + gitcli.SafeText(m.loadErr) + " · d details"
@@ -485,29 +527,36 @@ func resultColor(state app.State) string {
 	}
 }
 
+func (m *Model) keyHint(key, label string) string {
+	return m.style("["+key+"]", accent, false) + " " + m.style(label, ink, false)
+}
 func (m *Model) footer() string {
 	if m.preparing || m.running {
-		return " Esc cancel operation · waiting for outcomes"
+		return m.keyHint("Esc", "Cancel") + "  " + m.style(m.progressLabel(), muted, false)
 	}
 	if m.filtering {
-		return " ↑↓ choose · Enter open · Esc clear"
+		return m.keyHint("↑↓", "Choose") + "  " + m.keyHint("Enter", "Open") + "  " + m.keyHint("Esc", "Clear")
 	}
 	if len(m.selected) > 0 && m.actions != nil {
-		return fmt.Sprintf(" %d selected · f Fetch · p Push · l Pull · : Actions", len(m.selected))
+		return fmt.Sprintf("%d selected  ", len(m.selected)) + m.keyHint("f", "Fetch") + "  " + m.keyHint("p", "Push") + "  " + m.keyHint("l", "Pull") + "  " + m.keyHint(":", "Actions")
 	}
-	footer := " Enter Open · d Changes · o Shell"
+	parts := []string{m.keyHint("Enter", "Open"), m.keyHint("d", "Diff")}
 	if row := m.highlightedRow(); row != nil && m.actions != nil {
 		s := row.Status
-		if s.Error == "" && s.Operation == "" && s.Conflicts == 0 && !s.Detached && !s.Unborn && s.Upstream != "" {
+		if s.Error == "" && s.Operation == "" && s.Conflicts == 0 && !s.Detached && !s.Unborn && s.Upstream != "" && s.ComparisonKnown {
 			if s.Ahead > 0 && s.Behind == 0 {
-				footer += " · p Push"
+				parts = append(parts, m.keyHint("p", "Push"))
 			}
 			if s.Behind > 0 && s.Ahead == 0 && !s.Dirty() {
-				footer += " · l Pull"
+				parts = append(parts, m.keyHint("l", "Pull"))
 			}
 		}
 	}
-	return footer + " · : Actions"
+	if m.width >= 100 {
+		parts = append(parts, m.keyHint("Space", "Select"), m.keyHint("o", "Shell"))
+	}
+	parts = append(parts, m.keyHint(":", "Actions"))
+	return strings.Join(parts, "  ")
 }
 
 func (m *Model) helpContent() []string {
@@ -556,11 +605,14 @@ func fitLines(lines []string, height int) []string {
 }
 
 func (m *Model) between(left, right string, width int) string {
-	gap := width - ansi.StringWidth(left) - ansi.StringWidth(right)
-	if gap < 2 {
-		return left
+	if right == "" {
+		return cell(left, width)
 	}
-	return left + strings.Repeat(" ", gap) + right
+	available := width - ansi.StringWidth(right) - 2
+	if available < 1 {
+		return cell(right, width)
+	}
+	return cell(left, available) + "  " + right
 }
 
 func (m *Model) screen(lines []string) tea.View {
@@ -570,9 +622,15 @@ func (m *Model) screen(lines []string) tea.View {
 	}
 	for i := range lines {
 		if m.iconMode == "ascii" {
-			lines[i] = strings.NewReplacer("…", "~", "·", "|", "→", "->", "↑", "^", "↓", "v", "—", "-", "▏", "|", "│", "|").Replace(lines[i])
+			lines[i] = strings.NewReplacer("…", "~", "·", "|", "→", "->", "↑", "^", "↓", "v", "—", "-", "▏", "|", "─", "-", "│", "|", "╭", "+", "╮", "+", "╰", "+", "╯", "+", "◇", "*", "●", "*", "◐", "o", "▱", "/", "↵", "Enter").Replace(lines[i])
 		}
 		lines[i] = ansi.Truncate(lines[i], w, "")
+	}
+	if !m.noColor {
+		lines = fitLines(lines, h)
+		for i := range lines {
+			lines[i] = backgroundText(cell(lines[i], w), background)
+		}
 	}
 	v := tea.NewView(strings.Join(lines, "\n"))
 	v.AltScreen = true
@@ -613,4 +671,41 @@ func (m *Model) documentView(content []string, footer string, offset int) tea.Vi
 	lines := append([]string(nil), header...)
 	lines = append(lines, fitLines(body[offset:min(len(body), offset+page)], page)...)
 	return m.screen(append(lines, foot...))
+}
+
+// A single light frame holds the workspace; it does not stretch a divider through
+// dozens of empty rows when there are only a handful of repositories.
+func (m *Model) frame(content []string, w int) []string {
+	if w < 4 {
+		return content
+	}
+	top := m.style("╭"+strings.Repeat("─", w-2)+"╮", border, false)
+	bottom := m.style("╰"+strings.Repeat("─", w-2)+"╯", border, false)
+	if m.iconMode == "ascii" {
+		top = m.style("+"+strings.Repeat("-", w-2)+"+", border, false)
+		bottom = top
+	}
+	lines := []string{top}
+	for _, line := range content {
+		lines = append(lines, m.style("│", border, false)+" "+cell(line, w-4)+" "+m.style("│", border, false))
+	}
+	return append(lines, bottom)
+}
+func (m *Model) sectionRule(title string, w int) string {
+	label := "─ " + title + " "
+	return m.style(label+strings.Repeat("─", max(0, w-ansi.StringWidth(label))), border, false)
+}
+
+func fileCount(n int) string {
+	if n == 1 {
+		return "1 file"
+	}
+	return fmt.Sprintf("%d files", n)
+}
+
+// Nested foreground styles reset SGR attributes. Restore the background after
+// each reset so selected rows and the dark canvas remain continuous.
+func backgroundText(text, color string) string {
+	prefix := ansi.NewStyle().BackgroundColor(lipgloss.Color(color)).String()
+	return prefix + strings.NewReplacer("\x1b[m", "\x1b[m"+prefix, "\x1b[0m", "\x1b[0m"+prefix).Replace(text) + ansi.ResetStyle
 }

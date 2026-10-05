@@ -114,7 +114,7 @@ func TestPaginationKeepsHighlightInRenderedList(t *testing.T) {
 			m.key(tea.KeyPressMsg{Code: code})
 			before := m.scroll
 			content := m.View().Content
-			if !strings.Contains(content, "> [ ] "+m.highlightedRow().Name) {
+			if !strings.Contains(content, ">  ▱ "+m.highlightedRow().Name) {
 				t.Fatalf("highlight hidden at %v: %s", size, content)
 			}
 			if before != m.scroll {
@@ -132,7 +132,7 @@ func TestIndependentStatesAndGuidance(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m.highlight = 1
 	content := m.View().Content
-	for _, want := range []string{"ATTENTION", "◆ changed", "↑3", "Only committed changes", "locally known refs"} {
+	for _, want := range []string{"attention", "◆ changed", "↑3", "Selected repository", "locally known refs"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("missing %q: %s", want, content)
 		}
@@ -194,7 +194,7 @@ func TestNoticeDoesNotHideHighlightedRow(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 16})
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
 	m.Update(key("f")) // Unavailable action displays a notice and shrinks the list.
-	if !strings.Contains(m.View().Content, "> [ ] repo-29") {
+	if !strings.Contains(m.View().Content, ">  ▱ repo-29") {
 		t.Fatal("notice hid highlighted repository")
 	}
 }
