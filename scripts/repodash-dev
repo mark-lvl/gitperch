@@ -6,31 +6,38 @@ launcher_path=$(readlink -f -- "${BASH_SOURCE[0]}")
 repo_root=$(dirname -- "$(dirname -- "$launcher_path")")
 go_command=${GO:-go}
 
-# /tmp is shared, so only trust paths owned by this user and not writable by others.
+# /tmp is shared, so only trust paths owned by this user and not writable by
+# others. Prints the first untrusted path.
 owned_private() {
     local path
     for path in "$@"; do
-        [[ ! -e "$path" ]] && continue
-        [[ -O "$path" && ! -L "$path" ]] || return 1
-        (( (8#$(stat -c '%a' -- "$path") & 8#022) == 0 )) || return 1
+        if [[ ! -O "$path" || -L "$path" ]] ||
+            (( (8#$(stat -c '%a' -- "$path") & 8#022) != 0 )); then
+            printf '%s' "$path"
+            return 1
+        fi
     done
 }
 
 if ! command -v -- "$go_command" >/dev/null 2>&1; then
+    toolchain=/tmp/repodash-toolchain
     # Reuse the toolchain documented in README for this development environment.
-    if [[ "$go_command" == go && -x /tmp/repodash-toolchain/go/bin/go ]] &&
-        [[ -d /tmp/repodash-toolchain ]] &&
-        owned_private /tmp/repodash-toolchain /tmp/repodash-toolchain/go \
-            /tmp/repodash-toolchain/go/bin /tmp/repodash-toolchain/go/bin/go \
-            "${GOCACHE:-/tmp/repodash-gocache}" "${GOPATH:-/tmp/repodash-gopath}"; then
-        go_command=/tmp/repodash-toolchain/go/bin/go
-        export PATH="/tmp/repodash-toolchain/go/bin:$PATH"
-        export GOCACHE="${GOCACHE:-/tmp/repodash-gocache}"
-        export GOPATH="${GOPATH:-/tmp/repodash-gopath}"
-    else
+    if [[ "$go_command" != go || ! -x "$toolchain/go/bin/go" ]]; then
         printf 'repodash: Go compiler unavailable (%s). Install Go or set GO to its executable path.\n' "$go_command" >&2
         exit 1
     fi
+    cache=${GOCACHE:-/tmp/repodash-gocache}
+    gopath=${GOPATH:-/tmp/repodash-gopath}
+    # Create the caches privately first so nobody else can claim the names.
+    mkdir -p -m 700 -- "$cache" "$gopath" 2>/dev/null || true
+    if ! untrusted=$(owned_private "$toolchain" "$toolchain/go" "$toolchain/go/bin" \
+        "$toolchain/go/bin/go" "$cache" "$gopath"); then
+        printf 'repodash: refusing development toolchain fallback: %s is not privately owned by %s.\n' "$untrusted" "$(id -un)" >&2
+        printf 'Install Go or set GO to its executable path.\n' >&2
+        exit 1
+    fi
+    go_command=$toolchain/go/bin/go
+    export PATH="$toolchain/go/bin:$PATH" GOCACHE="$cache" GOPATH="$gopath"
 fi
 
 mkdir -p -- "$repo_root/bin"
