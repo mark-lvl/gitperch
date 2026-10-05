@@ -13,17 +13,24 @@ tracked counts sum staged and unstaged changes rather than claiming a net diff.
 
 ## Responsive layout
 
-At 120+ columns and 20+ rows, a single compact attention panel accompanies the
-repository list. At narrower sizes the list and selected preview stack vertically.
-Branch columns appear when the list has at least 90 columns; otherwise the preview
-provides branch/upstream context. Below 20 rows the preview disappears before list
-rows. The recommended minimum is 60×12; smaller workspace screens show a resize
-message. Documents and reviews remain scrollable with fixed titles and footers.
+The workspace uses a restrained dark canvas, cyan selection accents, magenta
+branch metadata, small status badges, and one thin outer frame. Content follows
+the repository rows: a small workspace never creates a large empty gap above its
+preview. Unselected rows have no permanent checkbox; selected repositories carry
+a small filled marker. Zero tracking counts stay hidden.
+
+At 120+ columns, the selected preview can place changed files beside real recent
+commits. Smaller layouts stack content vertically. The table drops branch and
+tracking columns when its content width is below 80 columns. Below 20 rows the
+preview disappears before list rows. The recommended minimum is 60×12; smaller
+workspace screens show a resize message. Documents and reviews remain scrollable.
+The command palette floats over the current workspace and includes short command
+descriptions. It grows only enough to hold its results.
 
 Path and branch truncation preserve filenames and useful branch prefixes/tails.
-ANSI cell measurement handles wide characters and colored strings. Colors use the
-terminal's basic palette, and every status also has text/symbols. `--no-color` and
-`NO_COLOR` are supported.
+ANSI cell measurement handles wide characters and colored strings. Bubble Tea
+converts theme colors to the detected terminal profile, including 256/16-color
+terminals. `--no-color`, `NO_COLOR`, and ASCII icons remain supported.
 
 ## Keyboard
 
@@ -33,7 +40,8 @@ terminal's basic palette, and every status also has text/symbols. `--no-color` a
 | PgUp/PgDn, Home/End | Page or jump through the list |
 | Enter | Open repository Overview; while searching, open the selected result |
 | d | Open Changes, including the tracked patch |
-| Tab / Shift+Tab | Cycle repository scopes; in details, cycle sections |
+| Tab / Shift+Tab | Toggle All / Focus; in details, cycle sections |
+| [ / ] | Scroll files in the selected repository preview |
 | : or Ctrl+K | Fuzzy command palette; arrows choose, Enter runs, Esc closes |
 | / | Search repository name, path, or branch; arrows navigate results |
 | Esc | Clear/close search, return from details/help, cancel reviews |
@@ -48,14 +56,17 @@ terminal's basic palette, and every status also has text/symbols. `--no-color` a
 | ? | Scrollable help grouped by context |
 | q / Ctrl+C | Quit / interrupt; during operations request cancellation and wait |
 
-The palette exposes Focus / All as a direct toggle, as well as the less-common
+The palette exposes Changed/Ahead/Behind/Issues filters and Focus / All, plus the less-common
 selection, ordering, shell, fetch, and detail commands. Unsupported push/pull
 shortcuts are omitted based on known state; final plans always revalidate. Bulk
 plans may include ineligible repositories and explicitly explain skips.
 
 Repository details provide Overview, Changes, Commits (eight recent commits), and
-Worktree. Preview reads are asynchronous, canceled when navigating to another
-uncached repository, protected against stale results, and cached until refresh.
+Worktree. Overview shows a compact sample; Changes reveals every changed file and
+the colored patch. Preview reads are asynchronous, canceled when navigating to
+another uncached repository, protected against stale results, and cached until
+refresh. Full patches load only while Changes is open, cancel on leaving, and
+keep only the most recently opened repository's patch in memory.
 Rendering launches no Git commands. Full Git errors, discovery warnings, and
 operation results remain accessible in details. No automatic rebase or repair runs.
 
@@ -76,22 +87,29 @@ icons = "unicode"       # default; also "ascii" or "nerd"
 default_focus = false   # start in the attention scope when true
 ```
 
-Terminal palette colors follow the emulator's theme. No additional theme file,
+Colors degrade to the emulator's supported color profile. No additional theme file,
 automatic refresh timer, or unsafe confirmation bypass is introduced.
 
 ## Render captures and validation
 
-The deterministic captures use test fixtures, rendered by the production view:
+The deterministic captures use test fixtures, rendered by the production view.
+PNG captures are rasterized from its actual ANSI output:
 
-- [Wide, 160×45](captures/workspace-160x45.txt)
-- [Medium, 110×35](captures/workspace-110x35.txt)
-- [Narrow, 78×28](captures/workspace-78x28.txt)
-- [Minimum width, 60×20](captures/workspace-60x20.txt)
+- [Wide, 160×45](captures/workspace-160x45.png) · [text](captures/workspace-160x45.txt)
+- [Medium, 110×35](captures/workspace-110x35.png) · [text](captures/workspace-110x35.txt)
+- [Narrow, 78×28](captures/workspace-78x28.png) · [text](captures/workspace-78x28.txt)
+- [Minimum width, 60×20](captures/workspace-60x20.png) · [text](captures/workspace-60x20.txt)
+- [Command palette](captures/palette-110x35.png)
+- [Repository overview](captures/details-110x35.png)
 
 Run `go test ./...`, `go vet ./...`, `go test -race ./...`, and
 `go build -o bin/repodash ./cmd/repodash`. Launch `bin/repodash /path/to/workspace`.
 To deliberately update reviewed captures:
-`UPDATE_RENDERS=1 go test ./internal/tui -run TestWorkspaceRenderCaptures`.
+`UPDATE_RENDERS=1 go test ./internal/tui -run 'TestWorkspaceRenderCaptures|TestOverlayRenderCaptures'`.
+The tests also export color ANSI files into the system temporary directory. With
+optional development packages `pillow` and `pyte`, run
+`python scripts/render-captures.py` to regenerate the PNGs. These packages are not
+application dependencies.
 
 ## Deliberately unavailable
 

@@ -22,16 +22,23 @@ const (
 	border      = "#284052"
 )
 
-type icons struct{ clean, changed, ahead, behind, failed, pointer, rule string }
+type icons struct{ clean, changed, ahead, behind, failed, pointer, rule, repo, brand string }
 
 func iconSet(mode string) icons {
-	if mode == "ascii" {
-		return icons{"ok", "*", "^", "v", "!", ">", "-"}
+	i := icons{clean: "✓", changed: "◆", ahead: "↑", behind: "↓", failed: "×", pointer: ">", rule: "─", repo: "▱", brand: "◇"}
+	switch mode {
+	case "ascii":
+		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*"}
+	case "nerd":
+		i.clean = "\uf00c"
+		i.changed = "\uf044"
+		i.ahead = "\uf062"
+		i.behind = "\uf063"
+		i.failed = "\uf071"
+		i.repo = "\uf07b"
+		i.brand = "\uf1d3"
 	}
-	if mode == "nerd" {
-		return icons{"\uf00c", "\uf044", "\uf062", "\uf063", "\uf071", ">", "─"}
-	}
-	return icons{"✓", "◆", "↑", "↓", "×", ">", "─"}
+	return i
 }
 
 // truncateMiddle keeps a branch prefix and meaningful suffix. Path truncation

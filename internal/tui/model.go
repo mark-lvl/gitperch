@@ -31,6 +31,11 @@ type Model struct {
 	detailGeneration  uint64
 	detailCancel      context.CancelFunc
 	detailTab         int
+	loadPatch         patchLoader
+	patch             *patchResult
+	patchPath         string
+	patchCancel       context.CancelFunc
+	patchGeneration   uint64
 	paletteQuery      string
 	paletteCursor     int
 	lazyGitAvailable  bool
@@ -138,10 +143,14 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 	}
 	defer func() {
 		m.keepHighlightVisible()
+		m.contextOffset = min(m.contextOffset, m.maxContextOffset())
 		if row := m.highlightedRow(); row == nil || row.Path != previousPath {
 			m.contextOffset = 0
 		}
 		if extra := m.ensureDetail(); extra != nil {
+			cmd = tea.Batch(cmd, extra)
+		}
+		if extra := m.ensurePatch(); extra != nil {
 			cmd = tea.Batch(cmd, extra)
 		}
 	}()
@@ -149,6 +158,15 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		return m, cmd
 	}
 	switch msg := msg.(type) {
+	case patchMsg:
+		if msg.generation == m.patchGeneration {
+			m.patch = &msg.result
+			m.patchPath = ""
+			if m.patchCancel != nil {
+				m.patchCancel()
+				m.patchCancel = nil
+			}
+		}
 	case detailMsg:
 		if msg.generation == m.detailGeneration {
 			m.detailCache[msg.path] = msg.result
@@ -210,6 +228,8 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	m.detailGeneration++
 	m.detailPath = ""
 	m.detailCache = make(map[string]detailResult)
+	m.cancelPatch()
+	m.patch = nil
 	m.warnings = m.warnings[:0]
 	for _, warning := range snapshot.Warnings {
 		m.warnings = append(m.warnings, gitcli.SafeText(warning.Path+": "+warning.Message))
@@ -308,11 +328,22 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.palette = true
 			m.paletteQuery = ""
 			m.paletteCursor = 0
+		case "p":
+			return m.executeCommand("push")
+		case "l":
+			return m.executeCommand("pull")
+		case "f":
+			return m.executeCommand("fetch")
 		case "o":
 			return m.launchShell()
 		case "g":
 			return m.launchLazyGit()
-		case "esc", "d":
+		case "r":
+			return m.refresh()
+		case "d":
+			m.detailTab = 1
+			m.detailOffset = 0
+		case "esc":
 			m.details = false
 		case "j", "down":
 			m.detailOffset++
@@ -335,6 +366,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.filtering {
 		switch key {
 		case "enter":
+			if m.highlightedRow() == nil {
+				return nil
+			}
 			m.filtering = false
 			m.details = true
 			m.detailTab = 0
@@ -385,6 +419,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.help = true
 		m.helpOffset = 0
 	case "d":
+		if m.highlightedRow() == nil {
+			return nil
+		}
 		m.detailTab = 1
 		m.details = true
 		m.detailOffset = 0
@@ -405,22 +442,16 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.clearSelection()
 		m.highlight, m.scroll = 0, 0
 	case "r":
-		m.message = "Refreshing repository status"
+		m.message = ""
 		return m.refresh()
 	case "tab", "shift+tab":
-		step := 1
-		if key == "shift+tab" {
-			step = len(scopes) - 1
-		}
-		m.scope = (m.scope + step) % len(scopes)
-		m.clearSelection()
-		m.highlight, m.scroll = 0, 0
+		return m.executeCommand("focus")
 	case "[":
 		m.contextOffset = max(0, m.contextOffset-1)
 	case "]":
 		if row := m.highlightedRow(); row != nil {
-			if r, ok := m.detailCache[row.Path]; ok {
-				m.contextOffset = min(max(0, len(r.data.Files)-1), m.contextOffset+1)
+			if _, ok := m.detailCache[row.Path]; ok {
+				m.contextOffset = min(m.maxContextOffset(), m.contextOffset+1)
 			}
 		}
 	case "s":
@@ -501,6 +532,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return m.preparePreview(app.Fetch)
 	case "enter":
+		if m.highlightedRow() == nil {
+			return nil
+		}
 		m.details = true
 		m.detailTab = 0
 		m.detailOffset = 0

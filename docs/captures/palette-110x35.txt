@@ -1,0 +1,35 @@
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ◇ repodash  ~/dev/platform                                                       [6 repos] [! 5 attention] │
+│ All repositories  Focus                                                       Tab view · / search · ? help │
+│                                                                                                            │
+│      REPOSITORY                 BRANCH                              STATUS            CHANGES    SYNC      │
+│    ▱ api-service   ╭──────────────────────────────────────────────────────────────────╮          —         │
+│ >  ▱ design-system │ Actions                                                Esc close │8 -2      ↑3        │
+│    ▱ docs          │                                                                  │          ↓4        │
+│    ▱ experiment    │ > push▏                                                          │          —         │
+│    ▱ mobile        │ ──────────────────────────────────────────────────────────────── │          —         │
+│    ▱ worker        │ > Push design-system                                             │ file     ↑2 ↓1     │
+│ ─ Selected reposito│   Review fetch scope, then confirm exact commits                 │─────────────────── │
+│ design-system  feat│ ──────────────────────────────────────────────────────────────── │                    │
+│ Working tree · 2 fi│ ↑↓ choose   Enter run                                            │                    │
+│ M  src/theme/tokens╰──────────────────────────────────────────────────────────────────╯             +8 -2  │
+│ ?  tests/theme_test.go                                                                                     │
+│                                                                                                            │
+│ ↑3 ahead · locally known refs                                                                              │
+│ ────────────────────────────────────────────────────────────────────────────────────────────────────────── │
+│ [Enter] Open  [d] Diff  [p] Push  [Space] Select  [o] Shell  [:] Actions                                   │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+

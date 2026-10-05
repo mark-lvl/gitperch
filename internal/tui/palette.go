@@ -3,9 +3,11 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 	"fmt"
+	"github.com/charmbracelet/x/ansi"
 	"repodash/internal/app"
 	gitcli "repodash/internal/git"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -15,6 +17,9 @@ type command struct{ id, label string }
 // are omitted. The palette is the seam for future real agent/task commands.
 func (m *Model) commands() []command {
 	commands := []command{{"refresh", "Refresh workspace"}, {"focus", "Toggle Focus / all repositories"}, {"sort", "Sort attention / name"}, {"all", "Select / deselect visible repositories"}, {"help", "Keyboard help"}}
+	for i := 2; i < len(scopes); i++ {
+		commands = append(commands, command{fmt.Sprintf("scope:%d", i), "Show " + strings.ToLower(scopes[i]) + " repositories"})
+	}
 	row := m.highlightedRow()
 	if row == nil {
 		return commands
@@ -32,7 +37,7 @@ func (m *Model) commands() []command {
 		commands = append(commands, command{"fetch", "Fetch " + target})
 		s := row.Status
 		bulk := len(m.selected) > 0
-		syncable := s.Error == "" && s.Conflicts == 0 && s.Operation == "" && !s.Detached && !s.Unborn && s.Upstream != ""
+		syncable := s.Error == "" && s.Conflicts == 0 && s.Operation == "" && !s.Detached && !s.Unborn && s.Upstream != "" && s.ComparisonKnown
 		if bulk || (syncable && s.Ahead > 0 && s.Behind == 0) {
 			commands = append(commands, command{"push", "Push " + target})
 		}
@@ -93,6 +98,7 @@ func (m *Model) paletteCommands() []command {
 }
 func (m *Model) paletteKey(msg tea.KeyPressMsg) tea.Cmd {
 	items := m.paletteCommands()
+	m.paletteCursor = min(m.paletteCursor, max(0, len(items)-1))
 	switch msg.String() {
 	case "esc":
 		m.palette = false
@@ -121,6 +127,13 @@ func (m *Model) paletteKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 func (m *Model) executeCommand(id string) tea.Cmd {
+	if strings.HasPrefix(id, "scope:") {
+		scope, err := strconv.Atoi(strings.TrimPrefix(id, "scope:"))
+		if err == nil && scope >= 0 && scope < len(scopes) {
+			m.setScope(scope)
+		}
+		return nil
+	}
 	switch id {
 	case "details", "changes":
 		m.details = true
@@ -139,29 +152,19 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 		m.help = true
 		m.helpOffset = 0
 	case "all":
-		return m.key(keyPress("a"))
-	case "sort":
-		return m.key(keyPress("s"))
-	case "focus":
 		m.details = false
 		m.help = false
-		path := ""
-		if row := m.highlightedRow(); row != nil {
-			path = row.Path
+		return m.key(keyPress("a"))
+	case "sort":
+		m.details = false
+		m.help = false
+		return m.key(keyPress("s"))
+	case "focus":
+		scope := 1
+		if m.scope != 0 {
+			scope = 0
 		}
-		if m.scope == 1 {
-			m.scope = 0
-		} else {
-			m.scope = 1
-		}
-		m.clearSelection()
-		m.highlight, m.scroll = 0, 0
-		for i, index := range m.visibleRows() {
-			if m.rows[index].Path == path {
-				m.highlight = i
-				break
-			}
-		}
+		m.setScope(scope)
 	case "fetch", "push", "pull":
 		if m.actions == nil {
 			return nil
@@ -183,25 +186,110 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 	return nil
 }
 func keyPress(text string) tea.KeyPressMsg { return tea.KeyPressMsg{Code: []rune(text)[0], Text: text} }
+
+// Palette floats above the current workspace, retaining repository orientation.
 func (m *Model) paletteView() tea.View {
-	lines := []string{m.style(" Actions", accent, true), " > " + gitcli.SafeText(m.paletteQuery) + "▏", ""}
+	if m.width < 12 || m.height < 6 {
+		return m.screen([]string{"Actions", "> " + gitcli.SafeText(m.paletteQuery), "Esc close"})
+	}
+	w := min(68, m.width-4)
+	inner := w - 4
 	items := m.paletteCommands()
-	page := max(1, m.height-5)
-	start := max(0, m.paletteCursor-page+1)
+	cursor := min(m.paletteCursor, max(0, len(items)-1))
+	page := max(1, min(7, (m.height-10)/2))
+	start := max(0, cursor-page+1)
+	title := m.between(m.style("Actions", accent, true), m.style("Esc close", muted, false), inner)
+	query := "Search commands…"
+	if m.paletteQuery != "" {
+		query = gitcli.SafeText(m.paletteQuery)
+	}
+	lines := []string{title, "", m.style("> "+cell(query+"▏", max(1, inner-2)), accent, false), m.rule(inner)}
 	for i := start; i < min(len(items), start+page); i++ {
-		prefix := "   "
-		if i == m.paletteCursor {
-			prefix = " > "
+		pointer := " "
+		if i == cursor {
+			pointer = ">"
 		}
-		line := prefix + items[i].label
-		if i == m.paletteCursor {
-			line = m.style(line, accent, true)
+		line := m.style(pointer+" ", accent, true) + m.style(cell(items[i].label, inner-2), ink, i == cursor)
+		description := "  " + m.commandHint(items[i].id)
+		if i == cursor && !m.noColor {
+			line = backgroundText(line, selection)
+			description = backgroundText(cell(m.style(description, muted, false), inner), selection)
+		} else {
+			description = m.style(description, muted, false)
 		}
-		lines = append(lines, line)
+		lines = append(lines, line, description)
 	}
 	if len(items) == 0 {
-		lines = append(lines, " No matching actions")
+		lines = append(lines, m.style("No matching actions", muted, false))
 	}
-	lines = fitLines(lines, max(0, m.height-1))
-	return m.screen(append(lines, " ↑↓ choose · Enter run · Esc close"))
+	lines = append(lines, m.rule(inner), m.style("↑↓ choose   Enter run", muted, false))
+	panel := m.frame(lines, w)
+	if len(panel) > m.height {
+		panel = panel[:m.height]
+	}
+	base := m.workspaceLines()
+	if m.details {
+		base = strings.Split(m.detailsView().Content, "\n")
+	}
+	base = fitLines(base, m.height)
+	x, y := (m.width-w)/2, max(0, (min(m.height, len(m.workspaceLines()))-len(panel))/2)
+	for i, line := range panel {
+		if !m.noColor {
+			line = backgroundText(line, surface)
+		}
+		if y+i >= m.height {
+			break
+		}
+		under := cell(base[y+i], m.width)
+		base[y+i] = ansi.Cut(under, 0, x) + cell(line, w) + ansi.Cut(under, x+w, m.width)
+	}
+	return m.screen(base)
+}
+func (m *Model) commandHint(id string) string {
+	switch id {
+	case "details":
+		return "Overview, working tree and recent commits"
+	case "changes":
+		return "Changed files and tracked patch"
+	case "shell":
+		return "Interactive shell in the highlighted repository"
+	case "lazygit":
+		return "Open the installed Git interface"
+	case "fetch":
+		return "Review targets before contacting remotes"
+	case "push":
+		return "Review fetch scope, then confirm exact commits"
+	case "pull":
+		return "Review and confirm fast-forward integration"
+	case "focus":
+		return "Switch between all repos and needs attention"
+	case "sort":
+		return "Change order while retaining the highlighted repo"
+	case "all":
+		return "Toggle bulk selection of visible repositories"
+	case "refresh":
+		return "Reload local Git status and repository context"
+	case "help":
+		return "Navigation, repository and bulk operations"
+	default:
+		return "Filter the workspace; clear bulk selection"
+	}
+}
+func (m *Model) setScope(scope int) {
+	path := ""
+	if row := m.highlightedRow(); row != nil {
+		path = row.Path
+	}
+	m.details = false
+	m.help = false
+	m.scope = scope
+	m.clearSelection()
+	m.highlight, m.scroll = 0, 0
+	for i, index := range m.visibleRows() {
+		if m.rows[index].Path == path {
+			m.highlight = i
+			break
+		}
+	}
+	m.keepHighlightVisible()
 }

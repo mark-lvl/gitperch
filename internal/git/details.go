@@ -18,7 +18,6 @@ type ChangedFile struct {
 }
 type Commit struct{ OID, Subject string }
 type RepoDetails struct {
-	Diff    string
 	Files   []ChangedFile
 	Commits []Commit
 }
@@ -75,13 +74,6 @@ func (r Runner) Details(ctx context.Context, path string) (RepoDetails, error) {
 			}
 		}
 	}
-	for _, args := range [][]string{{"diff", "--color=never", "--no-ext-diff", "--no-textconv"}, {"diff", "--cached", "--color=never", "--no-ext-diff", "--no-textconv"}} {
-		out, err = r.Run(ctx, path, args...)
-		if err != nil {
-			return d, err
-		}
-		d.Diff += string(out.Stdout)
-	}
 	// An unborn branch legitimately has no history.
 	_, headErr := r.Run(ctx, path, "rev-parse", "--verify", "--quiet", "HEAD")
 	var exitErr *exec.ExitError
@@ -100,4 +92,18 @@ func (r Runner) Details(ctx context.Context, path string) (RepoDetails, error) {
 		d.Commits = append(d.Commits, Commit{OID: strings.TrimSpace(fields[i]), Subject: fields[i+1]})
 	}
 	return d, nil
+}
+
+// Patch is separate from the preview read model so browsing repositories never
+// loads and caches multi-megabyte patches. Output and deadlines use the runner.
+func (r Runner) Patch(ctx context.Context, path string) (string, error) {
+	var patch strings.Builder
+	for _, args := range [][]string{{"diff", "--color=never", "--no-ext-diff", "--no-textconv"}, {"diff", "--cached", "--color=never", "--no-ext-diff", "--no-textconv"}} {
+		out, err := r.Run(ctx, path, args...)
+		patch.Write(out.Stdout)
+		if err != nil {
+			return patch.String(), err
+		}
+	}
+	return patch.String(), nil
 }

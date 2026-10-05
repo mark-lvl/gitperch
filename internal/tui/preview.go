@@ -30,11 +30,11 @@ func (m *Model) selectedPreview(w, h int) []string {
 	}
 	rightWidth := w - leftWidth - 3
 	count := max(row.Status.Changes, row.Status.Conflicts) + row.Status.Untracked
-	if loaded {
+	if loaded && result.err == nil {
 		count = len(result.data.Files)
 	}
 	heading := "Working tree · " + fileCount(count)
-	if !row.Status.Dirty() && row.Status.Error == "" {
+	if count == 0 && row.Status.Error == "" {
 		heading = "Working tree · clean"
 	}
 	head := m.style(heading, muted, false)
@@ -119,4 +119,24 @@ func (m *Model) renderFile(file gitcli.ChangedFile, w int) string {
 	}
 	pathWidth := max(1, w-4-ansi.StringWidth(delta)-1)
 	return m.style(cell(code, 2), color, true) + " " + m.style(cell(truncatePath(gitcli.SafeText(file.Path), pathWidth), pathWidth), ink, false) + " " + delta
+}
+
+func (m *Model) maxContextOffset() int {
+	row := m.highlightedRow()
+	if row == nil {
+		return 0
+	}
+	data, ok := m.detailCache[row.Path]
+	if !ok {
+		return 0
+	}
+	height := m.layout().bottom - 2
+	if m.notice() != "" {
+		height--
+	}
+	available := height - 4
+	if height >= 8 {
+		available--
+	}
+	return max(0, len(data.data.Files)-max(1, available))
 }

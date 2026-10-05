@@ -58,3 +58,16 @@ repository sections, help, six sizes from 160×45 to 45×8, quit, and alternate-
 restoration. Windows Terminal and specific installed Nerd Fonts were not tested.
 The linked design reference was inaccessible; the written UX specification guided
 the implementation. Full usage and captures are in `docs/ui.md`.
+
+## Reference-based correction
+
+The public image was retrieved directly from its share page on the follow-up.
+It revealed that the first pass lacked the requested visual hierarchy. The revised
+workspace uses compact content-driven geometry, a dark navy canvas, cyan accents,
+magenta branches, a continuous subtle selection background, and a bounded palette.
+Recent commits accompany changed files only in the wide selected preview; a
+permanent attention sidebar is no longer necessary. Full patches load separately
+on demand. Regression tests cover scope toggling/identity, palette actions from
+details, empty search, accurate hidden counts, preview scroll bounds, lazy patch
+loading and stale-result rejection. ANSI-derived PNG captures now accompany the
+text captures for visual review.

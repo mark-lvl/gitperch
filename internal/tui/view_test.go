@@ -36,8 +36,8 @@ func TestQuickViewsAndAttentionOrder(t *testing.T) {
 	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
 	m.key(key(" "))
 	want := []int{5, 2, 2, 2, 3, 6}
-	for _, count := range want {
-		m.key(tea.KeyPressMsg{Code: tea.KeyTab})
+	for i, count := range want {
+		m.setScope((i + 1) % len(scopes))
 		if len(m.visibleRows()) != count || len(m.selected) != 0 {
 			t.Fatalf("scope %s: %d rows, selection %v", scopes[m.scope], len(m.visibleRows()), m.selected)
 		}
@@ -52,8 +52,8 @@ func TestQuickViewsAndAttentionOrder(t *testing.T) {
 		t.Fatal("errors and conflicts should sort first")
 	}
 	m.key(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
-	if m.scope != 5 {
-		t.Fatal("reverse view navigation")
+	if m.scope != 1 {
+		t.Fatal("Tab should toggle All / Focus")
 	}
 }
 

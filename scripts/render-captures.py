@@ -22,7 +22,7 @@ def color(value, default):
 def render(source, target, width, height):
     screen = pyte.Screen(width, height)
     pyte.Stream(screen).feed(source.read_text().replace('\n', '\r\n'))
-    cw, ch, pad = 10, 22, 16
+    cw, ch, pad = 10, 20, 16
     font = ImageFont.truetype(FONT, 16)
     bold = ImageFont.truetype(FONT.replace('.ttf', '-Bold.ttf'), 16)
     canvas = Image.new('RGB', (width*cw+2*pad, height*ch+2*pad), '#080808')
@@ -45,5 +45,9 @@ if __name__ == '__main__':
         width, height = map(int, size.split('x'))
         render(Path('/tmp') / f'repodash-{size}.ansi',
                Path('docs/captures') / f'workspace-{size}.png', width, height)
+    for mode in ('palette', 'details'):
+        source = Path('/tmp') / f'repodash-{mode}-110x35.ansi'
+        if source.exists():
+            render(source, Path('docs/captures') / f'{mode}-110x35.png', 110, 35)
     if len(sys.argv) == 5:
         render(Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))

@@ -4,7 +4,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"context"
 	"fmt"
-	"repodash/internal/app"
 	gitcli "repodash/internal/git"
 	"strings"
 )
@@ -49,92 +48,98 @@ func (m *Model) ensureDetail() tea.Cmd {
 		return detailMsg{path, generation, detailResult{data, err}}
 	}
 }
-func fileLine(file gitcli.ChangedFile, width int) string {
-	delta := ""
-	if file.Binary {
-		delta = "binary"
-	} else if file.Added > 0 || file.Deleted > 0 {
-		delta = fmt.Sprintf("+%d -%d", file.Added, file.Deleted)
-	}
-	return " " + cell(gitcli.SafeText(file.Code), 2) + " " + cell(truncatePath(gitcli.SafeText(file.Path), max(1, width-len(delta)-6)), max(1, width-len(delta)-6)) + " " + delta
-}
-func (m *Model) previewLines(row app.Row) []string {
-	if m.loadDetails == nil {
-		return []string{fmt.Sprintf(" %d changed · %d untracked · %d conflicts · locally known refs", row.Status.Changes, row.Status.Untracked, row.Status.Conflicts)}
-	}
-	result, ok := m.detailCache[row.Path]
-	if !ok {
-		return []string{m.style(" Loading changes…", muted, false)}
-	}
-	if result.err != nil {
-		return []string{m.style(" Preview unavailable · Enter for error details", amber, false)}
-	}
-	lines := []string{}
-	for _, file := range result.data.Files[:min(3, len(result.data.Files))] {
-		lines = append(lines, fileLine(file, m.width))
-	}
-	if len(lines) == 0 {
-		lines = append(lines, m.style(" Working tree clean · compared with locally known refs", muted, false))
-	}
-	return lines
-}
-
 func (m *Model) repositoryDetails() []string {
 	row := m.highlightedRow()
 	if row == nil {
 		return m.detailsContent()
 	}
-	lines := []string{m.style(" repodash / "+gitcli.SafeText(row.Name), accent, true), m.rule(m.width)}
+	w := max(1, m.width)
+	title := m.between(m.style(" repodash / "+gitcli.SafeText(row.Name), accent, true), m.style("Esc workspace ", muted, false), w)
+	lines := []string{title, m.rule(w)}
 	tabs := []string{"Overview", "Changes", "Commits", "Worktree"}
-	labels := append([]string(nil), tabs...)
-	labels[m.detailTab] = "[" + labels[m.detailTab] + "]"
-	lines = append(lines, " "+strings.Join(labels, "  "), "Path: "+gitcli.SafeText(row.Path), m.detailLine(*row))
+	for i := range tabs {
+		if i == m.detailTab {
+			tabs[i] = m.style("["+tabs[i]+"]", accent, true)
+		} else {
+			tabs[i] = m.style(tabs[i], muted, false)
+		}
+	}
+	lines = append(lines, " "+strings.Join(tabs, "  "), m.style("Path: "+gitcli.SafeText(row.Path), muted, false))
+	branch := branchLabel(*row)
+	if row.Status.Upstream != "" {
+		branch += " → " + gitcli.SafeText(row.Status.Upstream)
+	}
+	label, color := m.primaryStatus(*row)
+	lines = append(lines, " "+m.style(branch, branchColor, false), " "+m.style(label, color, false)+"  "+m.previewHint(*row))
 	result, loaded := m.detailCache[row.Path]
 	if row.Status.Error != "" {
-		lines = append(lines, "Error: "+gitcli.SafeText(row.Status.Error))
+		lines = append(lines, "", m.style("Error: "+gitcli.SafeText(row.Status.Error), danger, false))
 	}
 	if result.err != nil {
-		lines = append(lines, "Preview error: "+gitcli.SafeText(result.err.Error()))
+		lines = append(lines, "", m.style("Preview error: "+gitcli.SafeText(result.err.Error()), danger, false))
+	}
+	appendFiles := func(limit int) {
+		lines = append(lines, "", m.style(" Working tree", accent, true))
+		if loaded && len(result.data.Files) == 0 && result.err == nil {
+			lines = append(lines, m.style(" No uncommitted changes", muted, false))
+		}
+		for _, file := range result.data.Files[:min(limit, len(result.data.Files))] {
+			lines = append(lines, " "+m.renderFile(file, w-2))
+		}
+		if len(result.data.Files) > limit {
+			lines = append(lines, m.style(fmt.Sprintf(" %d more files · Tab for Changes", len(result.data.Files)-limit), muted, false))
+		}
+	}
+	appendCommits := func(limit int) {
+		lines = append(lines, "", m.style(" Recent commits", accent, true))
+		if loaded && len(result.data.Commits) == 0 && result.err == nil {
+			lines = append(lines, m.style(" No commits", muted, false))
+		}
+		for _, commit := range result.data.Commits[:min(limit, len(result.data.Commits))] {
+			lines = append(lines, " "+m.style(gitcli.SafeText(commit.OID), accent, false)+"  "+gitcli.SafeText(commit.Subject))
+		}
 	}
 	switch m.detailTab {
 	case 0:
-		lines = append(lines, "", m.guidance(*row), "", " Working tree")
-		for _, file := range result.data.Files {
-			lines = append(lines, fileLine(file, m.width))
-		}
-		lines = append(lines, "", " Recent commits")
-		for _, commit := range result.data.Commits {
-			lines = append(lines, " "+gitcli.SafeText(commit.OID)+"  "+gitcli.SafeText(commit.Subject))
-		}
+		appendFiles(4)
+		appendCommits(3)
 	case 1:
-		lines = append(lines, "", " Working tree (staged + unstaged line counts)")
-		for _, file := range result.data.Files {
-			lines = append(lines, fileLine(file, m.width))
-		}
-		if loaded && len(result.data.Files) == 0 {
-			lines = append(lines, " No changed files")
-		}
-		if result.data.Diff != "" {
-			lines = append(lines, "", " Tracked patch (unstaged, then staged)")
-			for _, line := range strings.Split(result.data.Diff, "\n") {
-				lines = append(lines, gitcli.SafeText(line))
+		appendFiles(len(result.data.Files))
+		lines = append(lines, "", m.style(" Tracked patch · unstaged, then staged", accent, true))
+		if m.patch != nil && m.patch.path == row.Path {
+			if m.patch.err != nil {
+				lines = append(lines, m.style(" "+gitcli.SafeText(m.patch.err.Error()), danger, false))
 			}
+			lines = append(lines, m.patch.lines...)
+			if len(m.patch.lines) == 0 && m.patch.err == nil {
+				lines = append(lines, m.style(" No tracked patch · untracked file contents are not included", muted, false))
+			}
+		} else if m.loadPatch != nil {
+			lines = append(lines, m.style(" Loading patch…", muted, false))
 		}
 	case 2:
-		for _, commit := range result.data.Commits {
-			lines = append(lines, " "+gitcli.SafeText(commit.OID)+"  "+gitcli.SafeText(commit.Subject))
-		}
-		if loaded && len(result.data.Commits) == 0 {
-			lines = append(lines, " No commits")
-		}
+		appendCommits(len(result.data.Commits))
 	case 3:
-		lines = append(lines, "", "Common Git directory: "+gitcli.SafeText(row.Status.CommonDir), "Operation: "+gitcli.SafeText(row.Status.Operation))
+		operation := gitcli.SafeText(row.Status.Operation)
+		if operation == "" {
+			operation = "idle"
+		}
+		upstream := gitcli.SafeText(row.Status.Upstream)
+		if upstream == "" {
+			upstream = "none"
+		}
+		lines = append(lines, "", m.style(" Worktree metadata", accent, true), " Branch: "+branchLabel(*row), " Upstream: "+upstream, " Common Git directory: "+gitcli.SafeText(row.Status.CommonDir), " Operation: "+operation)
+		if !row.LastFetch.IsZero() {
+			lines = append(lines, " Last successful fetch: "+row.LastFetch.Format("2006-01-02 15:04:05"))
+		}
 	}
 	if m.loadDetails != nil && !loaded {
-		lines = append(lines, " Loading repository context…")
+		lines = append(lines, m.style(" Loading repository context…", muted, false))
+	}
+	if m.attentionRank(*row) > 0 {
+		lines = append(lines, "", m.style(" Next step", accent, true), " "+m.guidance(*row))
 	}
 	diagnostics := m.detailsContent()
-	// Workspace errors and operation results remain fully accessible.
 	for i, line := range diagnostics {
 		if strings.Contains(line, "BATCH RESULTS") || strings.Contains(line, "WORKSPACE WARNINGS") {
 			lines = append(lines, diagnostics[i:]...)
@@ -154,5 +159,8 @@ func (m *Model) closeReads() {
 	}
 	if m.detailCancel != nil {
 		m.detailCancel()
+	}
+	if m.patchCancel != nil {
+		m.patchCancel()
 	}
 }

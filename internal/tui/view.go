@@ -66,15 +66,15 @@ func hasIssue(row app.Row) bool {
 }
 
 type dashboardLayout struct {
-	split                                                     bool // wide selected preview: changes alongside recent commits
-	listWidth, inspectorWidth, body, slots, rowHeight, bottom int
+	split                          bool // wide selected preview: changes alongside recent commits
+	listWidth, body, slots, bottom int
 }
 
 // Geometry follows content as well as the viewport. A small workspace must not
 // create a screenful of blank rows between repositories and their context.
 func (m *Model) layout() dashboardLayout {
 	w, h := max(1, m.width), max(1, m.height)
-	l := dashboardLayout{listWidth: max(1, w-4), rowHeight: 1, bottom: 2}
+	l := dashboardLayout{listWidth: max(1, w-4), bottom: 2}
 	preview := 0
 	if h >= 20 {
 		desired := 6
@@ -171,7 +171,7 @@ func (m *Model) summaryLineAt(w int) string {
 	if activity != "" && w >= 100 {
 		right += "  " + m.style(activity, working, false)
 	}
-	brand := m.style("◇ repodash", accent, true)
+	brand := m.style(m.symbols().brand+" repodash", accent, true)
 	locationWidth := w - ansi.StringWidth(brand) - ansi.StringWidth(right) - 5
 	left := brand
 	if locationWidth > 3 {
@@ -188,7 +188,17 @@ func (m *Model) searchLineAt(w int) string {
 		if m.filtering {
 			query += "▏"
 		}
-		return m.between(m.style("/ "+truncatePath(query, max(1, w-25)), accent, true), m.style("Esc clear · Enter open", muted, false), w)
+		context := scopes[m.scope]
+		if m.scope == 1 {
+			hidden := 0
+			for _, row := range m.rows {
+				if m.attentionRank(row) == 0 {
+					hidden++
+				}
+			}
+			context = fmt.Sprintf("Focus · %d healthy hidden", hidden)
+		}
+		return m.between(m.style("/ "+query, accent, true), m.style(context, muted, false), w)
 	}
 	all, focus := m.style("All repositories", muted, false), m.style("Focus", muted, false)
 	if m.scope == 0 {
@@ -201,6 +211,7 @@ func (m *Model) searchLineAt(w int) string {
 		left += "  " + m.style(scopes[m.scope], accent, true)
 	}
 	if m.scope == 1 {
+		left = m.style("Focus", accent, true)
 		hidden := 0
 		for _, row := range m.rows {
 			if m.attentionRank(row) == 0 {
@@ -209,7 +220,16 @@ func (m *Model) searchLineAt(w int) string {
 		}
 		left += m.style(fmt.Sprintf(" · %d healthy hidden", hidden), muted, false)
 	}
-	return m.between(left, m.style("Tab view · / search · ? help", muted, false), w)
+	right := "Tab view · / search · ? help"
+	if m.loading {
+		right = "Refreshing local status…"
+	}
+	visible := len(m.visibleRows())
+	l := m.layout()
+	if visible > l.slots && !m.loading {
+		right = fmt.Sprintf("%d–%d/%d · / search", m.scroll+1, min(visible, m.scroll+l.slots), visible)
+	}
+	return m.between(left, m.style(right, muted, false), w)
 }
 func (m *Model) repositoryList(l dashboardLayout) []string {
 	indices := m.visibleRows()
@@ -318,20 +338,18 @@ func (m *Model) tableRow(row app.Row, highlighted bool, w int) string {
 			mark = "*"
 		}
 	}
-	repoIcon := "▱"
-	if m.iconMode == "nerd" {
-		repoIcon = "\uf07b"
-	}
-	if m.iconMode == "ascii" {
-		repoIcon = "/"
-	}
+	repoIcon := m.symbols().repo
 	c := columns(w)
 	label, color := m.primaryStatus(row)
 	line := m.style(pointer+mark, accent, true) + " " + m.style(repoIcon, amber, false) + " " + m.style(cell(gitcli.SafeText(row.Name), c.name), ink, highlighted) + " "
 	if c.branch > 0 {
 		line += m.style(cell(truncateMiddle(branchLabel(row), c.branch), c.branch), branchColor, false) + " "
 	}
-	line += m.style(cell(label, c.status), color, false) + " " + m.changeCell(row, c.changes)
+	statusCell := m.style(cell(label, c.status), color, false)
+	if label == m.symbols().clean+" clean" {
+		statusCell = cell(m.style(m.symbols().clean, success, false)+m.style(" clean", muted, false), c.status)
+	}
+	line += statusCell + " " + m.changeCell(row, c.changes)
 	if c.sync > 0 {
 		line += " " + m.style(cell(m.trackingCounts(row), c.sync), muted, false)
 	}
@@ -562,13 +580,13 @@ func (m *Model) footer() string {
 func (m *Model) helpContent() []string {
 	lines := []string{
 		m.style(" repodash / Keyboard guide", accent, true), m.rule(max(1, m.width)),
-		" NAVIGATION", " ↑↓ / j k      Move between repositories", " PgUp / PgDn   Move one page · Home / End jump to first / last",
-		" Tab / Shift+Tab  Cycle All, Attention, Changed, Ahead, Behind, Issues",
+		" NAVIGATION", " ↑↓ / j k      Move between repositories", " [ / ]         Scroll the selected preview's changed files", " PgUp / PgDn   Move one page · Home / End jump to first / last",
+		" Tab / Shift+Tab  Toggle All / Focus; more filters live in Actions",
 		" /             Search name, path or branch · arrows move · Enter opens", " s             Toggle name / attention order · r refresh local status",
 		"", " REPOSITORY ACTIONS", " Enter / d     Open repository overview / changes · Tab switches section", " o             Open a shell in the highlighted worktree", " g             Open LazyGit in the highlighted worktree",
 		"", " BULK OPERATIONS", " Space         Toggle selection · a selects / deselects visible rows",
 		" f             Review fetch targets, then confirm", " p / l         Review fetch scope → fetch → review push / FF pull → confirm",
-		" Search or view changes clear selection. Actions require explicit selection.",
+		" Search/view changes clear selection. Push/pull use the highlighted row when none are selected.",
 		"", " GLOBAL COMMANDS", " : / Ctrl+K    Fuzzy command palette · arrows choose · Enter runs", " ?             Help · q quit · Ctrl+C interrupt", "", " AGENT ACTIONS", " No agent integration is configured in this application.", "", " Sync counts use locally known refs. Fetch checks the remote.", " ↑ ahead · ↓ behind · unknown never means up to date.",
 		" Esc cancels previews; during a batch it requests cancellation.", " Esc clears search, then dismisses results. q quits; Ctrl+C interrupts.",
 	}
@@ -693,7 +711,7 @@ func (m *Model) frame(content []string, w int) []string {
 }
 func (m *Model) sectionRule(title string, w int) string {
 	label := "─ " + title + " "
-	return m.style(label+strings.Repeat("─", max(0, w-ansi.StringWidth(label))), border, false)
+	return m.style("─ ", border, false) + m.style(title, muted, false) + m.style(" "+strings.Repeat("─", max(0, w-ansi.StringWidth(label))), border, false)
 }
 
 func fileCount(n int) string {

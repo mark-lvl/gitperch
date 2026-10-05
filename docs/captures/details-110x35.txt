@@ -1,0 +1,35 @@
+ repodash / design-system                                                                       Esc workspace
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ [Overview]  Changes  Commits  Worktree
+Path: /home/mark/projects/design-system
+ feat/tokens → origin/feat/tokens
+ ◆ changed  ↑3 ahead · locally known refs
+
+ Working tree
+ M  src/theme/tokens.go                                                                                +8 -2
+ ?  tests/theme_test.go
+
+ Recent commits
+ 29ac81  Add semantic theme tokens
+ fe2034  Refactor shared components
+
+ Next step
+ Press p to review a push. Only committed changes are included.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ↑↓ scroll · Tab section · o shell · : actions · Esc back

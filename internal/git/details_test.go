@@ -22,7 +22,11 @@ func TestDetailsRealChangesAndHistoryAreReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(data.Diff, "+unstaged") || !strings.Contains(data.Diff, "+staged") {
+	patch, err := (Runner{}).Patch(context.Background(), d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(patch, "+unstaged") || !strings.Contains(patch, "+staged") {
 		t.Fatal("tracked patches missing")
 	}
 	if len(data.Files) != 2 || len(data.Commits) != 1 {

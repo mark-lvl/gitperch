@@ -12,16 +12,20 @@ and performs no network access.
    bin/repodash --no-color "$demo_root/workspace"
    ```
 
-   Confirm path, branch, independent status
-   markers and local-ref comparison wording. An absent upstream must not show
+   Confirm workspace counts, paths, branches, independent worktree and sync
+   columns, and local-ref comparison wording. An absent upstream must not show
    synchronized.
 2. Move with `j`/`k` and arrows. Select with Space, then toggle all visible rows
-   with `a`. Confirm the selected count.
+   with `a`. Confirm the selected count and contextual action shortcuts. Page
+   through the list with PgUp/PgDn and Home/End. Use Tab and Shift+Tab to cycle
+   quick views; confirm changing views clears selection. Press `s` and verify
+   attention ordering while the highlight retains its repository identity.
 3. Enter `/`, type a name/path/branch filter and confirm selection clears. Try
    no matches, Backspace, Enter and Esc. Hidden rows must not stay selected.
 4. Press `r` repeatedly. Confirm the UI responds while refreshing, results retain
    path identity and the latest refresh wins.
-5. Show help with `?`; use `d` and j/k to inspect full diagnostics and root warnings,
+5. Show help with `?` and scroll to the end; return with Esc. Use `d` and
+   arrows or PgUp/PgDn to inspect full diagnostics and root warnings,
    including long errors. Inspect the highlighted repository's error details when
    using an invalid `.git` candidate. Try an empty directory and a missing root.
 6. Press Enter to start a child shell. Check `pwd`, type `exit`, and confirm the
@@ -30,13 +34,16 @@ and performs no network access.
 7. Press `g` with LazyGit absent: confirm an actionable message. With LazyGit
    installed, open and quit it, then confirm restore/refresh. A temporary test
    executable can verify terminal lifecycle, but does not verify LazyGit itself.
-8. Resize to a narrow and short terminal; test long names and branches. Confirm
+8. Resize above and below 112 columns; confirm the inspector moves beside or
+   below the list. Resize to a narrow and short terminal; test long names and
+   branches. Check guidance for changed, behind, detached, and unknown rows. Confirm
    no panics or terminal control characters from repository data.
 9. Quit with `q`, relaunch and quit with Ctrl+C. Confirm the terminal remains
    usable. Repeat with `NO_COLOR=1`.
 10. Test the two-stage fast-forward pull on `behind`: select only that row with
     Space, press `l`, and inspect the immutable fetch-scope preview. Confirm the
-    remote and branch are visible. Press Enter once; wait for fetch and inspect
+    remote and branch are visible, eligible/skipped counts are correct, and
+    the confirmation footer remains visible while PgUp/PgDn scrolls details. Press Enter once; wait for fetch and inspect
     the refreshed final preview. It should name the exact commit and show
     fast-forward integration. Press Esc to cancel, then repeat and press Enter
     a second time. Confirm `peer.txt` appears in the worktree and the refreshed
