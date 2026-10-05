@@ -420,7 +420,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.help = true
 		m.helpOffset = 0
 	case "d":
-		if m.highlightedRow() == nil {
+		// Diagnostics stay reachable when no repository row is visible.
+		if m.highlightedRow() == nil && !m.hasDiagnostics() {
 			return nil
 		}
 		m.detailTab = 1
@@ -598,6 +599,10 @@ func (m *Model) launchLazyGit() tea.Cmd {
 }
 
 func (m *Model) clearSelection() { m.selected = make(map[string]bool) }
+
+func (m *Model) hasDiagnostics() bool {
+	return len(m.warnings) > 0 || m.loadErr != "" || len(m.results) > 0
+}
 
 func (m *Model) selectedPaths() []string {
 	paths := make([]string, 0, len(m.selected))

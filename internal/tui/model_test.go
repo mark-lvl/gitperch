@@ -204,3 +204,13 @@ func TestMissingLazyGitAndChildReturnRefresh(t *testing.T) {
 		t.Fatal("child return did not refresh")
 	}
 }
+
+func TestWarningsReviewableWithoutRows(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.width, m.height = 100, 30
+	m.applySnapshot(app.Snapshot{Warnings: []discovery.Warning{{Path: "/missing", Message: "no such directory"}}})
+	m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	if !m.details || !strings.Contains(m.View().Content, "no such directory") {
+		t.Fatalf("warning not reviewable: details=%v\n%s", m.details, m.View().Content)
+	}
+}
