@@ -191,6 +191,14 @@ func TestDisplaySafety(t *testing.T) {
 	if strings.Contains(s, "secret") || strings.ContainsAny(s, "\x1b\n") || !strings.Contains(s, "[redacted]") {
 		t.Fatal(s)
 	}
+	for _, in := range []string{"https://user:p@ss@host/repo", "fetch https://user:p@ss@host/repo failed"} {
+		if s := SafeText(in); strings.Contains(s, "ss@") || !strings.Contains(s, "[redacted]@host/repo") {
+			t.Fatalf("%q -> %q", in, s)
+		}
+	}
+	if s := SafeText("https://host/a@b"); s != "https://host/a@b" {
+		t.Fatalf("path changed: %q", s)
+	}
 }
 
 func TestFixtureNULs(t *testing.T) {

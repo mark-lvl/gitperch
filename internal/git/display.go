@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 
-var urlCredentials = regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://)[^/\s@]+@`)
+var urlCredentials = regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://)[^/\s]*@`)
 var secretQuery = regexp.MustCompile(`(?i)([?&](?:access_token|token|password|private_token)=)[^&\s]+`)
 
 // SafeText escapes control characters and removes URL userinfo from displays.
