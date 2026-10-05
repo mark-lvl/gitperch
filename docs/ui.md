@@ -123,4 +123,4 @@ and tracking data. No unsupported editor-launch configuration is guessed.
 
 Terminal snapshots and a local PTY check do not establish Windows Terminal or
 specific Nerd Font compatibility; the [manual smoke guide](tui-smoke.md) remains a
-useful checklist, with Enter now opening details and `o` opening a shell.
+useful checklist.

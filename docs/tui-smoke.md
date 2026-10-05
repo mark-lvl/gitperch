@@ -28,7 +28,8 @@ and performs no network access.
    arrows or PgUp/PgDn to inspect full diagnostics and root warnings,
    including long errors. Inspect the highlighted repository's error details when
    using an invalid `.git` candidate. Try an empty directory and a missing root.
-6. Press Enter to start a child shell. Check `pwd`, type `exit`, and confirm the
+6. Press Enter and confirm repository details open; Esc returns. Press `o` to
+   start a child shell. Check `pwd`, type `exit`, and confirm the
    dashboard restores and refreshes. The parent shell stays in its original
    directory. The child shell runs as your user.
 7. Press `g` with LazyGit absent: confirm an actionable message. With LazyGit
