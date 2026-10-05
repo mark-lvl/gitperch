@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"repodash/internal/app"
 	"repodash/internal/config"
 	"repodash/internal/discovery"
@@ -80,6 +81,12 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return 2
+	}
+	// Getwd keeps symlink components from $PWD, which discovery rejects as
+	// symlink ancestors. The working directory itself was not user-named, so
+	// resolve it; explicitly supplied symlink roots are still skipped.
+	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = resolved
 	}
 	ws, err := cfg.Resolve(*workspace, fs.Args(), cwd)
 	if err != nil {

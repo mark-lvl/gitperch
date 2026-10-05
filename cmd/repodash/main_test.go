@@ -100,3 +100,31 @@ func TestDefaultRequiresTerminalAndJSONRequiresStatus(t *testing.T) {
 		t.Fatalf("json: exit %d, %s", code, &errOut)
 	}
 }
+
+func TestSymlinkedWorkingDirectoryIsScanned(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", d)
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(d, "absent"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	real := filepath.Join(d, "real")
+	if out, err := exec.Command("git", "init", "-q", "-b", "main", filepath.Join(real, "repo")).CombinedOutput(); err != nil {
+		t.Fatalf("%v %s", err, out)
+	}
+	link := filepath.Join(d, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(link)
+	t.Setenv("PWD", link)
+	var out, errOut bytes.Buffer
+	if code := run([]string{"status", "--json"}, &out, &errOut); code != 0 {
+		t.Fatalf("exit %d: %s", code, &errOut)
+	}
+	var report app.Report
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Repositories) != 1 {
+		t.Fatalf("got %d rows", len(report.Repositories))
+	}
+}
