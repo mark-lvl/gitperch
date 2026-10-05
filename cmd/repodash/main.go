@@ -43,21 +43,30 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 		statusMode = true
 		args = args[1:]
 	}
-	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return 0
-		}
-		return 2
-	}
-	if fs.NArg() > 0 && fs.Arg(0) == "status" {
-		statusMode = true
-		rest := append([]string(nil), fs.Args()[1:]...)
-		if err := fs.Parse(rest); err != nil {
+	// The flag package stops at the first positional argument; keep parsing so
+	// options may follow roots. A literal "--" still ends option parsing.
+	var roots []string
+	for {
+		if err := fs.Parse(args); err != nil {
 			if err == flag.ErrHelp {
 				return 0
 			}
 			return 2
 		}
+		rest := fs.Args()
+		if len(rest) == 0 {
+			break
+		}
+		if consumed := len(args) - len(rest); consumed > 0 && args[consumed-1] == "--" {
+			roots = append(roots, rest...)
+			break
+		}
+		roots = append(roots, rest[0])
+		args = rest[1:]
+	}
+	if !statusMode && len(roots) > 0 && roots[0] == "status" {
+		statusMode = true
+		roots = roots[1:]
 	}
 	if *showVersion {
 		fmt.Fprintln(out, "repodash", version)
@@ -88,7 +97,7 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
 		cwd = resolved
 	}
-	ws, err := cfg.Resolve(*workspace, fs.Args(), cwd)
+	ws, err := cfg.Resolve(*workspace, roots, cwd)
 	if err != nil {
 		fmt.Fprintln(errOut, gitcli.SafeText(err.Error()))
 		return 2

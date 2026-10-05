@@ -75,6 +75,10 @@ func TestWorkspaceCLIAndExitCodes(t *testing.T) {
 		{[]string{"status", "--max-depth", "-1"}, 2},
 		{[]string{"status", "--json", filepath.Join(d, "missing"), filepath.Join(roots, "repo-00")}, 1},
 		{[]string{"status", "--json", "--config", configFile, filepath.Join(roots, "repo-00")}, 0},
+		{[]string{"status", filepath.Join(roots, "repo-00"), "--json"}, 0},
+		{[]string{"--json", "status", filepath.Join(roots, "repo-00")}, 0},
+		{[]string{"status", "--json", "--", filepath.Join(roots, "repo-00")}, 0},
+		{[]string{"status", "--json", "--", "--json"}, 1},
 	} {
 		out.Reset()
 		errOut.Reset()
