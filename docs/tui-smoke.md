@@ -35,8 +35,8 @@ and performs no network access.
 7. Press `g` with LazyGit absent: confirm an actionable message. With LazyGit
    installed, open and quit it, then confirm restore/refresh. A temporary test
    executable can verify terminal lifecycle, but does not verify LazyGit itself.
-8. Resize above and below 112 columns; confirm the inspector moves beside or
-   below the list. Resize to a narrow and short terminal; test long names and
+8. Resize above and below 120 columns; confirm the selected preview places
+   changed files beside or above recent commits. Resize to a narrow and short terminal; test long names and
    branches. Check guidance for changed, behind, detached, and unknown rows. Confirm
    no panics or terminal control characters from repository data.
 9. Quit with `q`, relaunch and quit with Ctrl+C. Confirm the terminal remains
