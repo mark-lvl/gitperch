@@ -12,7 +12,7 @@ The Bubble Tea v2 model owns refresh cancellation/generations, path-based bulk
 selection, filtering, highlight/scroll position, and action progress. Lip Gloss
 and ANSI cell measurements render the terminal. Fetch/push/fast-forward pull
 already use `app.Actions` plans, confirmations, revalidation and progress events.
-Push/pull first fetch a reviewed scope, then require a second confirmation.
+Push/pull fetch first, then ask once in a small popup; fetch needs no confirmation.
 These backend safeguards remain in place.
 
 ## Incremental implementation

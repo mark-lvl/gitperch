@@ -92,45 +92,36 @@ func TestFetchRequiresExplicitSelection(t *testing.T) {
 	}
 }
 
-func TestFetchPreviewDoesNotExecuteAndEscapeDiscards(t *testing.T) {
+func TestFetchRunsWithoutConfirmation(t *testing.T) {
 	fake := newActionFake(false)
 	m := actionModel(fake, "/repos/first", "/repos/second")
 	cmd := pressAction(m, "f")
 	if cmd == nil {
-		t.Fatal("fetch preview command missing")
-	}
-	msg, ok := cmd().(previewMsg)
-	if !ok {
-		t.Fatalf("preview command returned %T", cmd())
-	}
-	m.Update(msg)
-	if m.preview == nil || len(m.preview.Targets) != 2 {
-		t.Fatalf("preview targets = %#v", m.preview)
+		t.Fatal("fetch plan command missing")
 	}
 	if fake.fetchCalls.Load() != 0 {
-		t.Fatal("planning preview fetched before confirmation")
+		t.Fatal("pressing f fetched before planning")
 	}
-	view := m.View().Content
-	if !strings.Contains(view, "2 targets") || !strings.Contains(view, "Target 1/2") {
-		t.Fatalf("preview target count/details missing: %q", view)
+	_, run := m.Update(cmd().(previewMsg))
+	if m.preview != nil || !m.running || run == nil {
+		t.Fatalf("fetch asked for confirmation: preview=%#v running=%v", m.preview, m.running)
 	}
-	if strings.Contains(view, "alice:secret") || strings.Contains(view, "\x1b") {
-		t.Fatal("preview exposed credential or terminal control character")
+	batch := run().(tea.BatchMsg)
+	done := batch[0]() // events are buffered, so the batch finishes first
+	eventCmd := batch[1]
+	for {
+		progress, ok := eventCmd().(progressMsg)
+		if !ok {
+			break
+		}
+		_, eventCmd = m.Update(progress)
 	}
-	pressAction(m, "j")
-	if !strings.Contains(m.View().Content, "Target 2/2") {
-		t.Fatalf("preview j did not advance target: %q", m.View().Content)
+	m.Update(done)
+	if fake.fetchCalls.Load() != 2 {
+		t.Fatalf("fetch calls = %d, want 2", fake.fetchCalls.Load())
 	}
-	pressAction(m, "k")
-	if !strings.Contains(m.View().Content, "Target 1/2") {
-		t.Fatalf("preview k did not move target back: %q", m.View().Content)
-	}
-	pressAction(m, "esc")
-	if m.preview != nil || fake.fetchCalls.Load() != 0 {
-		t.Fatal("Escape did not discard preview without fetching")
-	}
-	if _, err := m.actions.Plan(context.Background(), app.Fetch, []string{"/repos/first"}); err != nil {
-		t.Fatalf("discarded preview remained active: %v", err)
+	if m.message != "Fetch finished · 2 succeeded" {
+		t.Fatalf("message = %q", m.message)
 	}
 }
 
@@ -139,16 +130,15 @@ func TestEnterExecutesPrivatePlanForSelectedRowsAndKeepsEvents(t *testing.T) {
 	m := actionModel(fake, "/repos/first")
 	previewCmd := pressAction(m, "f")
 	preview := previewCmd().(previewMsg)
-	m.Update(preview)
-	if len(m.preview.Targets) != 1 || m.preview.Targets[0].Path != "/repos/first" {
-		t.Fatalf("selection preview = %#v", m.preview.Targets)
+	if len(preview.preview.Targets) != 1 || preview.preview.Targets[0].Path != "/repos/first" {
+		t.Fatalf("selection preview = %#v", preview.preview.Targets)
 	}
 	// The display object cannot retarget the stored executable plan.
-	m.preview.Targets[0].Path = "/repos/second"
-	m.preview.Targets[0].URL = "https://evil.invalid/retargeted"
-	batchCmd := pressAction(m, "enter")
+	preview.preview.Targets[0].Path = "/repos/second"
+	preview.preview.Targets[0].URL = "https://evil.invalid/retargeted"
+	_, batchCmd := m.Update(preview)
 	if batchCmd == nil {
-		t.Fatal("confirmation returned no execution command")
+		t.Fatal("fetch returned no execution command")
 	}
 	batch, ok := batchCmd().(tea.BatchMsg)
 	if !ok || len(batch) != 2 {
@@ -221,8 +211,8 @@ func TestQuitDuringFetchRequestsCancellationUntilResultsArrive(t *testing.T) {
 	fake := newActionFake(true)
 	m := actionModel(fake, "/repos/first")
 	preview := pressAction(m, "f")().(previewMsg)
-	m.Update(preview)
-	batch := pressAction(m, "enter")().(tea.BatchMsg)
+	_, run := m.Update(preview)
+	batch := run().(tea.BatchMsg)
 	finished := make(chan tea.Msg, 1)
 	go func() { finished <- batch[0]() }()
 	progress, ok := batch[1]().(progressMsg)
@@ -271,22 +261,27 @@ func TestQuitDuringFetchRequestsCancellationUntilResultsArrive(t *testing.T) {
 func TestImplicitPushTargetDoesNotBecomeSelection(t *testing.T) {
 	fake := newActionFake(false)
 	m := actionModel(fake)
-	cmd := pressAction(m, "p")
-	if cmd == nil {
-		t.Fatal("push preview command missing")
+	push := func(want string) {
+		t.Helper()
+		cmd := pressAction(m, "p")
+		if cmd == nil {
+			t.Fatal("push plan command missing")
+		}
+		if len(m.selected) != 0 {
+			t.Fatalf("highlighted row became selected: %v", m.selected)
+		}
+		scope := cmd().(previewMsg)
+		if len(scope.preview.Targets) != 1 || scope.preview.Targets[0].Path != want {
+			t.Fatalf("push targeted %#v, want %s", scope.preview.Targets, want)
+		}
+		// This fake cannot push, so the preflight ends without a popup.
+		_, preflight := m.Update(scope)
+		m.Update(preflight())
+		if m.preview != nil || len(m.selected) != 0 {
+			t.Fatalf("preview=%#v selected=%v", m.preview, m.selected)
+		}
 	}
-	if len(m.selected) != 0 {
-		t.Fatalf("highlighted row became selected: %v", m.selected)
-	}
-	m.Update(cmd())
-	if m.preview == nil || len(m.preview.Targets) != 1 || m.preview.Targets[0].Path != "/repos/first" {
-		t.Fatalf("preview = %#v", m.preview)
-	}
-	pressAction(m, "esc")
+	push("/repos/first")
 	pressAction(m, "j")
-	cmd = pressAction(m, "p")
-	m.Update(cmd())
-	if m.preview == nil || len(m.preview.Targets) != 1 || m.preview.Targets[0].Path != "/repos/second" {
-		t.Fatalf("second push targeted %#v", m.preview)
-	}
+	push("/repos/second")
 }

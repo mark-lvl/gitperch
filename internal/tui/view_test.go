@@ -149,18 +149,22 @@ func TestIndependentStatesAndGuidance(t *testing.T) {
 	}
 }
 
-func TestPreviewKeepsConfirmationVisible(t *testing.T) {
+func TestPreviewPopupKeepsConfirmationVisible(t *testing.T) {
 	m := New(context.Background(), nil, true)
 	m.Update(tea.WindowSizeMsg{Width: 60, Height: 16})
-	m.preview = &app.Preview{Targets: []app.Target{{Path: "/repos/api", Action: app.Push, Eligible: true, Reason: strings.Repeat("reason ", 200), Commit: "EXACT-COMMIT", DirtyExcluded: true}}}
-	for range 100 {
-		m.previewKey("pgdown")
+	var targets []app.Target
+	for i := range 30 {
+		targets = append(targets, app.Target{Path: fmt.Sprintf("/repos/api%d", i), Action: app.Push, Eligible: true, Reason: strings.Repeat("reason ", 200), Commit: "0123456789", DirtyExcluded: true})
 	}
+	m.preview = &app.Preview{Targets: targets}
 	content := m.View().Content
-	for _, want := range []string{"EXACT-COMMIT", "Uncommitted changes are excluded", "Enter confirms 1 eligible", "Esc cancels"} {
+	for _, want := range []string{"Push 30 repositories?", "0123456", "more", "Uncommitted changes stay local", "Esc cancel"} {
 		if !strings.Contains(content, want) {
-			t.Fatalf("preview missing %q: %s", want, content)
+			t.Fatalf("popup missing %q: %s", want, content)
 		}
+	}
+	if strings.Contains(content, "reason reason") {
+		t.Fatalf("popup shows the full plan reason: %s", content)
 	}
 }
 

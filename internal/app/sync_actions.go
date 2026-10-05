@@ -148,7 +148,7 @@ func (a *Actions) planOne(ctx context.Context, action Action, path string, expec
 
 // PrepareSync turns a reviewed fetch scope into a final push/pull preview. It
 // fetches only targets whose local state/config still match the original scope.
-// The final integration/push always needs a second confirmation.
+// The final integration/push always needs its own confirmation.
 func (a *Actions) PrepareSync(ctx context.Context, id uint64, action Action) (Preview, error) {
 	if action != Push && action != Pull {
 		return Preview{}, errors.New("a synchronization action is required")

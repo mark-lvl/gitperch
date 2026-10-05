@@ -9,7 +9,7 @@
 │    ▱ mobile        │ │ > push▏                                                      │ │                    │
 │    ▱ worker        │ ╰──────────────────────────────────────────────────────────────╯ │file                │
 │ ╭──────────────────│ ↑ Push design-system                                         [↵] │──────────────────╮ │
-│ │ ▱ design-system  │   Review fetch scope, then confirm exact commits                 │           2m ago │ │
+│ │ ▱ design-system  │   Fetch, then confirm outgoing commits                           │           2m ago │ │
 │ │ ↑3 ahead · locall│ ──────────────────────────────────────────────────────────────── │                  │ │
 │ │ Working tree · 2 │ ↑↓ choose   ↵ run                                                │                  │ │
 │ │ M  src/theme/toke╰──────────────────────────────────────────────────────────────────╯           +8 -2  │ │

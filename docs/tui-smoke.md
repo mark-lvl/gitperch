@@ -41,18 +41,15 @@ and performs no network access.
    no panics or terminal control characters from repository data.
 9. Quit with `q`, relaunch and quit with Ctrl+C. Confirm the terminal remains
    usable. Repeat with `NO_COLOR=1`.
-10. Test the two-stage fast-forward pull on `behind`: select only that row with
-    Space, press `l`, and inspect the immutable fetch-scope preview. Confirm the
-    remote and branch are visible, eligible/skipped counts are correct, and
-    the confirmation footer remains visible while PgUp/PgDn scrolls details. Press Enter once; wait for fetch and inspect
-    the refreshed final preview. It should name the exact commit and show
-    fast-forward integration. Press Esc to cancel, then repeat and press Enter
-    a second time. Confirm `peer.txt` appears in the worktree and the refreshed
-    status is current.
+10. Test fast-forward pull on `behind`: select only that row with Space and
+    press `l`. Repodash fetches without asking, then floats a small popup over
+    the workspace naming the repository, `origin/main → main` and the short
+    commit. Press Esc to cancel, then repeat and press Enter. Confirm `peer.txt`
+    appears in the worktree and the refreshed status is current. Press `l` on a
+    clean, up-to-date row: no popup opens and the status line says why.
 11. Open the dashboard again and test push on `ahead`: select only that row,
-    press `p`, review the fetch scope, press Enter, then review the final
-    destination and commit before the second Enter. Confirm the remote's `main`
-    points to the local commit:
+    press `p`, check the popup's `main → origin/main` route and commit, then
+    press Enter. Confirm the remote's `main` points to the local commit:
 
     ```sh
     git --git-dir="$demo_root/remotes/origin.git" rev-parse refs/heads/main

@@ -4,9 +4,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"context"
 	"fmt"
+	"github.com/charmbracelet/x/ansi"
+	"path/filepath"
 	"repodash/internal/app"
 	gitcli "repodash/internal/git"
 	"sort"
+	"strings"
 )
 
 type previewMsg struct {
@@ -55,9 +58,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 				m.actionFailed = true
 			}
 		}
-		m.previewCursor = 0
-		m.previewLineOffset = 0
-		return true, nil
+		return true, m.settlePreview()
 	case progressMsg:
 		if msg.generation != m.actionGeneration || !m.running {
 			return true, nil
@@ -91,7 +92,16 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 				failed++
 			}
 		}
-		m.message = fmt.Sprintf("Batch finished · %d succeeded · %d skipped · %d failed/uncertain · d details", succeeded, skipped, failed)
+		m.message = fmt.Sprintf("%s finished · %d succeeded", capitalize(string(m.runningAction)), succeeded)
+		if skipped > 0 {
+			m.message += fmt.Sprintf(" · %d skipped", skipped)
+		}
+		if failed > 0 {
+			m.message += fmt.Sprintf(" · %d failed/uncertain", failed)
+		}
+		if skipped+failed > 0 {
+			m.message += " · d details"
+		}
 		if msg.err != nil {
 			m.actionFailed = true
 			m.message += " · " + msg.err.Error()
@@ -123,11 +133,58 @@ func (m *Model) preparePreview(action app.Action, paths []string) tea.Cmd {
 	m.preparing = true
 	m.details = false
 	m.help = false
-	m.message = fmt.Sprintf("Preparing %s preview for %d repositories", action, len(paths))
+	verb := action
+	if m.syncIntent != "" {
+		verb = m.syncIntent
+	}
+	m.message = fmt.Sprintf("Preparing %s for %s", verb, plural(len(paths), "repository", "repositories"))
 	actions := m.actions
 	return func() tea.Msg {
 		preview, err := actions.Plan(ctx, action, paths)
 		return previewMsg{generation: generation, preview: preview, err: err}
+	}
+}
+
+// settlePreview asks only where a confirmation protects something. Fetch runs
+// at once, including the fetch that scopes a push or pull, and a plan with
+// nothing eligible closes with its reason instead of opening a popup.
+func (m *Model) settlePreview() tea.Cmd {
+	eligible, reason := 0, ""
+	for _, target := range m.preview.Targets {
+		if target.Eligible {
+			eligible++
+		} else if reason == "" {
+			reason = target.Reason
+		}
+	}
+	action := app.Fetch
+	if m.syncIntent != "" {
+		action = m.syncIntent
+	} else if len(m.preview.Targets) > 0 {
+		action = m.preview.Targets[0].Action
+	}
+	if eligible == 0 {
+		m.discardPreview()
+		m.message = "Nothing to " + string(action)
+		if reason != "" {
+			m.message += ": " + gitcli.SafeText(reason)
+		}
+		return nil
+	}
+	if m.preview.Targets[0].Action == app.Fetch {
+		return m.confirmPreview()
+	}
+	m.message = ""
+	return nil
+}
+
+func (m *Model) discardPreview() {
+	m.actions.Discard(m.preview.ID)
+	m.preview = nil
+	m.syncIntent = ""
+	if m.actionCancel != nil {
+		m.actionCancel()
+		m.actionCancel = nil
 	}
 }
 
@@ -136,32 +193,8 @@ func (m *Model) previewKey(key string) tea.Cmd {
 	case "enter":
 		return m.confirmPreview()
 	case "esc", "q", "ctrl+c":
-		m.actions.Discard(m.preview.ID)
-		m.preview = nil
-		m.syncIntent = ""
-		if m.actionCancel != nil {
-			m.actionCancel()
-			m.actionCancel = nil
-		}
-		m.message = "Preview cancelled"
-	case "j", "down":
-		m.previewCursor = min(m.previewCursor+1, max(0, len(m.preview.Targets)-1))
-		m.previewLineOffset = 0
-	case "k", "up":
-		m.previewCursor = max(0, m.previewCursor-1)
-		m.previewLineOffset = 0
-	case "pgdown":
-		lines, footer := m.previewContent()
-		_, _, _, page := m.documentParts(lines, footer)
-		m.previewLineOffset += max(1, page)
-	case "pgup":
-		lines, footer := m.previewContent()
-		_, _, _, page := m.documentParts(lines, footer)
-		m.previewLineOffset = max(0, m.previewLineOffset-max(1, page))
-	}
-	if m.preview != nil {
-		lines, footer := m.previewContent()
-		m.previewLineOffset = min(m.previewLineOffset, m.documentMaxOffset(lines, footer))
+		m.discardPreview()
+		m.message = "Cancelled"
 	}
 	return nil
 }
@@ -183,13 +216,14 @@ func (m *Model) confirmPreview() tea.Cmd {
 		m.preparing = true
 		m.actionGeneration++
 		generation := m.actionGeneration
-		m.message = "Fetching reviewed scope before final synchronization preview"
+		m.message = "Fetching before " + string(action)
 		return func() tea.Msg {
 			preview, err := actions.PrepareSync(ctx, id, action)
 			return previewMsg{generation: generation, preview: preview, err: err}
 		}
 	}
 	m.running = true
+	m.runningAction = m.preview.Targets[0].Action
 	m.message = ""
 	m.results = map[string]app.Event{}
 	id, generation, actions := m.preview.ID, m.actionGeneration, m.actions
@@ -218,77 +252,95 @@ func (m *Model) nextEvent() tea.Cmd {
 	}
 }
 
-func (m *Model) previewContent() ([]string, string) {
+// previewView confirms a push or pull in a small popup: one line per eligible
+// repository, then skips with their reasons. Full plans stay in the backend.
+func (m *Model) previewView() tea.View {
 	p := m.preview
-	eligible := 0
+	action := p.Targets[0].Action
+	var ready, skipped []app.Target
 	for _, target := range p.Targets {
 		if target.Eligible {
-			eligible++
+			ready = append(ready, target)
+		} else {
+			skipped = append(skipped, target)
 		}
 	}
-	title := "Review fetch"
-	step := "Review targets → confirm fetch"
-	if m.syncIntent != "" {
-		title = "Fetch scope before " + string(m.syncIntent)
-		step = "STEP 1/2 · Review fetch → fetch → review " + string(m.syncIntent) + " → confirm"
-	} else if len(p.Targets) > 0 && p.Targets[0].Action != app.Fetch {
-		title = "Review " + string(p.Targets[0].Action)
-		step = "STEP 2/2 · Fetch complete → review exact changes → confirm"
+	verb := capitalize(string(action))
+	title := verb + " " + m.targetName(ready[0].Path) + "?"
+	if len(ready) > 1 {
+		title = verb + " " + plural(len(ready), "repository", "repositories") + "?"
 	}
-	lines := []string{
-		m.style(" repodash / "+title, accent, true),
-		m.rule(max(1, m.width)),
-		" " + step,
-		fmt.Sprintf(" %d targets · %d eligible · %d skipped", len(p.Targets), eligible, len(p.Targets)-eligible),
-		" j/k targets · PgUp/Dn scroll details", "",
+	w := min(64, m.width-4)
+	inner := max(1, w-4)
+	lines := []string{m.style(title, ink, true)}
+	room := max(1, m.height-7)
+	nameWidth := 0
+	for _, target := range ready {
+		nameWidth = max(nameWidth, min(24, ansi.StringWidth(m.targetName(target.Path))))
 	}
-	if len(p.Targets) > 1 {
-		lines = append(lines, " Selected repositories")
-		for _, target := range p.Targets {
-			state := "skip"
-			if target.Eligible {
-				state = "ready"
-			}
-			lines = append(lines, " "+truncatePath(gitcli.SafeText(target.Path), max(10, m.width/2))+" · "+gitcli.SafeText(target.Branch)+" · "+state)
+	dirty := false
+	for i, target := range ready {
+		if i == room-1 && len(ready) > room {
+			lines = append(lines, m.style(fmt.Sprintf("+%d more", len(ready)-i), muted, false))
+			break
 		}
-		lines = append(lines, "")
+		dirty = dirty || target.DirtyExcluded
+		lines = append(lines, m.between(cell(m.targetName(target.Path), nameWidth)+"  "+m.style(syncRoute(target), muted, false), m.style(shortCommit(target.Commit), muted, false), inner))
 	}
-	if len(p.Targets) > 0 {
-		target := p.Targets[min(m.previewCursor, len(p.Targets)-1)]
-		state, color := "SKIPPED", amber
-		if target.Eligible {
-			state, color = "ELIGIBLE", accent
+	for i, target := range skipped {
+		if i == 2 && len(skipped) > 3 {
+			lines = append(lines, m.style(fmt.Sprintf("+%d more skipped", len(skipped)-i), amber, false))
+			break
 		}
-		lines = append(lines,
-			m.style(fmt.Sprintf(" Target %d/%d: %s", m.previewCursor+1, len(p.Targets), gitcli.SafeText(target.Path)), ink, true),
-			m.style(" "+state+" · "+gitcli.SafeText(string(target.Action)), color, true),
-			" Reason: "+gitcli.SafeText(target.Reason), "",
-			" Branch: "+gitcli.SafeText(target.Branch),
-			" Remote: "+gitcli.SafeText(target.Remote),
-			" URL: "+gitcli.SafeText(target.URL),
-		)
-		if target.Scope != "" {
-			lines = append(lines, " Scope: "+gitcli.SafeText(target.Scope))
-		}
-		if target.Commit != "" {
-			lines = append(lines, " Exact commit: "+gitcli.SafeText(target.Commit))
-		}
-		if target.DirtyExcluded {
-			lines = append(lines, m.style(" Uncommitted changes are excluded", amber, true))
-		}
+		lines = append(lines, m.style("skip "+m.targetName(target.Path)+": "+gitcli.SafeText(target.Reason), amber, false))
 	}
-	lines = append(lines, "", " Eligible targets run independently. Skipped targets remain skipped.", " Best effort, no rollback. Repository state is revalidated before execution.")
-	footer := fmt.Sprintf(" Enter confirms %d eligible targets · Esc cancels", eligible)
-	if eligible == 0 {
-		footer = " Enter records skips; no eligible targets · Esc cancels"
+	if dirty {
+		lines = append(lines, m.style("Uncommitted changes stay local", muted, false))
 	}
-	if m.syncIntent != "" {
-		footer = " Enter fetches reviewed scope · Esc cancels\n Final push/pull needs a second confirmation"
+	lines = append(lines, "", m.style(m.symbols().enter+" "+string(action)+"   Esc cancel", muted, false))
+	if m.width < 24 || m.height < 6 {
+		return m.screen(lines)
 	}
-	return lines, footer
+	return m.overlay(lines, w)
 }
 
-func (m *Model) previewView() tea.View {
-	lines, footer := m.previewContent()
-	return m.documentView(lines, footer, m.previewLineOffset)
+// targetName prefers the dashboard name for a target path.
+func (m *Model) targetName(path string) string {
+	for _, row := range m.rows {
+		if row.Path == path {
+			return gitcli.SafeText(row.Name)
+		}
+	}
+	return gitcli.SafeText(filepath.Base(path))
+}
+
+// syncRoute renders a reviewed scope such as "main → origin/main".
+func syncRoute(target app.Target) string {
+	from, to, ok := strings.Cut(target.Scope, " -> ")
+	if !ok {
+		return gitcli.SafeText(target.Branch)
+	}
+	from, to = strings.TrimPrefix(from, "refs/heads/"), strings.TrimPrefix(to, "refs/heads/")
+	if target.Action == app.Pull {
+		from = target.Remote + "/" + from
+	} else {
+		to = target.Remote + "/" + to
+	}
+	return gitcli.SafeText(from + " → " + to)
+}
+
+func shortCommit(oid string) string { return gitcli.SafeText(oid[:min(7, len(oid))]) }
+
+func capitalize(text string) string {
+	if text == "" {
+		return text
+	}
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }

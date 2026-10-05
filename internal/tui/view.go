@@ -609,10 +609,10 @@ func (m *Model) helpContent() []string {
 		" /             Search name, path or branch · arrows move · Enter opens", " s             Toggle name / attention order · r refresh local status",
 		"", " REPOSITORY ACTIONS", " Enter / d     Open repository overview / changes · Tab switches section", " o             Open a shell in the highlighted worktree", " g             Open LazyGit in the highlighted worktree",
 		"", " BULK OPERATIONS", " Space         Toggle selection · a selects / deselects visible rows",
-		" f             Review fetch targets, then confirm", " p / l         Review fetch scope → fetch → review push / FF pull → confirm",
+		" f             Fetch selected repositories", " p / l         Fetch, then confirm push / FF pull in a popup",
 		" Search/view changes clear selection. Push/pull use the highlighted row when none are selected.",
 		"", " GLOBAL COMMANDS", " : / Ctrl+K    Fuzzy command palette · arrows choose · Enter runs", " ?             Help · q quit · Ctrl+C interrupt", "", " AGENT ACTIONS", " No agent integration is configured in this application.", "", " Sync counts use locally known refs. Fetch checks the remote.", " ↑ ahead · ↓ behind · unknown never means up to date.",
-		" Esc cancels previews; during a batch it requests cancellation.", " Esc clears search, then dismisses results. q quits; Ctrl+C interrupts.",
+		" Esc cancels the confirmation popup; during a batch it requests cancellation.", " Esc clears search, then dismisses results. q quits; Ctrl+C interrupts.",
 	}
 	return lines
 }

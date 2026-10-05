@@ -227,6 +227,12 @@ func (m *Model) paletteView() tea.View {
 		lines = append(lines, m.style("No matching commands", muted, false))
 	}
 	lines = append(lines, m.rule(inner), m.style("↑↓ choose   "+m.symbols().enter+" run", muted, false))
+	return m.overlay(lines, w)
+}
+
+// overlay floats a framed panel of width w above the workspace (or open
+// details), so popups keep the repository list in view.
+func (m *Model) overlay(lines []string, w int) tea.View {
 	panel := m.frame(lines, w)
 	if len(panel) > m.height {
 		panel = panel[:m.height]
@@ -260,11 +266,11 @@ func (m *Model) commandHint(id string) string {
 	case "lazygit":
 		return "Open the installed Git interface"
 	case "fetch":
-		return "Review targets before contacting remotes"
+		return "Update remote-tracking refs"
 	case "push":
-		return "Review fetch scope, then confirm exact commits"
+		return "Fetch, then confirm outgoing commits"
 	case "pull":
-		return "Review and confirm fast-forward integration"
+		return "Fetch, then confirm fast-forward"
 	case "focus":
 		return "Switch between all repos and needs attention"
 	case "sort":

@@ -20,65 +20,64 @@ type loader func(context.Context) (app.Snapshot, error)
 // Model holds the dashboard state. New supplies asynchronous refresh behavior
 // through load so the view remains independent of configuration and Git setup.
 type Model struct {
-	ctx               context.Context
-	load              loader
-	noColor           bool
-	iconMode          string
-	workspace         string
-	palette           bool
-	loadDetails       detailLoader
-	detailCache       map[string]detailResult
-	detailPath        string
-	detailGeneration  uint64
-	detailCancel      context.CancelFunc
-	detailTab         int
-	loadPatch         patchLoader
-	patch             *patchResult
-	patchPath         string
-	patchCancel       context.CancelFunc
-	patchGeneration   uint64
-	paletteQuery      string
-	paletteCursor     int
-	lazyGitAvailable  bool
-	closing           bool
-	rows              []app.Row
-	warnings          []string
-	selected          map[string]bool
-	actionTotal       int // targets in the running batch
-	highlight         int
-	filter            string
-	filtering         bool
-	scope             int
-	attentionFirst    bool
-	help              bool
-	helpOffset        int
-	details           bool
-	detailOffset      int
-	contextOffset     int
-	message           string
-	loadErr           string
-	loading           bool
-	width             int
-	height            int
-	scroll            int
-	generation        uint64
-	loadCancel        context.CancelFunc
-	actions           *app.Actions
-	preparing         bool
-	running           bool
-	preview           *app.Preview
-	syncIntent        app.Action
-	previewCursor     int
-	previewLineOffset int
-	actionCancel      context.CancelFunc
-	actionCtx         context.Context
-	actionGeneration  uint64
-	events            chan app.Event
-	results           map[string]app.Event
-	interrupted       bool
-	actionFailed      bool
-	clock             func() time.Time // header clock and relative ages; fixed in captures
-	ticking           bool
+	ctx              context.Context
+	load             loader
+	noColor          bool
+	iconMode         string
+	workspace        string
+	palette          bool
+	loadDetails      detailLoader
+	detailCache      map[string]detailResult
+	detailPath       string
+	detailGeneration uint64
+	detailCancel     context.CancelFunc
+	detailTab        int
+	loadPatch        patchLoader
+	patch            *patchResult
+	patchPath        string
+	patchCancel      context.CancelFunc
+	patchGeneration  uint64
+	paletteQuery     string
+	paletteCursor    int
+	lazyGitAvailable bool
+	closing          bool
+	rows             []app.Row
+	warnings         []string
+	selected         map[string]bool
+	actionTotal      int // targets in the running batch
+	highlight        int
+	filter           string
+	filtering        bool
+	scope            int
+	attentionFirst   bool
+	help             bool
+	helpOffset       int
+	details          bool
+	detailOffset     int
+	contextOffset    int
+	message          string
+	loadErr          string
+	loading          bool
+	width            int
+	height           int
+	scroll           int
+	generation       uint64
+	loadCancel       context.CancelFunc
+	actions          *app.Actions
+	preparing        bool
+	running          bool
+	preview          *app.Preview
+	syncIntent       app.Action
+	runningAction    app.Action
+	actionCancel     context.CancelFunc
+	actionCtx        context.Context
+	actionGeneration uint64
+	events           chan app.Event
+	results          map[string]app.Event
+	interrupted      bool
+	actionFailed     bool
+	clock            func() time.Time // header clock and relative ages; fixed in captures
+	ticking          bool
 }
 
 type snapshotMsg struct {

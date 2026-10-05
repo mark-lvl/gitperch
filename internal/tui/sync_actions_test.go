@@ -78,65 +78,45 @@ func syncActionModel(fake *syncActionFake) *Model {
 	return m
 }
 
+// startSyncPreview presses p/l and drives the automatic preflight fetch until
+// the single push/pull confirmation popup is open.
 func startSyncPreview(t *testing.T, m *Model, actionKey string) {
 	t.Helper()
 	cmd := pressAction(m, actionKey)
 	if cmd == nil {
-		t.Fatalf("%s did not prepare the reviewed fetch-scope preview", actionKey)
+		t.Fatalf("%s did not plan the fetch scope", actionKey)
 	}
-	result := cmd()
-	msg, ok := result.(previewMsg)
+	scope, ok := cmd().(previewMsg)
 	if !ok {
-		t.Fatalf("%s preview command returned %T", actionKey, result)
+		t.Fatalf("%s plan command returned a different message", actionKey)
 	}
-	m.Update(msg)
+	_, preflight := m.Update(scope)
+	if m.preview != nil || preflight == nil {
+		t.Fatalf("%s fetch scope asked for confirmation: %#v", actionKey, m.preview)
+	}
+	final, ok := preflight().(previewMsg)
+	if !ok {
+		t.Fatal("preflight did not return the final preview")
+	}
+	m.Update(final)
 }
 
-func prepareSyncPreview(t *testing.T, m *Model) {
-	t.Helper()
-	cmd := pressAction(m, "enter")
-	if cmd == nil {
-		t.Fatal("first Enter did not start sync preflight")
-	}
-	result := cmd()
-	msg, ok := result.(previewMsg)
-	if !ok {
-		t.Fatalf("preflight returned %T", result)
-	}
-	m.Update(msg)
-}
-
-func TestPushAndPullRequireFetchScopeAndSecondConfirmation(t *testing.T) {
+func TestPushAndPullFetchAutomaticallyThenConfirmOnce(t *testing.T) {
 	for _, tc := range []struct {
 		key       string
 		action    app.Action
+		title     string
 		wantScope string
 	}{
-		{key: "p", action: app.Push, wantScope: "refs/heads/main -> refs/heads/main"},
-		{key: "l", action: app.Pull, wantScope: "refs/heads/main -> refs/heads/main"},
+		{key: "p", action: app.Push, title: "Push first?", wantScope: "refs/heads/main -> refs/heads/main"},
+		{key: "l", action: app.Pull, title: "Fast-forward pull first?", wantScope: "refs/heads/main -> refs/heads/main"},
 	} {
 		t.Run(string(tc.action), func(t *testing.T) {
 			fake := newSyncActionFake(tc.action, false)
 			m := syncActionModel(fake)
 			startSyncPreview(t, m, tc.key)
-			if m.preview == nil || len(m.preview.Targets) != 1 || m.preview.Targets[0].Action != app.Fetch {
-				t.Fatalf("first preview = %#v", m.preview)
-			}
-			if fake.fetchCalls.Load() != 0 || fake.pushCalls.Load() != 0 || fake.ffCalls.Load() != 0 {
-				t.Fatal("p/l preview performed a network mutation")
-			}
-			if !strings.Contains(m.View().Content, "Fetch scope before "+string(tc.action)) {
-				t.Fatalf("fetch-scope review label missing: %q", m.View().Content)
-			}
-			pressAction(m, "esc")
-			if m.preview != nil || fake.fetchCalls.Load() != 0 {
-				t.Fatal("Esc on fetch-scope preview did not discard without fetching")
-			}
-			// Recreate the intent and confirm the reviewed fetch scope.
-			startSyncPreview(t, m, tc.key)
-			prepareSyncPreview(t, m)
 			if fake.fetchCalls.Load() != 1 || fake.pushCalls.Load() != 0 || fake.ffCalls.Load() != 0 {
-				t.Fatalf("first Enter calls fetch/push/ff = %d/%d/%d", fake.fetchCalls.Load(), fake.pushCalls.Load(), fake.ffCalls.Load())
+				t.Fatalf("preflight calls fetch/push/ff = %d/%d/%d", fake.fetchCalls.Load(), fake.pushCalls.Load(), fake.ffCalls.Load())
 			}
 			if m.preview == nil || len(m.preview.Targets) != 1 {
 				t.Fatalf("final preview missing: %#v", m.preview)
@@ -148,12 +128,13 @@ func TestPushAndPullRequireFetchScopeAndSecondConfirmation(t *testing.T) {
 			if target.Scope != tc.wantScope {
 				t.Fatalf("reviewed exact scope = %q, want %q", target.Scope, tc.wantScope)
 			}
-			if !strings.Contains(m.View().Content, "Target 1/1") || strings.Contains(m.View().Content, "alice:secret") {
-				t.Fatalf("final preview omitted target or exposed secret: %q", m.View().Content)
+			view := m.View().Content
+			if !strings.Contains(view, tc.title) || strings.Contains(view, "alice:secret") {
+				t.Fatalf("popup omitted title or exposed secret: %q", view)
 			}
 			pressAction(m, "esc")
 			if m.preview != nil || fake.pushCalls.Load() != 0 || fake.ffCalls.Load() != 0 {
-				t.Fatal("Esc on final sync preview executed or retained it")
+				t.Fatal("Esc on the popup executed or retained it")
 			}
 			replacement, err := m.actions.Plan(context.Background(), app.Fetch, []string{"/repos/first"})
 			if err != nil {
@@ -162,6 +143,23 @@ func TestPushAndPullRequireFetchScopeAndSecondConfirmation(t *testing.T) {
 			m.actions.Discard(replacement.ID)
 		})
 	}
+}
+
+func TestSyncWithNothingEligibleSkipsThePopup(t *testing.T) {
+	fake := newSyncActionFake(app.Pull, false) // behind only: nothing to push
+	m := syncActionModel(fake)
+	startSyncPreview(t, m, "p")
+	if m.preview != nil || fake.pushCalls.Load() != 0 {
+		t.Fatalf("ineligible push opened a popup: %#v", m.preview)
+	}
+	if !strings.HasPrefix(m.message, "Nothing to push: ") {
+		t.Fatalf("message = %q", m.message)
+	}
+	preview, err := m.actions.Plan(context.Background(), app.Fetch, []string{"/repos/first"})
+	if err != nil {
+		t.Fatalf("ineligible plan remained active: %v", err)
+	}
+	m.actions.Discard(preview.ID)
 }
 
 func TestSecondEnterExecutesExactPushOrFastForwardTarget(t *testing.T) {
@@ -176,11 +174,10 @@ func TestSecondEnterExecutesExactPushOrFastForwardTarget(t *testing.T) {
 			fake := newSyncActionFake(tc.action, false)
 			m := syncActionModel(fake)
 			startSyncPreview(t, m, tc.key)
-			prepareSyncPreview(t, m)
 			if m.preview == nil || m.preview.Targets[0].Action != tc.action {
 				t.Fatalf("expected final %s preview, got %#v", tc.action, m.preview)
 			}
-			// Only the second Enter confirms the final push/integration.
+			// The popup's Enter is the only confirmation.
 			batch := pressAction(m, "enter")().(tea.BatchMsg)
 			done, ok := batch[0]().(batchDoneMsg)
 			if !ok {
@@ -214,8 +211,8 @@ func TestSecondEnterExecutesExactPushOrFastForwardTarget(t *testing.T) {
 func TestEscCancelsSyncPreparationAndReleasesPlan(t *testing.T) {
 	fake := newSyncActionFake(app.Push, true)
 	m := syncActionModel(fake)
-	startSyncPreview(t, m, "p")
-	cmd := pressAction(m, "enter")
+	scope := pressAction(m, "p")().(previewMsg)
+	_, cmd := m.Update(scope)
 	finished := make(chan tea.Msg, 1)
 	go func() { finished <- cmd() }()
 	select {

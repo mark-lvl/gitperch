@@ -64,11 +64,11 @@ terminals. `--no-color`, `NO_COLOR`, and ASCII icons remain supported.
 | [ / ] | Scroll files in the selected repository preview |
 | : or Ctrl+K | Fuzzy command palette; arrows choose, Enter runs, Esc closes |
 | / | Search repository name, path, or branch; arrows navigate results |
-| Esc | Clear/close search, return from details/help, cancel reviews |
+| Esc | Clear/close search, return from details/help, cancel the confirmation popup |
 | Space | Toggle path-based bulk selection |
 | a | Select/deselect all visible repositories (existing binding) |
-| p / l | Review push / fast-forward pull for selection, or highlighted repository |
-| f | Review fetch for explicitly selected repositories |
+| p / l | Push / fast-forward pull selection or highlighted repository; one confirmation popup |
+| f | Fetch explicitly selected repositories (no confirmation) |
 | o | Open an interactive shell in the selected worktree |
 | g | Open LazyGit; palette lists it only when installed |
 | r | Refresh workspace and invalidate cached details |

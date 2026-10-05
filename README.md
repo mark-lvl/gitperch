@@ -90,8 +90,8 @@ Missing or inaccessible roots print warnings while valid roots continue.
 Exit codes: 0 completed, 1 partial failure, 2 invalid invocation, 130 interrupted.
 In the TUI, a failed/cancelled/uncertain batch remains an exit-code-1 failure
 even after dismissing its displayed results. Policy skips alone are not failures.
-Ctrl+C exits with 130 while browsing; in previews or active batches it requests
-cancellation instead of exiting immediately.
+Ctrl+C exits with 130 while browsing; in a confirmation popup it cancels the
+popup, and during a batch it requests cancellation instead of exiting immediately.
 Git command output is capped at 4 MiB per stream,
 with a 15-second default deadline. Repository-routing environment variables are
 removed. Background Git has closed stdin, disabled terminal/askpass authentication,
@@ -157,10 +157,10 @@ Tab switches sections and arrows/PgUp/PgDn scroll. `:` or Ctrl+K opens the fuzzy
 action palette; arrows choose, Enter executes, and Esc closes it. `/` filters by
 name/path/branch with arrow navigation and Enter to open a result. `?` opens help.
 
-Space selects repositories; `a` toggles all visible rows. `p`/`l` review push or
-fast-forward pull for the selected set, or the highlighted repository when no
-selection exists. `f` reviews fetch for explicitly selected repositories. All
-network operations retain the existing review and confirmation safeguards.
+Space selects repositories; `a` toggles all visible rows. `p`/`l` push or
+fast-forward pull the selected set, or the highlighted repository when no
+selection exists, after one confirmation popup. `f` fetches explicitly selected
+repositories straight away. Plans are still revalidated before anything runs.
 Search/scope changes clear selection; refresh preserves visible selections and
 the highlighted repository by path. Tab toggles All/Focus; the palette provides the other repository filters. `s` toggles attention/name ordering, `[ / ]` scroll preview files, and `r` refreshes.
 
@@ -176,20 +176,20 @@ directory. Missing LazyGit is reported visibly. Git errors, discovery warnings,
 and operation results remain accessible in repository details. `q` quits and
 Ctrl+C interrupts; during operations they request cancellation and wait.
 
-## Fetch preview and execution (M5)
+## Fetch (M5)
 
-Select repositories explicitly, press `f`, review targets with j/k (PgUp/PgDn
-scroll long details), then Enter confirms or Esc cancels. The preview names the
-worktree, exact remote URL and configured tracking refspecs, eligibility and
-reason. Fetch uses the branch's configured upstream remote or the sole remote;
+Select repositories explicitly and press `f`; fetch starts without a
+confirmation, since it only updates remote-tracking refs. If no selected
+repository can be fetched, the status line gives the reason instead. Fetch uses
+the branch's configured upstream remote or the sole remote;
 ambiguous targets are skipped. Ref mappings that could update local branches or
 tags are rejected. Fetch prunes remote-tracking branches, disables tag fetching
 and pruning, and does not recurse into submodules.
 
-After confirmation, HEAD, branch, common Git directory and configuration are
+Before execution, HEAD, branch, common Git directory and configuration are
 revalidated. Changed plans are skipped. Actions sharing a common Git directory,
 including linked worktrees, run serially; separate repositories use at most
-`action_workers`. Only one preview or batch can be active. Each target keeps its
+`action_workers`. Only one plan or batch can be active. Each target keeps its
 own result, so a failure does not stop other targets. `q`/Ctrl+C during a batch
 requests cancellation and waits for outcomes. Use `d` for full results; Esc in
 normal browsing dismisses them. Successful fetch time is tracked for the session.
@@ -211,16 +211,16 @@ comparisons deliberately start stale for some rows; fetch reveals current state.
 ## Push and fast-forward pull (M6)
 
 Select repositories with Space or `a`, then press `p` to push or `l` to
-fast-forward pull. Both actions use two confirmations. The first screen is an
-immutable Fetch scope preview: review the eligible fetch targets, then press
-Enter to fetch those targets. Repodash compares refreshed state and presents a
-second, final preview showing the exact push branch/commit or pull commit. Press
-Enter again to execute; Esc cancels either preview. Repositories skipped during
-fetch remain skipped. `d` shows full per-repository outcomes after the batch.
+fast-forward pull. Repodash first fetches the targets, compares the refreshed
+state, then opens one small popup listing each eligible repository with its
+route (`main → origin/main`) and short commit, plus any skips and their reasons.
+Enter executes; Esc cancels. When nothing is eligible, no popup opens and the
+status line says why. Repositories skipped during fetch remain skipped. `d`
+shows full per-repository outcomes after the batch.
 
 Push sends only the reviewed existing local branch commit(s) to the displayed
 destination. Dirty files do not prevent pushing commits already in the branch,
-and the preview explicitly says uncommitted changes are excluded. It requires a
+and the popup says uncommitted changes stay local. It requires a
 known ahead-only comparison and a conventional upstream. Detached/unborn
 branches, no upstream, behind or diverged histories, uncertain comparisons,
 multiple push URLs, triangular push remotes, mirror/force settings, and
@@ -230,7 +230,7 @@ final check can still make Git reject the push; repodash does not force or
 retry.
 
 Fast-forward pull requires a clean index and worktree. It fetches first, then
-offers the exact fetched commit for review. The final integration is
+offers the exact fetched commit for confirmation. The final integration is
 fast-forward-only with autostash disabled. Dirty, conflicted, detached/unborn,
 diverged, or operation-in-progress worktrees are skipped. Equal or ahead-only
 branches have nothing to integrate. Pull updates tracked source files through
