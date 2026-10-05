@@ -54,7 +54,10 @@ func (r Runner) Run(ctx context.Context, path string, args ...string) (Output, e
 	if bin == "" {
 		bin = "git"
 	}
-	argv := append([]string{"--no-optional-locks", "-c", "credential.interactive=false", "-C", path}, args...)
+	// Repository config is untrusted for a scanner of arbitrary directories:
+	// neutralise keys that would execute programs during routine inspection.
+	argv := append([]string{"--no-optional-locks", "-c", "credential.interactive=false",
+		"-c", "core.fsmonitor=false", "-c", "log.showSignature=false", "-C", path}, args...)
 	cmd := exec.CommandContext(ctx, bin, argv...)
 	cmd.Env = cleanEnvironment(os.Environ())
 	cmd.WaitDelay = time.Second

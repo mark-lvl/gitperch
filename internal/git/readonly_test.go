@@ -120,3 +120,33 @@ func TestInspectFiltersInheritedGitConfigRouting(t *testing.T) {
 		t.Fatalf("inherited config redirected Git inspection: error=%q", status.Error)
 	}
 }
+
+func TestRepositoryConfigCannotRunCommandsDuringInspection(t *testing.T) {
+	d := disposable(t)
+	write(t, filepath.Join(d, "tracked"), "committed\n")
+	commit(t, d)
+	write(t, filepath.Join(d, "tracked"), "edit\n")
+	marker := filepath.Join(t.TempDir(), "executed")
+	script := filepath.Join(t.TempDir(), "hook.sh")
+	write(t, script, "#!/bin/sh\ntouch '"+marker+"'\nexit 1\n")
+	if err := os.Chmod(script, 0700); err != nil {
+		t.Fatal(err)
+	}
+	gitCmd(t, d, "config", "core.fsmonitor", script)
+	gitCmd(t, d, "config", "log.showSignature", "true")
+	gitCmd(t, d, "config", "gpg.program", script)
+
+	r := Runner{}
+	if status := r.Inspect(context.Background(), d); status.Error != "" {
+		t.Fatalf("inspect: %s", status.Error)
+	}
+	if _, err := r.Details(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Patch(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("repository configuration executed a command")
+	}
+}
