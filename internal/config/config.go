@@ -213,6 +213,10 @@ func (c Config) Resolve(workspace string, roots []string, cwd string) (Workspace
 			selected.Paths = append(selected.Paths, p)
 		}
 	}
+	if len(selected.Paths) == 0 && name != "" {
+		// Scanning wherever the user stands would silently ignore their choice.
+		return Workspace{}, fmt.Errorf("workspace %q has no paths; add paths or pass ROOT arguments", name)
+	}
 	if len(selected.Paths) == 0 {
 		if cwd == "" {
 			var err error

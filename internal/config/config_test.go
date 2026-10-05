@@ -130,6 +130,13 @@ func TestResolveSelectionOverridesAndCWDallback(t *testing.T) {
 	if err != nil || len(w.Paths) != 1 || w.Paths[0] != cwd {
 		t.Fatalf("empty config should fall back to cwd: %+v, %v", w, err)
 	}
+	pathless := Config{Workspaces: []Workspace{{Name: "bare", MaxDepth: 1}}}
+	if _, err := pathless.Resolve("bare", nil, cwd); err == nil || !strings.Contains(err.Error(), "has no paths") {
+		t.Fatalf("pathless workspace should fail, got %v", err)
+	}
+	if w, err := pathless.Resolve("bare", []string{"r"}, cwd); err != nil || w.MaxDepth != 1 || w.Paths[0] != filepath.Join(cwd, "r") {
+		t.Fatalf("pathless workspace with roots = %+v, %v", w, err)
+	}
 }
 
 func TestResolveExpandsTildeInCLIPaths(t *testing.T) {
