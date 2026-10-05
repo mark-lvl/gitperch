@@ -5,6 +5,7 @@ import (
 	"repodash/internal/app"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMissionLayout(t *testing.T) {
@@ -12,7 +13,7 @@ func TestMissionLayout(t *testing.T) {
 		w, h                   int
 		split, branch, preview bool
 	}{
-		{160, 45, true, true, true}, {110, 35, false, true, true}, {78, 28, false, false, true}, {60, 20, false, false, true}, {80, 12, false, false, false},
+		{160, 45, true, true, true}, {110, 35, false, false, true}, {78, 28, false, false, true}, {60, 20, false, false, true}, {80, 12, false, false, false},
 	} {
 		m := New(nil, nil, true)
 		m.width, m.height = tc.w, tc.h
@@ -87,5 +88,35 @@ func TestASCIIAndNerdFallbackLayouts(t *testing.T) {
 		if mode == "ascii" && strings.ContainsAny(content, "◆✓↑↓→─…·") {
 			t.Fatal("presentation did not use ASCII fallback")
 		}
+	}
+}
+
+func TestRelativeTimeStaysShort(t *testing.T) {
+	now := time.Date(2026, 10, 5, 19, 42, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		at   time.Time
+		want string
+	}{{time.Time{}, "—"}, {now.Add(-20 * time.Second), "now"}, {now.Add(-11 * time.Minute), "11m ago"}, {now.Add(-3 * time.Hour), "3h ago"}, {now.Add(-50 * time.Hour), "2d ago"}, {now.AddDate(0, -3, 0), "Jul 5"}, {now.AddDate(-2, 0, 0), "2024-10"}} {
+		if got := relativeTime(now, tc.at); got != tc.want || ansi.StringWidth(got) > 9 {
+			t.Fatalf("%v: %q, want %q", tc.at, got, tc.want)
+		}
+	}
+}
+
+func TestNumberKeysJumpToVisibleRows(t *testing.T) {
+	m := New(nil, nil, true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.key(key("3"))
+	if m.highlight != 2 {
+		t.Fatalf("3 highlighted %d", m.highlight)
+	}
+	m.key(key("9")) // Beyond the six rows: ignored rather than clamped.
+	if m.highlight != 2 {
+		t.Fatalf("9 moved highlight to %d", m.highlight)
+	}
+	m.key(key("/"))
+	m.key(key("1"))
+	if m.filter != "1" || m.highlight != 0 {
+		t.Fatal("digits must type into search while filtering")
 	}
 }

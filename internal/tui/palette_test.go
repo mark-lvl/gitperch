@@ -49,7 +49,7 @@ func TestContextFooter(t *testing.T) {
 	for _, tc := range []struct {
 		index           int
 		present, absent string
-	}{{0, "[Enter] Open", "[p] Push"}, {1, "[p] Push", "[l] Pull"}, {2, "[l] Pull", "[p] Push"}, {5, "[d] Diff", "[p] Push"}} {
+	}{{0, "[↵] Open", "[p] Push"}, {1, "[p] Push", "[l] Pull"}, {2, "[l] Pull", "[p] Push"}, {5, "[d] Diff", "[p] Push"}} {
 		m.highlight = tc.index
 		footer := m.footer()
 		if !strings.Contains(footer, tc.present) || strings.Contains(footer, tc.absent) {
@@ -127,7 +127,7 @@ func TestPaletteAndHelpOverRepositoryDetails(t *testing.T) {
 	m.applySnapshot(app.Snapshot{Rows: testRows()})
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m.Update(key(":"))
-	if !strings.Contains(m.View().Content, " Actions") {
+	if !strings.Contains(m.View().Content, "Command Palette") {
 		t.Fatal("palette hidden behind details")
 	}
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})

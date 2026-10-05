@@ -10,6 +10,7 @@ import (
 	"repodash/internal/repository"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Metadata is a fresh local snapshot for planning/revalidation, never a remote
@@ -70,7 +71,10 @@ func (r Runner) Metadata(ctx context.Context, path string) (Metadata, error) {
 	return m, nil
 }
 
-func (r Runner) localMetadata(ctx context.Context, path string) (string, string, error) {
+// localMetadata also reports when HEAD last moved, from the reflog's mtime, so
+// the workspace can show recent activity without another Git process.
+func (r Runner) localMetadata(ctx context.Context, path string) (string, string, time.Time, error) {
+	var activity time.Time
 	gitPath := func(arg string) (string, error) {
 		out, err := r.Run(ctx, path, "rev-parse", "--path-format=absolute", arg)
 		if err != nil {
@@ -84,24 +88,27 @@ func (r Runner) localMetadata(ctx context.Context, path string) (string, string,
 	}
 	common, err := gitPath("--git-common-dir")
 	if err != nil {
-		return "", "", err
+		return "", "", activity, err
 	}
 	common, err = filepath.EvalSymlinks(common)
 	if err != nil {
-		return "", "", err
+		return "", "", activity, err
 	}
 	gitDir, err := gitPath("--git-dir")
 	if err != nil {
-		return "", "", err
+		return "", "", activity, err
+	}
+	if info, err := os.Stat(filepath.Join(gitDir, "logs", "HEAD")); err == nil {
+		activity = info.ModTime()
 	}
 	for _, marker := range []string{"MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer", "BISECT_LOG"} {
 		if _, err := os.Stat(filepath.Join(gitDir, marker)); err == nil {
-			return common, marker, nil
+			return common, marker, activity, nil
 		} else if !os.IsNotExist(err) {
-			return "", "", err
+			return "", "", activity, err
 		}
 	}
-	return common, "", nil
+	return common, "", activity, nil
 }
 
 type FetchTarget struct {

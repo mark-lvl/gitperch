@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // RepoDetails is an on-demand read model, separate from inexpensive workspace
@@ -16,7 +17,10 @@ type ChangedFile struct {
 	Added, Deleted int
 	Binary         bool
 }
-type Commit struct{ OID, Subject string }
+type Commit struct {
+	OID, Subject string
+	Time         time.Time
+}
 type RepoDetails struct {
 	Files   []ChangedFile
 	Commits []Commit
@@ -83,13 +87,17 @@ func (r Runner) Details(ctx context.Context, path string) (RepoDetails, error) {
 	if headErr != nil {
 		return d, headErr
 	}
-	out, err = r.Run(ctx, path, "log", "-8", "--format=%h%x00%s%x00")
+	out, err = r.Run(ctx, path, "log", "-8", "--format=%h%x00%ct%x00%s%x00")
 	if err != nil {
 		return d, err
 	}
 	fields := strings.Split(string(out.Stdout), "\x00")
-	for i := 0; i+1 < len(fields); i += 2 {
-		d.Commits = append(d.Commits, Commit{OID: strings.TrimSpace(fields[i]), Subject: fields[i+1]})
+	for i := 0; i+2 < len(fields); i += 3 {
+		c := Commit{OID: strings.TrimSpace(fields[i]), Subject: fields[i+2]}
+		if seconds, err := strconv.ParseInt(strings.TrimSpace(fields[i+1]), 10, 64); err == nil {
+			c.Time = time.Unix(seconds, 0)
+		}
+		d.Commits = append(d.Commits, c)
 	}
 	return d, nil
 }

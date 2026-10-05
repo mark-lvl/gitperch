@@ -1,22 +1,21 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
-│ ◇ repodash  ~/dev/platform                       [6 repos] [! 5 attention] │
-│ All repositories  Focus                       Tab view · / search · ? help │
-│                                                                            │
-│      REPOSITORY                               STATUS            CHANGES    │
-│    ▱ api-service                              ✓ clean           —          │
-│ >  ▱ design-system                            ◆ changed         +12 -2     │
-│    ▱ docs                                     ↓ behind          —          │
-│    ▱ experiment                               ! no upstream     —          │
-│    ▱ mobile                                   × failed          —          │
-│    ▱ worker                                   ! conflict        1 file     │
-│ ─ Selected repository ──────────────────────────────────────────────────── │
-│ design-system  feat/tokens → origin/feat/tokens                            │
-│ /home/mark/projects/design-system                                          │
-│ Working tree · 3 files                                                     │
-│ M  src/theme/tokens.go                                              +8 -2  │
-│ M  src/components/button.go                                            +4  │
-│ ?  tests/theme_test.go                                                     │
-│ ↑3 ahead · locally known refs                                              │
+│ ◇ repodash  ~/dev/platform                [6 repos] [! 5 attention]  19:42 │
 │ ────────────────────────────────────────────────────────────────────────── │
-│ [Enter] Open  [d] Diff  [p] Push  [:] Actions                              │
+│        REPO                           STATUS                Δ              │
+│    1 ▱ api-service                    ✓ clean               —              │
+│ ▌  2 ▱ design-system                  ● changed ↑3          +12 -2         │
+│    3 ▱ docs                           ↓ 4 behind            —              │
+│    4 ▱ experiment                     ! no upstream         —              │
+│    5 ▱ mobile                         × failed              —              │
+│    6 ▱ worker                         ! conflict ↑2 ↓1      1 file         │
+│ ╭────────────────────────────────────────────────────────────────────────╮ │
+│ │ ▱ design-system  feat/tokens → origin/feat/tokens               2m ago │ │
+│ │ ↑3 ahead · locally known refs                                          │ │
+│ │ Working tree · 3 files                                                 │ │
+│ │ M  src/theme/tokens.go                                          +8 -2  │ │
+│ │ M  src/components/button.go                                        +4  │ │
+│ │ ?  tests/theme_test.go                                                 │ │
+│ ╰────────────────────────────────────────────────────────────────────────╯ │
+│                                                                            │
+│ [↑↓] Move  [↵] Open  [d] Diff  [p] Push  [/] Search  [:] Command  [?] Help │
 ╰────────────────────────────────────────────────────────────────────────────╯

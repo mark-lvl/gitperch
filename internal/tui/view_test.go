@@ -114,7 +114,7 @@ func TestPaginationKeepsHighlightInRenderedList(t *testing.T) {
 			m.key(tea.KeyPressMsg{Code: code})
 			before := m.scroll
 			content := m.View().Content
-			if !strings.Contains(content, ">  ▱ "+m.highlightedRow().Name) {
+			if !highlightedLine(content, m.highlightedRow().Name) {
 				t.Fatalf("highlight hidden at %v: %s", size, content)
 			}
 			if before != m.scroll {
@@ -132,7 +132,7 @@ func TestIndependentStatesAndGuidance(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m.highlight = 1
 	content := m.View().Content
-	for _, want := range []string{"attention", "◆ changed", "↑3", "Selected repository", "locally known refs"} {
+	for _, want := range []string{"attention", "● changed ↑3", "design-system  feat/tokens → origin/feat/tokens", "locally known refs"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("missing %q: %s", want, content)
 		}
@@ -194,7 +194,18 @@ func TestNoticeDoesNotHideHighlightedRow(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 16})
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
 	m.Update(key("f")) // Unavailable action displays a notice and shrinks the list.
-	if !strings.Contains(m.View().Content, ">  ▱ repo-29") {
+	if !highlightedLine(m.View().Content, "repo-29") {
 		t.Fatal("notice hid highlighted repository")
 	}
+}
+
+// highlightedLine reports whether the row naming repository carries the
+// highlight marker; narrow layouts insert a row number before the name.
+func highlightedLine(content, repository string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "▱ "+repository+" ") && strings.Contains(line, "▌") {
+			return true
+		}
+	}
+	return false
 }

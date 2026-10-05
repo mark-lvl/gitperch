@@ -10,7 +10,25 @@ import (
 	gitcli "repodash/internal/git"
 	"strings"
 	"testing"
+	"time"
 )
+
+// captureNow pins the header clock and relative ages in reviewed captures.
+var captureNow = time.Date(2026, 10, 5, 19, 42, 0, 0, time.UTC)
+
+func captureRows() []app.Row {
+	rows := dashboardRows()
+	for i, age := range []time.Duration{3 * time.Hour, 2 * time.Minute, 26 * time.Hour, 11 * time.Minute, 0, 7 * time.Minute} {
+		if age > 0 {
+			rows[i].Status.LastActivity = captureNow.Add(-age)
+		}
+	}
+	return rows
+}
+
+func captureCommits() []gitcli.Commit {
+	return []gitcli.Commit{{OID: "29ac81", Subject: "Add semantic theme tokens", Time: captureNow.Add(-12 * time.Minute)}, {OID: "fe2034", Subject: "Refactor shared components", Time: captureNow.Add(-time.Hour)}}
+}
 
 // writeANSICapture exports color output for scripts/render-captures.py into
 // REPODASH_ANSI_DIR, a directory the caller creates privately (mktemp -d).
@@ -33,11 +51,12 @@ func TestWorkspaceRenderCaptures(t *testing.T) {
 			m := New(context.Background(), nil, true)
 			m.lazyGitAvailable = false
 			m.Configure("~/dev/platform", "unicode", false)
-			m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+			m.clock = func() time.Time { return captureNow }
+			m.applySnapshot(app.Snapshot{Rows: captureRows()})
 			m.EnableActions(app.NewActions(newActionFake(false), 1))
 			m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
 			m.highlight = 1
-			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Commits: []gitcli.Commit{{OID: "29ac81", Subject: "Add semantic theme tokens"}, {OID: "fe2034", Subject: "Refactor shared components"}}, Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: " M", Path: "src/components/button.go", Added: 4}, {Code: "??", Path: "tests/theme_test.go"}}}}
+			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Commits: captureCommits(), Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: " M", Path: "src/components/button.go", Added: 4}, {Code: "??", Path: "tests/theme_test.go"}}}}
 			m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
 			content := m.View().Content
 			if os.Getenv("UPDATE_RENDERS") == "1" {
@@ -76,13 +95,14 @@ func TestOverlayRenderCaptures(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			m := New(nil, nil, true)
 			m.Configure("~/dev/platform", "unicode", false)
-			m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+			m.clock = func() time.Time { return captureNow }
+			m.applySnapshot(app.Snapshot{Rows: captureRows()})
 			m.highlight = 1
 			m.width, m.height = 110, 35
 			m.lazyGitAvailable = false
 			m.EnableActions(app.NewActions(newActionFake(false), 1))
 			m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
-			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: "??", Path: "tests/theme_test.go"}}, Commits: []gitcli.Commit{{OID: "29ac81", Subject: "Add semantic theme tokens"}, {OID: "fe2034", Subject: "Refactor shared components"}}}}
+			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: "??", Path: "tests/theme_test.go"}}, Commits: captureCommits()}}
 			if mode == "palette" {
 				m.palette = true
 				m.paletteQuery = "push"

@@ -4,6 +4,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"context"
 	"fmt"
+	"github.com/charmbracelet/x/ansi"
+	"repodash/internal/app"
 	gitcli "repodash/internal/git"
 	"strings"
 )
@@ -54,17 +56,21 @@ func (m *Model) repositoryDetails() []string {
 		return m.detailsContent()
 	}
 	w := max(1, m.width)
-	title := m.between(m.style(" repodash / "+gitcli.SafeText(row.Name), accent, true), m.style("Esc workspace ", muted, false), w)
+	title := m.between(m.style(" Repository: ", ink, true)+m.style(gitcli.SafeText(row.Name), accent, true), m.style("Esc to back ", muted, false), w)
 	lines := []string{title, m.rule(w)}
-	tabs := []string{"Overview", "Changes", "Commits", "Worktree"}
-	for i := range tabs {
-		if i == m.detailTab {
-			tabs[i] = m.style("["+tabs[i]+"]", accent, true)
-		} else {
-			tabs[i] = m.style(tabs[i], muted, false)
+	// Wide terminals list sections in a side column; narrow ones keep tabs inline.
+	if m.detailNavWidth() == 0 {
+		tabs := append([]string(nil), detailTabs...)
+		for i := range tabs {
+			if i == m.detailTab {
+				tabs[i] = m.style("["+tabs[i]+"]", accent, true)
+			} else {
+				tabs[i] = m.style(tabs[i], muted, false)
+			}
 		}
+		lines = append(lines, " "+strings.Join(tabs, "  "))
 	}
-	lines = append(lines, " "+strings.Join(tabs, "  "), m.style("Path: "+gitcli.SafeText(row.Path), muted, false))
+	lines = append(lines, " "+m.detailActions(*row), m.style(" Path: "+gitcli.SafeText(row.Path), muted, false))
 	branch := branchLabel(*row)
 	if row.Status.Upstream != "" {
 		branch += " → " + gitcli.SafeText(row.Status.Upstream)
@@ -84,7 +90,7 @@ func (m *Model) repositoryDetails() []string {
 			lines = append(lines, m.style(" No uncommitted changes", muted, false))
 		}
 		for _, file := range result.data.Files[:min(limit, len(result.data.Files))] {
-			lines = append(lines, " "+m.renderFile(file, w-2))
+			lines = append(lines, " "+m.renderFile(file, max(1, w-m.detailNavWidth()-3)))
 		}
 		if len(result.data.Files) > limit {
 			lines = append(lines, m.style(fmt.Sprintf(" %d more files · Tab for Changes", len(result.data.Files)-limit), muted, false))
@@ -96,7 +102,7 @@ func (m *Model) repositoryDetails() []string {
 			lines = append(lines, m.style(" No commits", muted, false))
 		}
 		for _, commit := range result.data.Commits[:min(limit, len(result.data.Commits))] {
-			lines = append(lines, " "+m.style(gitcli.SafeText(commit.OID), accent, false)+"  "+gitcli.SafeText(commit.Subject))
+			lines = append(lines, " "+m.renderCommit(commit, max(1, w-m.detailNavWidth()-3)))
 		}
 	}
 	switch m.detailTab {
@@ -150,6 +156,68 @@ func (m *Model) repositoryDetails() []string {
 		lines = append(lines, "Load error: "+gitcli.SafeText(m.loadErr))
 	}
 	return lines
+}
+
+var detailTabs = []string{"Overview", "Changes", "Commits", "Worktree"}
+
+// detailNavWidth is the section column, including its separator; zero keeps
+// the inline tab row on terminals too narrow to spare it.
+func (m *Model) detailNavWidth() int {
+	if m.highlightedRow() == nil || m.width < 70 {
+		return 0
+	}
+	return 17
+}
+
+// detailNav lists sections with the changed-file count beside Changes.
+func (m *Model) detailNav(height int) []string {
+	w := m.detailNavWidth() - 1
+	lines := []string{""}
+	for i, tab := range detailTabs {
+		count := ""
+		if row := m.highlightedRow(); i == 1 && row != nil {
+			files := max(row.Status.Changes, row.Status.Conflicts) + row.Status.Untracked
+			if result, ok := m.detailCache[row.Path]; ok && result.err == nil {
+				files = len(result.data.Files)
+			}
+			if files > 0 {
+				count = m.chip(fmt.Sprint(files), muted)
+			}
+		}
+		label := " " + tab
+		line := m.style(cell(label, w-ansi.StringWidth(count)-1), muted, false) + count
+		if i == m.detailTab {
+			line = m.style(m.symbols().pointer, accent, true) + m.style(cell(tab, w-ansi.StringWidth(count)-2), accent, true) + count
+			if !m.noColor {
+				line = backgroundText(cell(line, w-1), selection)
+			}
+		}
+		lines = append(lines, line, "")
+	}
+	lines = fitLines(lines, height)
+	for i := range lines {
+		lines[i] = cell(lines[i], w) + m.style("│", border, false)
+	}
+	return lines
+}
+
+// detailActions shows only keys that work here for this repository.
+func (m *Model) detailActions(row app.Row) string {
+	hints := []hint{{"d", "Diff", 0}, {"o", "Shell", 1}}
+	if m.lazyGitAvailable {
+		hints = append(hints, hint{"g", "LazyGit", 2})
+	}
+	s := row.Status
+	if m.actions != nil && s.Error == "" && s.Operation == "" && s.Conflicts == 0 && !s.Detached && !s.Unborn && s.Upstream != "" && s.ComparisonKnown {
+		if s.Ahead > 0 && s.Behind == 0 {
+			hints = append(hints, hint{"p", "Push", 0})
+		}
+		if s.Behind > 0 && s.Ahead == 0 && !s.Dirty() {
+			hints = append(hints, hint{"l", "Pull", 0})
+		}
+	}
+	hints = append(hints, hint{":", "More", 0})
+	return m.hintBar("", hints, max(1, m.width-m.detailNavWidth()-2))
 }
 
 func (m *Model) closeReads() {

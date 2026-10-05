@@ -23,7 +23,7 @@ func TestSmallWorkspaceKeepsPreviewNextToList(t *testing.T) {
 		if strings.Contains(line, "worker") {
 			last = i
 		}
-		if strings.Contains(line, "Selected repository") {
+		if strings.Contains(line, "╭") && last >= 0 && preview < 0 {
 			preview = i
 		}
 	}
@@ -154,7 +154,7 @@ func TestPaletteFitsEverySupportedWidth(t *testing.T) {
 		m.width, m.height = size[0], size[1]
 		m.palette = true
 		content := m.View().Content
-		if !strings.Contains(content, "Actions") || !strings.Contains(content, "Esc close") {
+		if !strings.Contains(content, "Command Palette") || !strings.Contains(content, "Esc") {
 			t.Fatalf("palette lost navigation: %v", size)
 		}
 		if len(strings.Split(content, "\n")) > size[1] {

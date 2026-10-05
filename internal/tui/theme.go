@@ -1,6 +1,11 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
+	"time"
+
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -20,15 +25,17 @@ const (
 	danger      = "203"
 	selection   = "#102638"
 	border      = "#284052"
+	chipSurface = "#15283a" // keycaps, header badges and file-status chips
 )
 
-type icons struct{ clean, changed, ahead, behind, failed, pointer, rule, repo, brand string }
+// branch is empty outside nerd mode: no fork glyph is common to terminal fonts.
+type icons struct{ clean, changed, ahead, behind, failed, pointer, rule, repo, brand, branch, enter string }
 
 func iconSet(mode string) icons {
-	i := icons{clean: "✓", changed: "◆", ahead: "↑", behind: "↓", failed: "×", pointer: ">", rule: "─", repo: "▱", brand: "◇"}
+	i := icons{clean: "✓", changed: "●", ahead: "↑", behind: "↓", failed: "×", pointer: "▌", rule: "─", repo: "▱", brand: "◇", enter: "↵"}
 	switch mode {
 	case "ascii":
-		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*"}
+		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*", enter: "Enter"}
 	case "nerd":
 		i.clean = "\uf00c"
 		i.changed = "\uf044"
@@ -37,8 +44,49 @@ func iconSet(mode string) icons {
 		i.failed = "\uf071"
 		i.repo = "\uf07b"
 		i.brand = "\uf1d3"
+		i.branch = "\ue0a0"
 	}
 	return i
+}
+
+// relativeTime keeps ages short enough for a narrow column. Zero is unknown.
+func relativeTime(now, t time.Time) string {
+	if t.IsZero() {
+		return "—"
+	}
+	d := now.Sub(t)
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d/time.Minute))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d/time.Hour))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d/(24*time.Hour)))
+	case t.Year() == now.Year():
+		return t.Format("Jan 2")
+	default:
+		return t.Format("2006-01")
+	}
+}
+
+// chip draws a small filled label. Without color it falls back to brackets,
+// which also keeps plain-text captures and assertions readable.
+func (m *Model) chip(text, color string) string {
+	if m.noColor {
+		return "[" + text + "]"
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Background(lipgloss.Color(chipSurface)).Render(" " + text + " ")
+}
+
+// fileChip is the colored one-letter status badge used beside changed files.
+func (m *Model) fileChip(code, color string) string {
+	if m.noColor {
+		return cell(code, 2)
+	}
+	code = ansi.Truncate(code, 2, "")
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(background)).Background(lipgloss.Color(color)).Bold(true).Render(code) + strings.Repeat(" ", 2-ansi.StringWidth(code))
 }
 
 // truncateMiddle keeps a branch prefix and meaningful suffix. Path truncation

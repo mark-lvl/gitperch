@@ -14,18 +14,37 @@ tracked counts sum staged and unstaged changes rather than claiming a net diff.
 ## Responsive layout
 
 The workspace uses a restrained dark canvas, cyan selection accents, magenta
-branch metadata, small status badges, and one thin outer frame. Content follows
-the repository rows: a small workspace never creates a large empty gap above its
-preview. Unselected rows have no permanent checkbox; selected repositories carry
-a small filled marker. Zero tracking counts stay hidden.
+branch metadata, and one thin outer frame. A single header line carries the
+workspace, repository and attention badges, and a clock. The second line is a
+quiet rule that names an active search or scope and the scroll range only when
+they apply. The highlighted row has an accent bar; selected repositories carry
+a small filled marker. Folder icons and status labels share the status color.
+Tracking counts follow the status (`● changed ↑3`) unless the status already is
+the tracking state (`↑ 3 commits`, `↓ 4 behind`). Zero tracking counts stay hidden.
 
-At 120+ columns, the selected preview can place changed files beside real recent
-commits. Smaller layouts stack content vertically. The table drops branch and
-tracking columns when its content width is below 80 columns. Below 20 rows the
-preview disappears before list rows. The recommended minimum is 60×12; smaller
+The highlighted repository's preview is a bordered card: name, branch → upstream
+and last activity, then its status line and changed files with colored status
+chips. Key hints are filled keycaps at the bottom; the least important ones drop
+first on narrow terminals, and only keys that work for the highlighted
+repository appear.
+
+Columns follow three terminal tiers:
+
+| Width | Columns | Preview |
+| --- | --- | --- |
+| Wide, 120+ | Repo · Branch · Status · Δ · Updated | Changed files beside recent commits with ages |
+| Medium, 80–119 | Repo · Status · Δ | Stacked; the branch moves to the card |
+| Narrow, < 80 | Row number · Repo · Status · Δ | Stacked; the upstream is dropped first |
+
+**Updated** is the modification time of the worktree's HEAD reflog: the last
+commit, checkout, pull or reset, read without starting another Git process. It
+shows `—` when the reflog is absent. Default branches (`main`, `master`) are
+dimmed so feature branches stand out. Below 20 rows the preview disappears
+before list rows. The recommended minimum is 60×12; smaller
 workspace screens show a resize message. Documents and reviews remain scrollable.
-The command palette floats over the current workspace and includes short command
-descriptions. It grows only enough to hold its results.
+The command palette floats over the current workspace: a search box, then an
+icon, title and short description per command, with an Enter badge on the
+chosen one. It grows only enough to hold its results.
 
 Path and branch truncation preserve filenames and useful branch prefixes/tails.
 ANSI cell measurement handles wide characters and colored strings. Bubble Tea
@@ -38,6 +57,7 @@ terminals. `--no-color`, `NO_COLOR`, and ASCII icons remain supported.
 | --- | --- |
 | ↑/↓ or j/k | Navigate repositories |
 | PgUp/PgDn, Home/End | Page or jump through the list |
+| 1–9 | Jump to that visible row; narrow layouts show the numbers |
 | Enter | Open repository Overview; while searching, open the selected result |
 | d | Open Changes, including the tracked patch |
 | Tab / Shift+Tab | Toggle All / Focus; in details, cycle sections |
@@ -62,7 +82,9 @@ shortcuts are omitted based on known state; final plans always revalidate. Bulk
 plans may include ineligible repositories and explicitly explain skips.
 
 Repository details provide Overview, Changes, Commits (eight recent commits), and
-Worktree. Overview shows a compact sample; Changes reveals every changed file and
+Worktree. From 70 columns the sections are a side column, with the changed-file
+count beside Changes; the content starts with the keys available for that
+repository. Commits show their age. Overview shows a compact sample; Changes reveals every changed file and
 the colored patch. Preview reads are asynchronous, canceled when navigating to
 another uncached repository, protected against stale results, and cached until
 refresh. Full patches load only while Changes is open, cancel on leaving, and
@@ -120,7 +142,9 @@ application dependencies.
 
 Agents, semantic agent messages/waiting states, tests, pull requests and tasks have
 no real backend integration here, so no fabricated counters, columns, tabs or
-buttons appear. The detail-loader and command registry are the seams for later
+buttons appear. The reference mockup's AGENT column, agent badge and Agent tab,
+Commit, Open pull request, Sync all and Start agent are therefore absent, and `a`
+and `s` keep their existing select-all and sort bindings. The detail-loader and command registry are the seams for later
 integration. Stage/commit/conflict resolution are available through the real shell
 or optional LazyGit, not new embedded mutation workflows. Line counts are fetched
 only for the highlighted repository; the table retains existing cheap Git status

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"repodash/internal/app"
@@ -76,6 +77,8 @@ type Model struct {
 	results           map[string]app.Event
 	interrupted       bool
 	actionFailed      bool
+	clock             func() time.Time // header clock and relative ages; fixed in captures
+	ticking           bool
 }
 
 type snapshotMsg struct {
@@ -86,6 +89,19 @@ type snapshotMsg struct {
 
 type childExitedMsg struct{ err error }
 
+// clockMsg redraws the header clock and relative ages; it never reads Git.
+type clockMsg struct{}
+
+func (m *Model) now() time.Time { return m.clock() }
+
+// The tick starts with the first snapshot rather than in Init, so Init stays a
+// single cancellable load. Ticks align to the minute to keep the clock exact.
+func (m *Model) tick() tea.Cmd {
+	m.ticking = true
+	wait := time.Minute - time.Duration(m.now().Second())*time.Second
+	return tea.Tick(wait, func(time.Time) tea.Msg { return clockMsg{} })
+}
+
 // New creates a TUI model. load must honor its context; refreshing cancels an
 // older load and ignores any late result from it.
 func New(ctx context.Context, load func(context.Context) (app.Snapshot, error), noColor bool) *Model {
@@ -95,6 +111,7 @@ func New(ctx context.Context, load func(context.Context) (app.Snapshot, error), 
 	_, lazyGitErr := exec.LookPath("lazygit")
 	return &Model{
 		lazyGitAvailable: lazyGitErr == nil,
+		clock:            time.Now,
 		detailCache:      make(map[string]detailResult),
 		ctx:              ctx,
 		load:             load,
@@ -201,6 +218,9 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		} else {
 			m.loadErr = ""
 		}
+		if !m.ticking && !m.closing {
+			return m, m.tick()
+		}
 	case childExitedMsg:
 		if msg.err != nil {
 			m.message = "Child process: " + msg.err.Error()
@@ -208,6 +228,11 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 			m.message = "Child process finished"
 		}
 		return m, m.refresh()
+	case clockMsg:
+		if m.closing {
+			return m, nil
+		}
+		return m, m.tick()
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
 	}
@@ -349,10 +374,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		case "j", "down":
 			m.detailOffset++
 		case "pgdown":
-			_, _, _, page := m.documentParts(m.repositoryDetails(), detailsFooter)
+			_, _, _, page := m.detailParts()
 			m.detailOffset += max(1, page)
 		case "pgup":
-			_, _, _, page := m.documentParts(m.repositoryDetails(), detailsFooter)
+			_, _, _, page := m.detailParts()
 			m.detailOffset = max(0, m.detailOffset-max(1, page))
 		case "home":
 			m.detailOffset = 0
@@ -361,7 +386,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				m.detailOffset--
 			}
 		}
-		m.detailOffset = min(m.detailOffset, m.documentMaxOffset(m.repositoryDetails(), detailsFooter))
+		_, body, _, page := m.detailParts()
+		m.detailOffset = min(m.detailOffset, max(0, len(body)-max(1, page)))
 		return nil
 	}
 	if m.filtering {
@@ -469,6 +495,12 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			}
 		}
 		m.keepHighlightVisible()
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		// Narrow layouts number the first nine rows; the keys work at any width.
+		if index := int(msg.String()[0] - '1'); index < len(m.visibleRows()) {
+			m.highlight = index
+			m.keepHighlightVisible()
+		}
 	case "home":
 		m.highlight = 0
 		m.keepHighlightVisible()
@@ -706,8 +738,25 @@ func (m *Model) detailsContent() []string {
 	return content
 }
 
+func (m *Model) detailParts() (header, body, foot []string, page int) {
+	return m.documentPartsAt(m.repositoryDetails(), detailsFooter, max(1, m.width-m.detailNavWidth()-1))
+}
+
+// detailsView scrolls the section content beside a fixed section column.
 func (m *Model) detailsView() tea.View {
-	return m.documentView(m.repositoryDetails(), detailsFooter, m.detailOffset)
+	inset := m.detailNavWidth()
+	if inset == 0 {
+		return m.documentView(m.repositoryDetails(), detailsFooter, m.detailOffset)
+	}
+	header, body, foot, page := m.detailParts()
+	offset := min(max(0, m.detailOffset), max(0, len(body)-max(1, page)))
+	body = fitLines(body[offset:min(len(body), offset+page)], page)
+	nav := m.detailNav(page)
+	lines := append([]string(nil), header...)
+	for i := range body {
+		lines = append(lines, nav[i]+" "+body[i])
+	}
+	return m.screen(append(lines, foot...))
 }
 
 func (m *Model) detailLine(row app.Row) string {

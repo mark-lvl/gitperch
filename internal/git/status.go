@@ -16,7 +16,7 @@ func (r Runner) Inspect(ctx context.Context, path string) repository.Status {
 	if err != nil {
 		s.Error = SafeText(err.Error())
 	} else {
-		s.CommonDir, s.Operation, err = r.localMetadata(ctx, path)
+		s.CommonDir, s.Operation, s.LastActivity, err = r.localMetadata(ctx, path)
 		if err != nil {
 			s.Error = SafeText(err.Error())
 		}

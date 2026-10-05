@@ -191,41 +191,42 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 func keyPress(text string) tea.KeyPressMsg { return tea.KeyPressMsg{Code: []rune(text)[0], Text: text} }
 
 // Palette floats above the current workspace, retaining repository orientation.
+// Each command is an icon, a title and a one-line description.
 func (m *Model) paletteView() tea.View {
 	if m.width < 12 || m.height < 6 {
-		return m.screen([]string{"Actions", "> " + gitcli.SafeText(m.paletteQuery), "Esc close"})
+		return m.screen([]string{"Command Palette", "> " + gitcli.SafeText(m.paletteQuery), "Esc close"})
 	}
 	w := min(68, m.width-4)
 	inner := w - 4
 	items := m.paletteCommands()
 	cursor := min(m.paletteCursor, max(0, len(items)-1))
-	page := max(1, min(7, (m.height-10)/2))
+	page := max(1, min(7, (m.height-11)/2))
 	start := max(0, cursor-page+1)
-	title := m.between(m.style("Actions", accent, true), m.style("Esc close", muted, false), inner)
-	query := "Search commands…"
+	title := m.between(m.style("Command Palette", ink, true), m.style("Esc to close", muted, false), inner)
+	query := m.style("Search commands…", muted, false)
 	if m.paletteQuery != "" {
-		query = gitcli.SafeText(m.paletteQuery)
+		query = m.style(gitcli.SafeText(m.paletteQuery), ink, false)
 	}
-	lines := []string{title, "", m.style("> "+cell(query+"▏", max(1, inner-2)), accent, false), m.rule(inner)}
+	input := m.card([]string{m.style("> ", accent, true) + query + m.style("▏", accent, false)}, "", inner, 3)
+	lines := append([]string{title}, input...)
+	enter := m.chip(m.symbols().enter, accent)
 	for i := start; i < min(len(items), start+page); i++ {
-		pointer := " "
+		icon, color := m.commandIcon(items[i].id)
+		text := m.style(icon, color, true) + " " + m.style(items[i].label, ink, i == cursor)
+		description := "  " + m.style(m.commandHint(items[i].id), muted, false)
 		if i == cursor {
-			pointer = ">"
+			text = m.between(text, enter, inner)
+			if !m.noColor {
+				text = backgroundText(cell(text, inner), selection)
+				description = backgroundText(cell(description, inner), selection)
+			}
 		}
-		line := m.style(pointer+" ", accent, true) + m.style(cell(items[i].label, inner-2), ink, i == cursor)
-		description := "  " + m.commandHint(items[i].id)
-		if i == cursor && !m.noColor {
-			line = backgroundText(line, selection)
-			description = backgroundText(cell(m.style(description, muted, false), inner), selection)
-		} else {
-			description = m.style(description, muted, false)
-		}
-		lines = append(lines, line, description)
+		lines = append(lines, text, description)
 	}
 	if len(items) == 0 {
-		lines = append(lines, m.style("No matching actions", muted, false))
+		lines = append(lines, m.style("No matching commands", muted, false))
 	}
-	lines = append(lines, m.rule(inner), m.style("↑↓ choose   Enter run", muted, false))
+	lines = append(lines, m.rule(inner), m.style("↑↓ choose   "+m.symbols().enter+" run", muted, false))
 	panel := m.frame(lines, w)
 	if len(panel) > m.height {
 		panel = panel[:m.height]
@@ -295,4 +296,39 @@ func (m *Model) setScope(scope int) {
 		}
 	}
 	m.keepHighlightVisible()
+}
+
+// commandIcon uses single-cell glyphs so labels align in every icon mode.
+func (m *Model) commandIcon(id string) (string, string) {
+	if m.iconMode == "ascii" {
+		return "*", accent
+	}
+	switch id {
+	case "details":
+		return m.symbols().repo, accent
+	case "changes":
+		return "±", amber
+	case "shell":
+		return "$", success
+	case "lazygit":
+		return m.symbols().branch, branchColor
+	case "fetch":
+		return "⇣", accent
+	case "push":
+		return m.symbols().ahead, accent
+	case "pull":
+		return m.symbols().behind, amber
+	case "refresh":
+		return "↻", success
+	case "focus":
+		return "◎", amber
+	case "sort":
+		return "⇅", muted
+	case "all":
+		return "●", accent
+	case "help":
+		return "?", muted
+	default:
+		return "≡", muted
+	}
 }

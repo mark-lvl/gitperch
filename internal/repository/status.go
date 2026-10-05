@@ -19,6 +19,9 @@ type Status struct {
 	Error           string    `json:"error,omitempty"`
 	CommonDir       string    `json:"common_git_dir,omitempty"`
 	Operation       string    `json:"operation,omitempty"`
+	// LastActivity is the HEAD reflog's modification time: the last commit,
+	// checkout, pull or reset in this worktree. Zero when the reflog is absent.
+	LastActivity time.Time `json:"last_activity,omitzero"`
 }
 
 func (s Status) Dirty() bool { return s.Changes > 0 || s.Untracked > 0 || s.Conflicts > 0 }

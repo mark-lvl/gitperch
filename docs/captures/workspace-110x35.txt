@@ -1,22 +1,21 @@
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ◇ repodash  ~/dev/platform                                                       [6 repos] [! 5 attention] │
-│ All repositories  Focus                                                       Tab view · / search · ? help │
-│                                                                                                            │
-│      REPOSITORY                 BRANCH                              STATUS            CHANGES    SYNC      │
-│    ▱ api-service                main                                ✓ clean           —          —         │
-│ >  ▱ design-system              feat/tokens                         ◆ changed         +12 -2     ↑3        │
-│    ▱ docs                       main                                ↓ behind          —          ↓4        │
-│    ▱ experiment                 prototype                           ! no upstream     —          —         │
-│    ▱ mobile                     main                                × failed          —          —         │
-│    ▱ worker                     main                                ! conflict        1 file     ↑2 ↓1     │
-│ ─ Selected repository ──────────────────────────────────────────────────────────────────────────────────── │
-│ design-system  feat/tokens → origin/feat/tokens                                                            │
-│ /home/mark/projects/design-system                                                                          │
-│ Working tree · 3 files                                                                                     │
-│ M  src/theme/tokens.go                                                                              +8 -2  │
-│ M  src/components/button.go                                                                            +4  │
-│ ?  tests/theme_test.go                                                                                     │
-│ ↑3 ahead · locally known refs                                                                              │
+│ ◇ repodash  ~/dev/platform                                                [6 repos] [! 5 attention]  19:42 │
 │ ────────────────────────────────────────────────────────────────────────────────────────────────────────── │
-│ [Enter] Open  [d] Diff  [p] Push  [Space] Select  [o] Shell  [:] Actions                                   │
+│      REPO                                   STATUS                                   Δ                     │
+│    ▱ api-service                            ✓ clean                                  —                     │
+│ ▌  ▱ design-system                          ● changed ↑3                             +12 -2                │
+│    ▱ docs                                   ↓ 4 behind                               —                     │
+│    ▱ experiment                             ! no upstream                            —                     │
+│    ▱ mobile                                 × failed                                 —                     │
+│    ▱ worker                                 ! conflict ↑2 ↓1                         1 file                │
+│ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ ▱ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
+│ │ ↑3 ahead · locally known refs                                                                          │ │
+│ │ Working tree · 3 files                                                                                 │ │
+│ │ M  src/theme/tokens.go                                                                          +8 -2  │ │
+│ │ M  src/components/button.go                                                                        +4  │ │
+│ │ ?  tests/theme_test.go                                                                                 │ │
+│ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                            │
+│ [↑↓] Move  [↵] Open  [d] Diff  [p] Push  [Space] Select  [o] Shell  [/] Search  [:] Command  [?] Help      │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

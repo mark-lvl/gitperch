@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDetailsRealChangesAndHistoryAreReadOnly(t *testing.T) {
@@ -31,6 +32,12 @@ func TestDetailsRealChangesAndHistoryAreReadOnly(t *testing.T) {
 	}
 	if len(data.Files) != 2 || len(data.Commits) != 1 {
 		t.Fatalf("%+v", data)
+	}
+	if c := data.Commits[0]; c.Subject == "" || c.Time.IsZero() || time.Since(c.Time) > time.Hour {
+		t.Fatalf("commit time not parsed: %+v", c)
+	}
+	if s := (Runner{}).Inspect(context.Background(), d); s.LastActivity.IsZero() || time.Since(s.LastActivity) > time.Hour {
+		t.Fatalf("last activity not read from the HEAD reflog: %+v", s)
 	}
 	for _, f := range data.Files {
 		if f.Path == "tracked" && (f.Added != 2 || f.Deleted != 0 || f.Code != "MM") {
