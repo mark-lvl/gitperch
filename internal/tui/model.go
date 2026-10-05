@@ -43,6 +43,7 @@ type Model struct {
 	rows              []app.Row
 	warnings          []string
 	selected          map[string]bool
+	actionTotal       int // targets in the running batch
 	highlight         int
 	filter            string
 	filtering         bool
@@ -530,7 +531,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		} else if key == "l" {
 			m.syncIntent = app.Pull
 		}
-		return m.preparePreview(app.Fetch)
+		return m.preparePreview(app.Fetch, m.selectedPaths())
 	case "enter":
 		if m.highlightedRow() == nil {
 			return nil
@@ -597,6 +598,16 @@ func (m *Model) launchLazyGit() tea.Cmd {
 }
 
 func (m *Model) clearSelection() { m.selected = make(map[string]bool) }
+
+func (m *Model) selectedPaths() []string {
+	paths := make([]string, 0, len(m.selected))
+	for path, selected := range m.selected {
+		if selected {
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
 
 func (m *Model) highlightedRow() *app.Row {
 	indices := m.visibleRows()

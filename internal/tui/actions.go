@@ -102,18 +102,13 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 	return false, nil
 }
 
-func (m *Model) preparePreview(action app.Action) tea.Cmd {
-	var paths []string
-	for path, selected := range m.selected {
-		if selected {
-			paths = append(paths, path)
-		}
-	}
+func (m *Model) preparePreview(action app.Action, paths []string) tea.Cmd {
 	if len(paths) == 0 {
 		m.message = "Select repositories explicitly with Space or a before an action"
 		return nil
 	}
 	sort.Strings(paths)
+	m.actionTotal = len(paths)
 	if m.loadCancel != nil {
 		m.loadCancel()
 		m.loadCancel = nil

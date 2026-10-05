@@ -169,9 +169,12 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 		if m.actions == nil {
 			return nil
 		}
-		if len(m.selected) == 0 {
+		// Target the highlighted row without selecting it, so it cannot leak
+		// into later actions after a cancelled or failed plan.
+		paths := m.selectedPaths()
+		if len(paths) == 0 {
 			if row := m.highlightedRow(); row != nil {
-				m.selected[row.Path] = true
+				paths = []string{row.Path}
 			}
 		}
 		m.syncIntent = ""
@@ -181,7 +184,7 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 		if id == "pull" {
 			m.syncIntent = app.Pull
 		}
-		return m.preparePreview(app.Fetch)
+		return m.preparePreview(app.Fetch, paths)
 	}
 	return nil
 }

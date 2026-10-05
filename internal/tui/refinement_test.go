@@ -191,7 +191,7 @@ func TestSuggestedPushWorksInDetails(t *testing.T) {
 	m.details = true
 	m.EnableActions(app.NewActions(newActionFake(false), 1))
 	_, cmd := m.Update(key("p"))
-	if cmd == nil || !m.preparing || len(m.selected) != 1 {
+	if cmd == nil || !m.preparing || m.actionTotal != 1 || len(m.selected) != 0 {
 		t.Fatal("suggested push did not open guarded review")
 	}
 	if m.actionCancel != nil {

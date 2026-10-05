@@ -531,7 +531,7 @@ func (m *Model) progressLabel() string {
 			done++
 		}
 	}
-	return fmt.Sprintf("Batch running · %d/%d finished", done, len(m.selected))
+	return fmt.Sprintf("Batch running · %d/%d finished", done, m.actionTotal)
 }
 
 func resultColor(state app.State) string {

@@ -267,3 +267,26 @@ func TestQuitDuringFetchRequestsCancellationUntilResultsArrive(t *testing.T) {
 		t.Fatal("q returned a non-quit command after results arrived")
 	}
 }
+
+func TestImplicitPushTargetDoesNotBecomeSelection(t *testing.T) {
+	fake := newActionFake(false)
+	m := actionModel(fake)
+	cmd := pressAction(m, "p")
+	if cmd == nil {
+		t.Fatal("push preview command missing")
+	}
+	if len(m.selected) != 0 {
+		t.Fatalf("highlighted row became selected: %v", m.selected)
+	}
+	m.Update(cmd())
+	if m.preview == nil || len(m.preview.Targets) != 1 || m.preview.Targets[0].Path != "/repos/first" {
+		t.Fatalf("preview = %#v", m.preview)
+	}
+	pressAction(m, "esc")
+	pressAction(m, "j")
+	cmd = pressAction(m, "p")
+	m.Update(cmd())
+	if m.preview == nil || len(m.preview.Targets) != 1 || m.preview.Targets[0].Path != "/repos/second" {
+		t.Fatalf("second push targeted %#v", m.preview)
+	}
+}
