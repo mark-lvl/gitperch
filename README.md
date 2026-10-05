@@ -203,7 +203,7 @@ demo_root=$(bash scripts/demo.sh)
 bin/repodash "$demo_root/workspace"
 ```
 
-The script prints its new `/tmp/repodash-demo.*` directory and leaves it available
+The script prints its new `repodash-demo.*` directory (under `$TMPDIR`, else `/tmp`) and leaves it available
 for inspection. It includes clean, behind, ahead, dirty, diverged, detached,
 unborn, missing-upstream, failed-remote, and linked-worktree scenarios. Tracking
 comparisons deliberately start stale for some rows; fetch reveals current state.

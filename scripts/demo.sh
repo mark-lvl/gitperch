@@ -3,7 +3,9 @@
 set -euo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-demo_root=$(mktemp -d /tmp/repodash-demo.XXXXXX)
+demo_root=$(mktemp -d "${TMPDIR:-/tmp}/repodash-demo.XXXXXX")
+# Remove a half-built demo on failure; success keeps it for inspection.
+trap 'rm -rf -- "$demo_root"' EXIT
 mkdir -p "$demo_root/remotes" "$demo_root/workspace"
 git init -q --bare -b main "$demo_root/remotes/origin.git"
 git init -q -b main "$demo_root/seed"
@@ -39,4 +41,5 @@ git init -q -b main "$demo_root/workspace/unborn"
 git init -q -b main "$demo_root/workspace/broken-remote"
 git -C "$demo_root/workspace/broken-remote" remote add origin "$demo_root/remotes/missing.git"
 git -C "$demo_root/workspace/clean" worktree add -q -b linked "$demo_root/workspace/linked"
+trap - EXIT
 printf '%s\n' "$demo_root"
