@@ -10,6 +10,10 @@ command_path="$install_dir/repodash"
 if [[ -e "$command_path" || -L "$command_path" ]]; then
     if [[ ! -L "$command_path" || $(readlink -f -- "$command_path") != "$launcher" ]]; then
         printf 'repodash: %s already exists and belongs to another installation.\n' "$command_path" >&2
+        if [[ -L "$command_path" && $(readlink -- "$command_path") == */scripts/repodash-dev ]]; then
+            # Typically a launcher from a checkout that has since moved.
+            printf 'It points to %s; remove it with: rm %q\n' "$(readlink -- "$command_path")" "$command_path" >&2
+        fi
         exit 1
     fi
 fi
