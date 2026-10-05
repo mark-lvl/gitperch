@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Rebuild the development checkout before launching, preserving the caller's cwd.
+set -euo pipefail
+
+launcher_path=$(readlink -f -- "${BASH_SOURCE[0]}")
+repo_root=$(dirname -- "$(dirname -- "$launcher_path")")
+go_command=${GO:-go}
+
+if ! command -v -- "$go_command" >/dev/null 2>&1; then
+    # Reuse the toolchain documented in README for this development environment.
+    if [[ "$go_command" == go && -x /tmp/repodash-toolchain/go/bin/go ]]; then
+        go_command=/tmp/repodash-toolchain/go/bin/go
+        export PATH="/tmp/repodash-toolchain/go/bin:$PATH"
+        export GOCACHE="${GOCACHE:-/tmp/repodash-gocache}"
+        export GOPATH="${GOPATH:-/tmp/repodash-gopath}"
+    else
+        printf 'repodash: Go compiler unavailable (%s). Install Go or set GO to its executable path.\n' "$go_command" >&2
+        exit 1
+    fi
+fi
+
+mkdir -p -- "$repo_root/bin"
+build_dir=$(mktemp -d "$repo_root/bin/.dev-build.XXXXXX")
+trap 'rm -rf -- "$build_dir"' EXIT
+
+# Go's cache makes unchanged launches inexpensive. Failed builds leave the last
+# good binary intact, but stop this launch so stale code is never run silently.
+"$go_command" -C "$repo_root" build -o "$build_dir/repodash" ./cmd/repodash
+mv -f -- "$build_dir/repodash" "$repo_root/bin/repodash"
+rm -rf -- "$build_dir"
+trap - EXIT
+exec "$repo_root/bin/repodash" "$@"

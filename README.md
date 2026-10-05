@@ -33,6 +33,27 @@ make build
 go install ./cmd/repodash
 ```
 
+For an automatically refreshed development command, run:
+
+```sh
+make install-dev
+repodash /path/to/projects
+```
+
+This installs a launcher at `~/.local/bin/repodash`, accessible from any directory
+when `~/.local/bin` is on `PATH`. Each launch incrementally rebuilds this checkout
+into `bin/repodash` before starting it, preserving your current directory and
+arguments. Build errors stop the launch and leave the previous binary intact.
+An already running dashboard continues using its original build; quit and
+relaunch to pick up edits. The checkout must stay at its installed location.
+
+The launcher uses Go from `PATH`, or `GO=/path/to/go`. In this development
+environment it also recognizes the toolchain and caches under `/tmp` described
+above. If that temporary toolchain is removed, install Go or set `GO`.
+`INSTALL_DIR=/another/directory make install-dev` changes the install location.
+The installer refuses to overwrite an unrelated existing command. Remove the
+installed symlink to uninstall; this does not remove the checkout or binary.
+
 `make build` creates `bin/repodash`; `go install` places `repodash` in Go's
 configured `GOBIN` (or `$(go env GOPATH)/bin`). Add that directory to `PATH` if
 you want to invoke `repodash` from any directory. This is a local build
@@ -125,8 +146,9 @@ NO_COLOR=1 repodash /path/to/projects
 
 The default command requires terminal input and output; use `status` when piping.
 The Bubble Tea v2 workspace shows a compact health header, repository list,
-selected preview, and contextual actions. At 120+ columns it adds one small
-attention panel; narrower terminals stack the preview below the list. Short
+selected preview, and contextual actions. At 120+ columns its selected preview places changed files beside recent
+commits. Narrower terminals stack content vertically. The compact frame follows
+the content, and the command palette floats over the workspace. Short
 terminals hide the preview first. The recommended minimum is 60×12.
 
 Use arrows/j/k to navigate, Enter for repository details, `d` for changes, and
@@ -140,8 +162,7 @@ fast-forward pull for the selected set, or the highlighted repository when no
 selection exists. `f` reviews fetch for explicitly selected repositories. All
 network operations retain the existing review and confirmation safeguards.
 Search/scope changes clear selection; refresh preserves visible selections and
-the highlighted repository by path. Tab cycles scopes; the palette provides a
-direct Focus/All toggle. `s` toggles attention/name ordering and `r` refreshes.
+the highlighted repository by path. Tab toggles All/Focus; the palette provides the other repository filters. `s` toggles attention/name ordering, `[ / ]` scroll preview files, and `r` refreshes.
 
 Colors supplement status symbols and text, using the terminal palette. Existing
 TOML configuration accepts `[ui]` with `icons = "unicode"` (also `ascii` or `nerd`)
