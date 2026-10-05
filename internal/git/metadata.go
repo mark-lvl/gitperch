@@ -60,7 +60,8 @@ func (r Runner) Metadata(ctx context.Context, path string) (Metadata, error) {
 		if remote == "" {
 			continue
 		}
-		if strings.ContainsAny(remote, " \t\r\x00") || strings.HasPrefix(remote, "-") {
+		// Fetch passes "-c remote.<name>.pruneTags", which Git splits at "=".
+		if strings.ContainsAny(remote, " \t\r\x00=") || strings.HasPrefix(remote, "-") {
 			return m, fmt.Errorf("unsupported remote name")
 		}
 		m.Remotes = append(m.Remotes, remote)

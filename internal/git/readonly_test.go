@@ -150,3 +150,11 @@ func TestRepositoryConfigCannotRunCommandsDuringInspection(t *testing.T) {
 		t.Fatal("repository configuration executed a command")
 	}
 }
+
+func TestMetadataRejectsRemoteNamesThatBreakConfigOverrides(t *testing.T) {
+	d := disposable(t)
+	gitCmd(t, d, "remote", "add", "a=b", t.TempDir())
+	if _, err := (Runner{}).Metadata(context.Background(), d); err == nil || !strings.Contains(err.Error(), "unsupported remote name") {
+		t.Fatalf("got %v", err)
+	}
+}
