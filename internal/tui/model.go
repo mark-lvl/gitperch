@@ -25,6 +25,16 @@ type Model struct {
 	iconMode          string
 	workspace         string
 	palette           bool
+	loadDetails       detailLoader
+	detailCache       map[string]detailResult
+	detailPath        string
+	detailGeneration  uint64
+	detailCancel      context.CancelFunc
+	detailTab         int
+	paletteQuery      string
+	paletteCursor     int
+	lazyGitAvailable  bool
+	closing           bool
 	rows              []app.Row
 	warnings          []string
 	selected          map[string]bool
@@ -75,13 +85,16 @@ func New(ctx context.Context, load func(context.Context) (app.Snapshot, error), 
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	_, lazyGitErr := exec.LookPath("lazygit")
 	return &Model{
-		ctx:      ctx,
-		load:     load,
-		noColor:  noColor,
-		selected: make(map[string]bool),
-		width:    80,
-		height:   24,
+		lazyGitAvailable: lazyGitErr == nil,
+		detailCache:      make(map[string]detailResult),
+		ctx:              ctx,
+		load:             load,
+		noColor:          noColor,
+		selected:         make(map[string]bool),
+		width:            80,
+		height:           24,
 	}
 }
 
@@ -116,13 +129,27 @@ func (m *Model) refresh() tea.Cmd {
 	}
 }
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 	// Notices can change the available row count without a resize.
-	defer m.keepHighlightVisible()
+	defer func() {
+		m.keepHighlightVisible()
+		if extra := m.ensureDetail(); extra != nil {
+			cmd = tea.Batch(cmd, extra)
+		}
+	}()
 	if handled, cmd := m.actionMessage(msg); handled {
 		return m, cmd
 	}
 	switch msg := msg.(type) {
+	case detailMsg:
+		if msg.generation == m.detailGeneration {
+			m.detailCache[msg.path] = msg.result
+			m.detailPath = ""
+			if m.detailCancel != nil {
+				m.detailCancel()
+				m.detailCancel = nil
+			}
+		}
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		if m.width < 1 {
@@ -168,6 +195,13 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	}
 	oldSelection := m.selected
 	m.rows = append([]app.Row(nil), snapshot.Rows...)
+	if m.detailCancel != nil {
+		m.detailCancel()
+		m.detailCancel = nil
+	}
+	m.detailGeneration++
+	m.detailPath = ""
+	m.detailCache = make(map[string]detailResult)
 	m.warnings = m.warnings[:0]
 	for _, warning := range snapshot.Warnings {
 		m.warnings = append(m.warnings, gitcli.SafeText(warning.Path+": "+warning.Message))
@@ -210,6 +244,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.previewKey(key)
 	}
 	if key == "ctrl+c" {
+		m.closeReads()
 		m.interrupted = true
 		if m.loadCancel != nil {
 			m.loadCancel()
@@ -217,19 +252,38 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return tea.Quit
 	}
+	if m.palette {
+		return m.paletteKey(msg)
+	}
 	if m.details {
 		switch key {
 		case "q":
+			m.closeReads()
 			return tea.Quit
+		case "tab", "shift+tab":
+			step := 1
+			if key == "shift+tab" {
+				step = 3
+			}
+			m.detailTab = (m.detailTab + step) % 4
+			m.detailOffset = 0
+		case ":", "ctrl+k":
+			m.palette = true
+			m.paletteQuery = ""
+			m.paletteCursor = 0
+		case "o":
+			return m.launchShell()
+		case "g":
+			return m.launchLazyGit()
 		case "esc", "d":
 			m.details = false
 		case "j", "down":
 			m.detailOffset++
 		case "pgdown":
-			_, _, _, page := m.documentParts(m.detailsContent(), detailsFooter)
+			_, _, _, page := m.documentParts(m.repositoryDetails(), detailsFooter)
 			m.detailOffset += max(1, page)
 		case "pgup":
-			_, _, _, page := m.documentParts(m.detailsContent(), detailsFooter)
+			_, _, _, page := m.documentParts(m.repositoryDetails(), detailsFooter)
 			m.detailOffset = max(0, m.detailOffset-max(1, page))
 		case "home":
 			m.detailOffset = 0
@@ -238,15 +292,28 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				m.detailOffset--
 			}
 		}
-		m.detailOffset = min(m.detailOffset, m.documentMaxOffset(m.detailsContent(), detailsFooter))
+		m.detailOffset = min(m.detailOffset, m.documentMaxOffset(m.repositoryDetails(), detailsFooter))
 		return nil
 	}
 	if m.filtering {
 		switch key {
 		case "enter":
 			m.filtering = false
+			m.details = true
+			m.detailTab = 0
+			m.detailOffset = 0
 		case "esc":
 			m.filtering = false
+			m.filter = ""
+			m.clearSelection()
+			m.highlight, m.scroll = 0, 0
+		case "down", "up":
+			indices := m.visibleRows()
+			if key == "down" {
+				m.highlight = min(max(0, len(indices)-1), m.highlight+1)
+			} else {
+				m.highlight = max(0, m.highlight-1)
+			}
 		case "backspace":
 			text := []rune(m.filter)
 			if len(text) > 0 {
@@ -269,6 +336,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		case "?", "esc":
 			m.help = false
 		case "q":
+			m.closeReads()
 			if m.loadCancel != nil {
 				m.loadCancel()
 			}
@@ -292,15 +360,21 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	indices := m.visibleRows()
 	switch key {
 	case "q":
+		m.closeReads()
 		if m.loadCancel != nil {
 			m.loadCancel()
 			m.loadCancel = nil
 		}
 		return tea.Quit
+	case ":", "ctrl+k":
+		m.palette = true
+		m.paletteQuery = ""
+		m.paletteCursor = 0
 	case "?":
 		m.help = true
 		m.helpOffset = 0
 	case "d":
+		m.detailTab = 1
 		m.details = true
 		m.detailOffset = 0
 	case "esc":
@@ -389,6 +463,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			}
 		}
 	case "f", "p", "l":
+		if len(m.selected) == 0 && m.actions != nil && (key == "p" || key == "l") {
+			id := "push"
+			if key == "l" {
+				id = "pull"
+			}
+			return m.executeCommand(id)
+		}
 		if m.actions == nil {
 			m.message = "This action is not available yet"
 			return nil
@@ -401,6 +482,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return m.preparePreview(app.Fetch)
 	case "enter":
+		m.details = true
+		m.detailTab = 0
+		m.detailOffset = 0
+	case "o":
 		return m.launchShell()
 	case "g":
 		return m.launchLazyGit()
@@ -521,7 +606,7 @@ func (m *Model) pageSize() int {
 	return m.layout().slots
 }
 
-const detailsFooter = " ↑↓ / PgUp/Dn scroll · Esc back · q quit"
+const detailsFooter = " ↑↓ scroll · Tab section · o shell · : actions · Esc back"
 
 func (m *Model) detailsContent() []string {
 	content := []string{m.style(" repodash / Diagnostics", accent, true), m.rule(max(1, m.width))}
@@ -553,7 +638,7 @@ func (m *Model) detailsContent() []string {
 }
 
 func (m *Model) detailsView() tea.View {
-	return m.documentView(m.detailsContent(), detailsFooter, m.detailOffset)
+	return m.documentView(m.repositoryDetails(), detailsFooter, m.detailOffset)
 }
 
 func (m *Model) detailLine(row app.Row) string {

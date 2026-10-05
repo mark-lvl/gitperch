@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -97,6 +98,9 @@ func (m *Model) View() tea.View {
 	if m.width < 60 || m.height < 12 {
 		return m.screen([]string{"Terminal too small", "Minimum recommended size: 60x12", "Resize terminal · q quit"})
 	}
+	if m.palette {
+		return m.paletteView()
+	}
 	l := m.layout()
 	lines := []string{m.summaryLine(), m.searchLine(), ""}
 	list := m.repositoryList(l)
@@ -133,25 +137,34 @@ func (m *Model) summaryLine() string {
 	if location == "" && m.highlightedRow() != nil {
 		location = gitcli.SafeText(m.highlightedRow().Path)
 	}
-	location = truncatePath(location, max(8, m.width-48))
 	summary := fmt.Sprintf("%d repos · ! %d attention", len(m.rows), attention)
-	activity := ""
 	if m.loading {
-		activity = " · refreshing"
+		summary += " · loading"
 	}
 	if m.preparing {
-		activity = " · preparing review"
+		summary += " · review"
 	}
 	if m.running {
-		activity = " · " + m.progressLabel()
+		summary += " · " + m.progressLabel()
 	}
-	return m.between(m.style(" repodash", accent, true)+"  "+m.style(location, muted, false), summary+activity+" ", m.width)
+	locationWidth := m.width - ansi.StringWidth(summary) - ansi.StringWidth(" repodash   ") - 2
+	left := m.style(" repodash", accent, true)
+	if locationWidth > 4 {
+		left += "  " + m.style(truncatePath(location, locationWidth), muted, false)
+	}
+	return m.between(left, summary+" ", m.width)
+
 }
 
 func (m *Model) attentionPanel(w, h int) []string {
 	lines := []string{m.style(" ATTENTION", amber, true), ""}
 	count := 0
-	for _, i := range m.visibleRows() {
+	indices := make([]int, len(m.rows))
+	for i := range m.rows {
+		indices[i] = i
+	}
+	sort.SliceStable(indices, func(i, j int) bool { return attentionRank(m.rows[indices[i]]) > attentionRank(m.rows[indices[j]]) })
+	for _, i := range indices {
 		row := m.rows[i]
 		if attentionRank(row) == 0 {
 			continue
@@ -168,21 +181,6 @@ func (m *Model) attentionPanel(w, h int) []string {
 	}
 	lines = append(lines, m.style(" Tab Focus / All", muted, false))
 	return fitLines(lines, h)
-}
-
-func (m *Model) scopeLine() string {
-	if m.width < 80 {
-		return " View: " + m.style("["+scopes[m.scope]+"]", accent, true) + m.style(" · Tab next view", muted, false)
-	}
-	var tabs []string
-	for i, name := range scopes {
-		if i == m.scope {
-			tabs = append(tabs, m.style("["+name+"]", accent, true))
-		} else {
-			tabs = append(tabs, m.style(name, muted, false))
-		}
-	}
-	return " " + strings.Join(tabs, "  ") + m.style("  · Tab next view", muted, false)
 }
 
 func (m *Model) searchLine() string {
@@ -412,52 +410,21 @@ func nextStep(row app.Row) string {
 }
 
 func (m *Model) guidance(row app.Row) string {
+	if result, ok := m.results[row.Path]; ok && (result.State == app.Failed || result.State == app.OutcomeUnknown) {
+		text := strings.ToLower(result.Message)
+		if strings.Contains(text, "non-fast-forward") || strings.Contains(text, "fetch first") || strings.Contains(text, "diverged") {
+			return "Remote history needs review. Open details for the Git error; reconcile in your shell before retrying."
+		}
+		if strings.Contains(text, "permission denied") || strings.Contains(text, "authentication") {
+			return "Check remote authentication in your shell. Open details for the Git error, then retry explicitly."
+		}
+		return "Operation failed or outcome uncertain. Open details for the Git error; refresh before retrying."
+	}
+
 	if m.actions == nil && row.Status.Error == "" && row.Status.Upstream != "" && !row.Status.Detached && !row.Status.Unborn && row.Status.Conflicts == 0 && row.Status.Operation == "" {
 		return "Read-only dashboard. Open your shell or LazyGit to review changes and synchronize. Counts use locally known refs."
 	}
 	return nextStep(row)
-}
-
-func (m *Model) inspector(w, h int) []string {
-	lines := []string{m.style(" REPOSITORY INSPECTOR", muted, true), ""}
-	row := m.highlightedRow()
-	if row == nil {
-		return fitLines(append(lines, " Highlight a repository to inspect it."), h)
-	}
-	add := func(text string) {
-		lines = append(lines, strings.Split(ansi.Wrap(" "+text, max(1, w-1), "/"), "\n")...)
-	}
-	add(m.style(gitcli.SafeText(row.Name), ink, true))
-	add(m.style(gitcli.SafeText(row.Path), muted, false))
-	lines = append(lines, "")
-	add("Branch    " + branchLabel(*row))
-	upstream := gitcli.SafeText(row.Status.Upstream)
-	if upstream == "" {
-		upstream = "none"
-	}
-	add("Upstream  " + upstream)
-	work, color := worktreeLabel(*row)
-	add("Worktree  " + m.style(work, color, false))
-	add(fmt.Sprintf("Changes %d  ·  new %d  ·  conflicts %d", row.Status.Changes, row.Status.Untracked, row.Status.Conflicts))
-	sync, color := syncLabel(*row)
-	add("Sync      " + m.style(sync, color, false))
-	add(m.style("Compared with locally known refs", muted, false))
-	if !row.LastFetch.IsZero() {
-		add("Last fetch  " + row.LastFetch.Format("15:04:05"))
-	}
-	lines = append(lines, "", m.style(" NEXT STEP", accent, true))
-	add(m.guidance(*row))
-	if result, ok := m.results[row.Path]; ok {
-		lines = append(lines, "")
-		add(m.style("Result: "+string(result.State), resultColor(result.State), true))
-		add(gitcli.SafeText(result.Message))
-	}
-	if row.Status.Error != "" {
-		add(m.style(gitcli.SafeText(row.Status.Error), danger, false))
-	}
-	// Reserve a permanent diagnostics hint even if the explanatory text is long.
-	lines = fitLines(lines, max(0, h-1))
-	return append(lines, m.style(" d details · Enter shell · g LazyGit", muted, false))
 }
 
 func (m *Model) compactInspector() []string {
@@ -475,10 +442,6 @@ func (m *Model) compactInspector() []string {
 		lines = append(lines, " Highlight a repository to see its details.")
 	}
 	return lines
-}
-
-func (m *Model) previewLines(row app.Row) []string {
-	return []string{fmt.Sprintf(" %d changed · %d untracked · %d conflicts · locally known refs", row.Status.Changes, row.Status.Untracked, row.Status.Conflicts)}
 }
 
 func (m *Model) notice() string {
@@ -517,28 +480,40 @@ func resultColor(state app.State) string {
 
 func (m *Model) footer() string {
 	if m.preparing || m.running {
-		return " Esc cancel operation · waiting for outcomes · d details after completion"
+		return " Esc cancel operation · waiting for outcomes"
 	}
 	if m.filtering {
-		return " Type to filter · Enter done · Esc close · changing search clears selection"
+		return " ↑↓ choose · Enter open · Esc clear"
 	}
 	if len(m.selected) > 0 && m.actions != nil {
-		return fmt.Sprintf(" %d selected · Space toggle · a all · f fetch · p push · l pull · ? help · q quit", len(m.selected))
+		return fmt.Sprintf(" %d selected · f Fetch · p Push · l Pull · : Actions", len(m.selected))
 	}
-	return fmt.Sprintf(" %d selected · ↑↓ move · Space select · / search · r refresh · ? help · q quit", len(m.selected))
+	footer := " Enter Open · d Changes · o Shell"
+	if row := m.highlightedRow(); row != nil && m.actions != nil {
+		s := row.Status
+		if s.Error == "" && s.Operation == "" && s.Conflicts == 0 && !s.Detached && !s.Unborn && s.Upstream != "" {
+			if s.Ahead > 0 && s.Behind == 0 {
+				footer += " · p Push"
+			}
+			if s.Behind > 0 && s.Ahead == 0 && !s.Dirty() {
+				footer += " · l Pull"
+			}
+		}
+	}
+	return footer + " · : Actions"
 }
 
 func (m *Model) helpContent() []string {
 	lines := []string{
 		m.style(" repodash / Keyboard guide", accent, true), m.rule(max(1, m.width)),
-		" BROWSE", " ↑↓ / j k      Move between repositories", " PgUp / PgDn   Move one page · Home / End jump to first / last",
+		" NAVIGATION", " ↑↓ / j k      Move between repositories", " PgUp / PgDn   Move one page · Home / End jump to first / last",
 		" Tab / Shift+Tab  Cycle All, Attention, Changed, Ahead, Behind, Issues",
-		" /             Search name, path or branch · Enter finishes search", " s             Toggle name / attention order · r refresh local status",
-		"", " INSPECT", " d             Full diagnostics, workspace warnings and batch results", " Enter         Open a shell in the highlighted worktree", " g             Open LazyGit in the highlighted worktree",
-		"", " SELECT & SYNC", " Space         Toggle selection · a selects / deselects visible rows",
+		" /             Search name, path or branch · arrows move · Enter opens", " s             Toggle name / attention order · r refresh local status",
+		"", " REPOSITORY ACTIONS", " Enter / d     Open repository overview / changes · Tab switches section", " o             Open a shell in the highlighted worktree", " g             Open LazyGit in the highlighted worktree",
+		"", " BULK OPERATIONS", " Space         Toggle selection · a selects / deselects visible rows",
 		" f             Review fetch targets, then confirm", " p / l         Review fetch scope → fetch → review push / FF pull → confirm",
 		" Search or view changes clear selection. Actions require explicit selection.",
-		"", " Sync counts use locally known refs. Fetch checks the remote.", " ↑ ahead · ↓ behind · unknown never means up to date.",
+		"", " GLOBAL COMMANDS", " : / Ctrl+K    Fuzzy command palette · arrows choose · Enter runs", " ?             Help · q quit · Ctrl+C interrupt", "", " AGENT ACTIONS", " No agent integration is configured in this application.", "", " Sync counts use locally known refs. Fetch checks the remote.", " ↑ ahead · ↓ behind · unknown never means up to date.",
 		" Esc cancels previews; during a batch it requests cancellation.", " Esc clears search, then dismisses results. q quits; Ctrl+C interrupts.",
 	}
 	return lines
@@ -587,6 +562,9 @@ func (m *Model) screen(lines []string) tea.View {
 		lines = lines[:h]
 	}
 	for i := range lines {
+		if m.iconMode == "ascii" {
+			lines[i] = strings.NewReplacer("…", "~", "·", "|", "→", "->", "↑", "^", "↓", "v", "—", "-", "▏", "|", "│", "|").Replace(lines[i])
+		}
 		lines[i] = ansi.Truncate(lines[i], w, "")
 	}
 	v := tea.NewView(strings.Join(lines, "\n"))

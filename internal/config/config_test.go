@@ -171,3 +171,15 @@ func writeConfig(t *testing.T, body string) string {
 	}
 	return path
 }
+
+func TestUISettings(t *testing.T) {
+	for _, mode := range []string{"ascii", "unicode", "nerd"} {
+		cfg, err := Load(writeConfig(t, "[ui]\nicons = \""+mode+"\"\ndefault_focus = true\n"), true)
+		if err != nil || cfg.UI.Icons != mode || !cfg.UI.DefaultFocus {
+			t.Fatalf("%s: %+v %v", mode, cfg.UI, err)
+		}
+	}
+	if _, err := Load(writeConfig(t, "[ui]\nicons = \"invalid\"\n"), true); err == nil {
+		t.Fatal("invalid icons accepted")
+	}
+}

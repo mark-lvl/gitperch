@@ -247,6 +247,17 @@ func (m *Model) previewContent() ([]string, string) {
 		fmt.Sprintf(" %d targets · %d eligible · %d skipped", len(p.Targets), eligible, len(p.Targets)-eligible),
 		" j/k targets · PgUp/Dn scroll details", "",
 	}
+	if len(p.Targets) > 1 {
+		lines = append(lines, " Selected repositories")
+		for _, target := range p.Targets {
+			state := "skip"
+			if target.Eligible {
+				state = "ready"
+			}
+			lines = append(lines, " "+truncatePath(gitcli.SafeText(target.Path), max(10, m.width/2))+" · "+gitcli.SafeText(target.Branch)+" · "+state)
+		}
+		lines = append(lines, "")
+	}
 	if len(p.Targets) > 0 {
 		target := p.Targets[min(m.previewCursor, len(p.Targets)-1)]
 		state, color := "SKIPPED", amber

@@ -75,6 +75,10 @@ func TestSelectionFilteringAndPathIdentity(t *testing.T) {
 		t.Fatal("branch filter")
 	}
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if !m.details {
+		t.Fatal("search Enter did not open repository")
+	}
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m.Update(key("a"))
 	if len(m.selected) != 1 {
 		t.Fatal("visible selection")
