@@ -1,4 +1,4 @@
-// Package tui implements the read-only terminal dashboard.
+// Package tui implements the interactive terminal dashboard.
 package tui
 
 import (
@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 	"repodash/internal/app"
 	gitcli "repodash/internal/git"
 )
@@ -23,13 +22,19 @@ type Model struct {
 	ctx               context.Context
 	load              loader
 	noColor           bool
+	iconMode          string
+	workspace         string
+	palette           bool
 	rows              []app.Row
 	warnings          []string
 	selected          map[string]bool
 	highlight         int
 	filter            string
 	filtering         bool
+	scope             int
+	attentionFirst    bool
 	help              bool
+	helpOffset        int
 	details           bool
 	detailOffset      int
 	message           string
@@ -80,6 +85,15 @@ func New(ctx context.Context, load func(context.Context) (app.Snapshot, error), 
 	}
 }
 
+// Configure uses the existing TOML configuration rather than a second settings source.
+func (m *Model) Configure(workspace, icons string, focus bool) {
+	m.workspace = gitcli.SafeText(workspace)
+	m.iconMode = icons
+	if focus {
+		m.scope = 1
+	}
+}
+
 func (m *Model) Init() tea.Cmd { return m.refresh() }
 
 func (m *Model) refresh() tea.Cmd {
@@ -103,6 +117,8 @@ func (m *Model) refresh() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Notices can change the available row count without a resize.
+	defer m.keepHighlightVisible()
 	if handled, cmd := m.actionMessage(msg); handled {
 		return m, cmd
 	}
@@ -158,7 +174,7 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	}
 	m.selected = make(map[string]bool)
 	for _, row := range m.rows {
-		if oldSelection[row.Path] && matches(row, m.filter) {
+		if oldSelection[row.Path] && matches(row, m.filter) && m.inScope(row) {
 			m.selected[row.Path] = true
 		}
 	}
@@ -209,11 +225,20 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.details = false
 		case "j", "down":
 			m.detailOffset++
+		case "pgdown":
+			_, _, _, page := m.documentParts(m.detailsContent(), detailsFooter)
+			m.detailOffset += max(1, page)
+		case "pgup":
+			_, _, _, page := m.documentParts(m.detailsContent(), detailsFooter)
+			m.detailOffset = max(0, m.detailOffset-max(1, page))
+		case "home":
+			m.detailOffset = 0
 		case "k", "up":
 			if m.detailOffset > 0 {
 				m.detailOffset--
 			}
 		}
+		m.detailOffset = min(m.detailOffset, m.documentMaxOffset(m.detailsContent(), detailsFooter))
 		return nil
 	}
 	if m.filtering {
@@ -239,7 +264,29 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if m.help && key != "?" && key != "esc" && key != "q" {
+	if m.help {
+		switch key {
+		case "?", "esc":
+			m.help = false
+		case "q":
+			if m.loadCancel != nil {
+				m.loadCancel()
+			}
+			return tea.Quit
+		case "j", "down":
+			m.helpOffset++
+		case "k", "up":
+			m.helpOffset = max(0, m.helpOffset-1)
+		case "pgdown":
+			_, _, _, page := m.documentParts(m.helpContent(), helpFooter)
+			m.helpOffset += max(1, page)
+		case "pgup":
+			_, _, _, page := m.documentParts(m.helpContent(), helpFooter)
+			m.helpOffset = max(0, m.helpOffset-max(1, page))
+		case "home":
+			m.helpOffset = 0
+		}
+		m.helpOffset = min(m.helpOffset, m.documentMaxOffset(m.helpContent(), helpFooter))
 		return nil
 	}
 	indices := m.visibleRows()
@@ -251,7 +298,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return tea.Quit
 	case "?":
-		m.help = !m.help
+		m.help = true
+		m.helpOffset = 0
 	case "d":
 		m.details = true
 		m.detailOffset = 0
@@ -274,6 +322,39 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case "r":
 		m.message = "Refreshing repository status"
 		return m.refresh()
+	case "tab", "shift+tab":
+		step := 1
+		if key == "shift+tab" {
+			step = len(scopes) - 1
+		}
+		m.scope = (m.scope + step) % len(scopes)
+		m.clearSelection()
+		m.highlight, m.scroll = 0, 0
+	case "s":
+		path := ""
+		if row := m.highlightedRow(); row != nil {
+			path = row.Path
+		}
+		m.attentionFirst = !m.attentionFirst
+		for i, index := range m.visibleRows() {
+			if m.rows[index].Path == path {
+				m.highlight = i
+				break
+			}
+		}
+		m.keepHighlightVisible()
+	case "home":
+		m.highlight = 0
+		m.keepHighlightVisible()
+	case "end":
+		m.highlight = max(0, len(indices)-1)
+		m.keepHighlightVisible()
+	case "pgdown":
+		m.highlight = min(max(0, len(indices)-1), m.highlight+m.pageSize())
+		m.keepHighlightVisible()
+	case "pgup":
+		m.highlight = max(0, m.highlight-m.pageSize())
+		m.keepHighlightVisible()
 	case "j", "down":
 		if m.highlight+1 < len(indices) {
 			m.highlight++
@@ -390,10 +471,20 @@ func (m *Model) highlightedRow() *app.Row {
 func (m *Model) visibleRows() []int {
 	indices := make([]int, 0, len(m.rows))
 	for i, row := range m.rows {
-		if matches(row, m.filter) {
+		if matches(row, m.filter) && m.inScope(row) {
 			indices = append(indices, i)
 		}
 	}
+	sort.SliceStable(indices, func(i, j int) bool {
+		a, b := m.rows[indices[i]], m.rows[indices[j]]
+		if m.attentionFirst && attentionRank(a) != attentionRank(b) {
+			return attentionRank(a) > attentionRank(b)
+		}
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.Path < b.Path
+	})
 	return indices
 }
 
@@ -427,227 +518,42 @@ func (m *Model) keepHighlightVisible() {
 }
 
 func (m *Model) pageSize() int {
-	if m.height <= 0 {
-		return 1
-	}
-	if m.height-9 < 1 {
-		return 1
-	}
-	return m.height - 9
+	return m.layout().slots
 }
 
-func (m *Model) View() tea.View {
-	if m.preview != nil {
-		return m.previewView()
-	}
-	if m.details {
-		return m.detailsView()
-	}
-	width := m.width
-	if width < 1 {
-		width = 1
-	}
-	header := "repodash · ahead/behind: locally known refs"
-	if m.actions == nil {
-		header = "repodash · read-only · ahead/behind: locally known refs"
-	}
-	lines := []string{m.style(header, "#7DDA58", true)}
-	if m.filtering {
-		lines = append(lines, "Filter: "+gitcli.SafeText(m.filter)+"▏")
-	} else if m.filter != "" {
-		lines = append(lines, "Filter: "+gitcli.SafeText(m.filter)+" ( / edit )")
-	} else {
-		lines = append(lines, "Repositories")
-	}
-	if m.loading {
-		lines[1] += "  · refreshing"
-	}
-	if m.preparing {
-		lines[1] += " · preparing preview"
-	}
-	if m.running {
-		lines[1] += " · batch running (q cancels)"
-	}
-	var detail []string
-	if m.loadErr != "" {
-		detail = append(detail, "Load error: "+gitcli.SafeText(m.loadErr))
-	}
-	if m.help {
-		detail = append(detail,
-			"j/k or arrows move · Space select · a select all visible · / filter",
-			"r refresh · d details · Enter shell · g LazyGit · f fetch · p push · l FF pull · q quit/cancel",
-		)
-	} else {
-		indices := m.visibleRows()
-		if len(indices) == 0 {
-			if m.filter != "" {
-				detail = append(detail, "No repositories match this filter")
-			} else {
-				detail = append(detail, "No repositories discovered")
-			}
-		}
-		if row := m.highlightedRow(); row != nil {
-			detail = append(detail, "Path: "+gitcli.SafeText(row.Path))
-			detail = append(detail, m.detailLine(*row))
-			if row.Status.Error != "" {
-				detail = append(detail, "Error: "+gitcli.SafeText(row.Status.Error))
-			}
-		}
-		if len(m.warnings) > 0 {
-			detail = append(detail, fmt.Sprintf("Warnings: %d · %s", len(m.warnings), m.warnings[0]))
-		}
-	}
-	if m.message != "" {
-		detail = append(detail, gitcli.SafeText(m.message))
-	}
-	wrappedDetail := make([]string, 0, len(detail))
-	for _, line := range detail {
-		wrappedDetail = append(wrappedDetail, strings.Split(ansi.Wrap(line, width, "/"), "\n")...)
-	}
-	footer := fmt.Sprintf("Selected: %d  ·  d details  ·  ? help  ·  q quit", len(m.selected))
-	reserved := len(lines) + len(wrappedDetail) + 1
-	if reserved > m.height {
-		reserved = len(lines) + 1
-		if reserved > m.height {
-			reserved = m.height
-		}
-		wrappedDetail = nil
-	}
-	rowSlots := m.height - reserved
-	if rowSlots < 0 {
-		rowSlots = 0
-	}
-	indices := m.visibleRows()
-	if !m.help && len(indices) > 0 {
-		if rowSlots == 0 {
-			rowSlots = 1
-		}
-		if m.highlight < m.scroll {
-			m.scroll = m.highlight
-		} else if m.highlight >= m.scroll+rowSlots {
-			m.scroll = m.highlight - rowSlots + 1
-		}
-		end := m.scroll + rowSlots
-		if end > len(indices) {
-			end = len(indices)
-		}
-		for pos := m.scroll; pos < end; pos++ {
-			idx := indices[pos]
-			line := m.rowLine(m.rows[idx], pos == m.highlight)
-			if pos == m.highlight {
-				line = m.style(line, "#84D8FF", true)
-			}
-			lines = append(lines, line)
-		}
-	}
-	lines = append(lines, wrappedDetail...)
-	lines = append(lines, m.style(footer, "#AAAAAA", false))
-	for i, line := range lines {
-		lines[i] = ansi.Truncate(line, width, "")
-	}
-	if len(lines) > m.height && m.height > 0 {
-		lines = append(lines[:1], lines[len(lines)-m.height+1:]...)
-	}
-	view := tea.NewView(strings.Join(lines, "\n"))
-	view.AltScreen = true
-	return view
-}
+const detailsFooter = " ↑↓ / PgUp/Dn scroll · Esc back · q quit"
 
-func (m *Model) rowLine(row app.Row, highlighted bool) string {
-	status := row.Status
-	branch := status.Branch
-	if status.Detached {
-		branch = "(detached)"
-	}
-	if status.Unborn {
-		branch += " (unborn)"
-	}
-	upstream := status.Upstream
-	if upstream == "" {
-		upstream = "none"
-	}
-	comparison := "ahead:? behind:?"
-	if status.ComparisonKnown {
-		comparison = fmt.Sprintf("ahead:%d behind:%d", status.Ahead, status.Behind)
-	}
-	markers := make([]string, 0, 5)
-	if status.Dirty() {
-		markers = append(markers, "dirty")
-	}
-	if status.Conflicts > 0 {
-		markers = append(markers, "conflicts")
-	}
-	if status.Detached {
-		markers = append(markers, "detached")
-	}
-	if status.Upstream == "" {
-		markers = append(markers, "no-upstream")
-	}
-	if status.Error != "" {
-		markers = append(markers, "error")
-	}
-	if status.Synchronized() {
-		markers = append(markers, "synchronized")
-	}
-	selected := "[ ]"
-	if m.selected[row.Path] {
-		selected = "[x]"
-	}
-	pointer := " "
-	if highlighted {
-		pointer = ">"
-	}
-	state := status.Operation
-	if state == "" {
-		state = "idle"
-	}
-	if result, ok := m.results[row.Path]; ok {
-		state = string(result.State)
-	}
-	line := fmt.Sprintf("%s %s %s %s | %s | %s | c:%d u:%d x:%d | %s | %s",
-		pointer, selected, gitcli.SafeText(state), gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), status.Changes,
-		status.Untracked, status.Conflicts, comparison, gitcli.SafeText(strings.Join(markers, ",")))
-	return line
-}
-
-func (m *Model) detailsView() tea.View {
-	width, height := max(1, m.width), max(1, m.height)
-	content := []string{}
+func (m *Model) detailsContent() []string {
+	content := []string{m.style(" repodash / Diagnostics", accent, true), m.rule(max(1, m.width))}
 	if row := m.highlightedRow(); row != nil {
 		content = append(content, "Path: "+gitcli.SafeText(row.Path), m.detailLine(*row))
 		if row.Status.Error != "" {
-			content = append(content, "Error: "+gitcli.SafeText(row.Status.Error))
+			content = append(content, m.style("Error: "+gitcli.SafeText(row.Status.Error), danger, false))
 		}
 	}
 	if m.loadErr != "" {
 		content = append(content, "Load error: "+gitcli.SafeText(m.loadErr))
 	}
-	content = append(content, m.warnings...)
-	for _, row := range m.rows {
-		if result, ok := m.results[row.Path]; ok {
-			content = append(content, gitcli.SafeText(result.Path)+": "+string(result.State)+" · "+gitcli.SafeText(result.Message))
+	if len(m.results) > 0 {
+		content = append(content, "", m.style(" BATCH RESULTS", accent, true))
+		for _, row := range m.rows {
+			if result, ok := m.results[row.Path]; ok {
+				content = append(content, gitcli.SafeText(result.Path)+": "+string(result.State)+" · "+gitcli.SafeText(result.Message))
+			}
 		}
 	}
-	if len(content) == 0 {
+	if len(m.warnings) > 0 {
+		content = append(content, "", m.style(" WORKSPACE WARNINGS", amber, true))
+		content = append(content, m.warnings...)
+	}
+	if len(content) == 2 {
 		content = append(content, "No repository details or warnings")
 	}
-	var wrapped []string
-	for _, line := range content {
-		wrapped = append(wrapped, strings.Split(ansi.Wrap(line, width, "/"), "\n")...)
-	}
-	page := max(1, height-2)
-	offset := min(m.detailOffset, max(0, len(wrapped)-page))
-	lines := []string{ansi.Truncate("Details · j/k scroll · Esc back", width, "")}
-	for _, line := range wrapped[offset:min(len(wrapped), offset+page)] {
-		lines = append(lines, ansi.Truncate(line, width, ""))
-	}
-	lines = append(lines, ansi.Truncate(fmt.Sprintf("Line %d/%d · q quit", offset+1, len(wrapped)), width, ""))
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	v := tea.NewView(strings.Join(lines, "\n"))
-	v.AltScreen = true
-	return v
+	return content
+}
+
+func (m *Model) detailsView() tea.View {
+	return m.documentView(m.detailsContent(), detailsFooter, m.detailOffset)
 }
 
 func (m *Model) detailLine(row app.Row) string {
@@ -681,12 +587,4 @@ func (m *Model) detailLine(row app.Row) string {
 		line += " · " + string(result.State) + ": " + gitcli.SafeText(result.Message)
 	}
 	return line
-}
-
-func (m *Model) style(text, color string, bold bool) string {
-	if m.noColor {
-		return text
-	}
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Bold(bold)
-	return style.Render(text)
 }

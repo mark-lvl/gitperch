@@ -4,11 +4,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"context"
 	"fmt"
-	"github.com/charmbracelet/x/ansi"
 	"repodash/internal/app"
 	gitcli "repodash/internal/git"
 	"sort"
-	"strings"
 )
 
 type previewMsg struct {
@@ -82,7 +80,18 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 			m.actionCancel()
 			m.actionCancel = nil
 		}
-		m.message = "Batch finished; results remain in d details"
+		succeeded, skipped, failed := 0, 0, 0
+		for _, result := range msg.results {
+			switch result.State {
+			case app.Succeeded:
+				succeeded++
+			case app.Skipped:
+				skipped++
+			default:
+				failed++
+			}
+		}
+		m.message = fmt.Sprintf("Batch finished · %d succeeded · %d skipped · %d failed/uncertain · d details", succeeded, skipped, failed)
 		if msg.err != nil {
 			m.actionFailed = true
 			m.message += " · " + msg.err.Error()
@@ -147,9 +156,17 @@ func (m *Model) previewKey(key string) tea.Cmd {
 		m.previewCursor = max(0, m.previewCursor-1)
 		m.previewLineOffset = 0
 	case "pgdown":
-		m.previewLineOffset += max(1, m.height-2)
+		lines, footer := m.previewContent()
+		_, _, _, page := m.documentParts(lines, footer)
+		m.previewLineOffset += max(1, page)
 	case "pgup":
-		m.previewLineOffset = max(0, m.previewLineOffset-max(1, m.height-2))
+		lines, footer := m.previewContent()
+		_, _, _, page := m.documentParts(lines, footer)
+		m.previewLineOffset = max(0, m.previewLineOffset-max(1, page))
+	}
+	if m.preview != nil {
+		lines, footer := m.previewContent()
+		m.previewLineOffset = min(m.previewLineOffset, m.documentMaxOffset(lines, footer))
 	}
 	return nil
 }
@@ -178,6 +195,7 @@ func (m *Model) confirmPreview() tea.Cmd {
 		}
 	}
 	m.running = true
+	m.message = ""
 	m.results = map[string]app.Event{}
 	id, generation, actions := m.preview.ID, m.actionGeneration, m.actions
 	m.preview = nil
@@ -205,8 +223,7 @@ func (m *Model) nextEvent() tea.Cmd {
 	}
 }
 
-func (m *Model) previewView() tea.View {
-	width, height := max(1, m.width), max(1, m.height)
+func (m *Model) previewContent() ([]string, string) {
 	p := m.preview
 	eligible := 0
 	for _, target := range p.Targets {
@@ -214,46 +231,58 @@ func (m *Model) previewView() tea.View {
 			eligible++
 		}
 	}
-	header := fmt.Sprintf("Preview: %d targets · %d eligible · j/k targets · PgUp/Dn details", len(p.Targets), eligible)
+	title := "Review fetch"
+	step := "Review targets → confirm fetch"
 	if m.syncIntent != "" {
-		header = fmt.Sprintf("Fetch scope before %s: %d targets · j/k review", m.syncIntent, len(p.Targets))
+		title = "Fetch scope before " + string(m.syncIntent)
+		step = "STEP 1/2 · Review fetch → fetch → review " + string(m.syncIntent) + " → confirm"
+	} else if len(p.Targets) > 0 && p.Targets[0].Action != app.Fetch {
+		title = "Review " + string(p.Targets[0].Action)
+		step = "STEP 2/2 · Fetch complete → review exact changes → confirm"
 	}
-	var lines []string
+	lines := []string{
+		m.style(" repodash / "+title, accent, true),
+		m.rule(max(1, m.width)),
+		" " + step,
+		fmt.Sprintf(" %d targets · %d eligible · %d skipped", len(p.Targets), eligible, len(p.Targets)-eligible),
+		" j/k targets · PgUp/Dn scroll details", "",
+	}
 	if len(p.Targets) > 0 {
 		target := p.Targets[min(m.previewCursor, len(p.Targets)-1)]
-		state := "SKIPPED"
+		state, color := "SKIPPED", amber
 		if target.Eligible {
-			state = "ELIGIBLE"
+			state, color = "ELIGIBLE", accent
 		}
-		detail := []string{fmt.Sprintf("Target %d/%d: %s", m.previewCursor+1, len(p.Targets), target.Path), fmt.Sprintf("%s %s · remote:%s · branch:%s", state, target.Action, target.Remote, target.Branch), "URL: " + target.URL, "Reason: " + target.Reason}
+		lines = append(lines,
+			m.style(fmt.Sprintf(" Target %d/%d: %s", m.previewCursor+1, len(p.Targets), gitcli.SafeText(target.Path)), ink, true),
+			m.style(" "+state+" · "+gitcli.SafeText(string(target.Action)), color, true),
+			" Reason: "+gitcli.SafeText(target.Reason), "",
+			" Branch: "+gitcli.SafeText(target.Branch),
+			" Remote: "+gitcli.SafeText(target.Remote),
+			" URL: "+gitcli.SafeText(target.URL),
+		)
 		if target.Scope != "" {
-			detail = append(detail, "Scope: "+target.Scope)
+			lines = append(lines, " Scope: "+gitcli.SafeText(target.Scope))
 		}
 		if target.Commit != "" {
-			detail = append(detail, "Exact commit: "+target.Commit)
+			lines = append(lines, " Exact commit: "+gitcli.SafeText(target.Commit))
 		}
 		if target.DirtyExcluded {
-			detail = append(detail, "Uncommitted changes are excluded")
-		}
-		for _, line := range detail {
-			lines = append(lines, strings.Split(ansi.Wrap(gitcli.SafeText(line), width, "/"), "\n")...)
+			lines = append(lines, m.style(" Uncommitted changes are excluded", amber, true))
 		}
 	}
-	footer := "Enter confirms batch · Esc cancels · best effort, no rollback"
+	lines = append(lines, "", " Eligible targets run independently. Skipped targets remain skipped.", " Best effort, no rollback. Repository state is revalidated before execution.")
+	footer := fmt.Sprintf(" Enter confirms %d eligible targets · Esc cancels", eligible)
+	if eligible == 0 {
+		footer = " Enter records skips; no eligible targets · Esc cancels"
+	}
 	if m.syncIntent != "" {
-		footer = "Enter fetches reviewed scope; final push/pull needs a second confirmation · Esc cancels"
+		footer = " Enter fetches reviewed scope · Esc cancels\n Final push/pull needs a second confirmation"
 	}
-	page := max(1, height-2)
-	offset := min(m.previewLineOffset, max(0, len(lines)-page))
-	lines = append([]string{header}, lines[offset:min(len(lines), offset+page)]...)
-	lines = append(lines, footer)
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	for i, line := range lines {
-		lines[i] = ansi.Truncate(line, width, "")
-	}
-	v := tea.NewView(strings.Join(lines, "\n"))
-	v.AltScreen = true
-	return v
+	return lines, footer
+}
+
+func (m *Model) previewView() tea.View {
+	lines, footer := m.previewContent()
+	return m.documentView(lines, footer, m.previewLineOffset)
 }
