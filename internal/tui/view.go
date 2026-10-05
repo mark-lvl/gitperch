@@ -36,11 +36,18 @@ func attentionRank(row app.Row) int {
 	}
 }
 
+func (m *Model) attentionRank(row app.Row) int {
+	if result, ok := m.results[row.Path]; ok && (result.State == app.Failed || result.State == app.OutcomeUnknown) {
+		return 7
+	}
+	return attentionRank(row)
+}
+
 func (m *Model) inScope(row app.Row) bool {
 	s := row.Status
 	switch m.scope {
 	case 1:
-		return attentionRank(row) > 0
+		return m.attentionRank(row) > 0
 	case 2:
 		return s.Dirty()
 	case 3:
@@ -89,17 +96,17 @@ func (m *Model) View() tea.View {
 	if m.preview != nil {
 		return m.previewView()
 	}
-	if m.details {
-		return m.detailsView()
+	if m.palette {
+		return m.paletteView()
 	}
 	if m.help {
 		return m.helpView()
 	}
+	if m.details {
+		return m.detailsView()
+	}
 	if m.width < 60 || m.height < 12 {
 		return m.screen([]string{"Terminal too small", "Minimum recommended size: 60x12", "Resize terminal · q quit"})
-	}
-	if m.palette {
-		return m.paletteView()
 	}
 	l := m.layout()
 	lines := []string{m.summaryLine(), m.searchLine(), ""}
@@ -129,7 +136,7 @@ func (m *Model) View() tea.View {
 func (m *Model) summaryLine() string {
 	attention := 0
 	for _, row := range m.rows {
-		if attentionRank(row) > 0 {
+		if m.attentionRank(row) > 0 {
 			attention++
 		}
 	}
@@ -163,10 +170,10 @@ func (m *Model) attentionPanel(w, h int) []string {
 	for i := range m.rows {
 		indices[i] = i
 	}
-	sort.SliceStable(indices, func(i, j int) bool { return attentionRank(m.rows[indices[i]]) > attentionRank(m.rows[indices[j]]) })
+	sort.SliceStable(indices, func(i, j int) bool { return m.attentionRank(m.rows[indices[i]]) > m.attentionRank(m.rows[indices[j]]) })
 	for _, i := range indices {
 		row := m.rows[i]
-		if attentionRank(row) == 0 {
+		if m.attentionRank(row) == 0 {
 			continue
 		}
 		label, color := m.primaryStatus(row)
@@ -399,9 +406,9 @@ func nextStep(row app.Row) string {
 	case s.Behind > 0 && s.Dirty():
 		return "Commit or stash local changes in your shell before a fast-forward pull."
 	case s.Behind > 0:
-		return "Select with Space, then l to review a fast-forward pull."
+		return "Press l to review a fast-forward pull."
 	case s.Ahead > 0:
-		return "Select with Space, then p to review a push. Only committed changes are included."
+		return "Press p to review a push. Only committed changes are included."
 	case s.Dirty():
 		return "Review local changes in your shell or LazyGit. Tracking refs are up to date."
 	default:

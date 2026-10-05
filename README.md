@@ -124,31 +124,36 @@ NO_COLOR=1 repodash /path/to/projects
 ```
 
 The default command requires terminal input and output; use `status` when piping.
-Bubble Tea v2.0.10 and Lip Gloss v2.0.6 power the dashboard. Filtering and selection
-are small model operations, so no Bubbles components are needed.
+The Bubble Tea v2 workspace shows a compact health header, repository list,
+selected preview, and contextual actions. At 120+ columns it adds one small
+attention panel; narrower terminals stack the preview below the list. Short
+terminals hide the preview first. The recommended minimum is 60×12.
 
-| Key | Behavior |
-| --- | --- |
-| j/k, arrows | Move highlight |
-| Space | Toggle selection |
-| a | Select/deselect all visible rows |
-| / | Edit name/path/branch filter; changing it clears selection |
-| Esc | Leave filtering / clear filter |
-| r | Refresh local status |
-| f | Preview selected repositories for fetch |
-| p | Review fetch scope, then preview and push eligible commits |
-| l | Review fetch scope, then preview and fast-forward pull |
-| Enter | Open a child shell in the highlighted worktree |
-| g | Open LazyGit in the highlighted worktree |
-| ? | Toggle help |
-| d | Read full repository diagnostics and all root warnings; j/k scroll |
-| q, Ctrl+C | Quit |
+Use arrows/j/k to navigate, Enter for repository details, `d` for changes, and
+`o` for a shell. Details have Overview, Changes, Commits, and Worktree sections;
+Tab switches sections and arrows/PgUp/PgDn scroll. `:` or Ctrl+K opens the fuzzy
+action palette; arrows choose, Enter executes, and Esc closes it. `/` filters by
+name/path/branch with arrow navigation and Enter to open a result. `?` opens help.
+
+Space selects repositories; `a` toggles all visible rows. `p`/`l` review push or
+fast-forward pull for the selected set, or the highlighted repository when no
+selection exists. `f` reviews fetch for explicitly selected repositories. All
+network operations retain the existing review and confirmation safeguards.
+Search/scope changes clear selection; refresh preserves visible selections and
+the highlighted repository by path. Tab cycles scopes; the palette provides a
+direct Focus/All toggle. `s` toggles attention/name ordering and `r` refreshes.
+
+Colors supplement status symbols and text, using the terminal palette. Existing
+TOML configuration accepts `[ui]` with `icons = "unicode"` (also `ascii` or `nerd`)
+and `default_focus = false`. Agent/test/task actions are omitted because there is
+no real integration yet. See the [interface guide](docs/ui.md) for all bindings,
+configuration, limitations, and wide/medium/narrow render captures.
 
 Child tools temporarily take over the terminal; the dashboard restores and
 refreshes after exit. The child shell does not change the parent shell's
-directory. Missing LazyGit is reported visibly. Highlighted errors and root
-warnings remain visible. [WSL smoke checklist](docs/tui-smoke.md) documents manual
-checks.
+directory. Missing LazyGit is reported visibly. Git errors, discovery warnings,
+and operation results remain accessible in repository details. `q` quits and
+Ctrl+C interrupts; during operations they request cancellation and wait.
 
 ## Fetch preview and execution (M5)
 

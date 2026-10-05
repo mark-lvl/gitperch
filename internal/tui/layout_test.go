@@ -2,6 +2,7 @@ package tui
 
 import (
 	"github.com/charmbracelet/x/ansi"
+	"repodash/internal/app"
 	"strings"
 	"testing"
 )
@@ -37,10 +38,53 @@ func TestTruncationKeepsContext(t *testing.T) {
 			}
 		}
 	}
+	if !strings.HasSuffix(truncatePath("開発/変更/ファイル.go", 5), ".go") {
+		t.Fatal("wide filename suffix lost")
+	}
 	if !strings.HasSuffix(truncatePath("src/auth/callback.go", 16), "callback.go") {
 		t.Fatal("filename lost")
 	}
 	if !strings.HasPrefix(truncateMiddle("feat/long-callback", 14), "feat/") {
 		t.Fatal("branch prefix lost")
+	}
+}
+
+func TestRefreshPreservesPathAfterReordering(t *testing.T) {
+	m := New(nil, nil, true)
+	rows := dashboardRows()
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	m.highlight = 2
+	path := m.highlightedRow().Path
+	m.selected[path] = true
+	m.attentionFirst = true
+	// Preserve the same highlight under the explicit sorting change first.
+	for i, index := range m.visibleRows() {
+		if m.rows[index].Path == path {
+			m.highlight = i
+			break
+		}
+	}
+	rows[2].Name = "aaa-renamed"
+	rows[2].Status.Conflicts = 2
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	if m.highlightedRow().Path != path || !m.selected[path] {
+		t.Fatal("refresh lost stable path identity")
+	}
+}
+func TestASCIIAndNerdFallbackLayouts(t *testing.T) {
+	for _, mode := range []string{"ascii", "unicode", "nerd"} {
+		m := New(nil, nil, true)
+		m.Configure("/workspace", mode, true)
+		m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+		m.width, m.height = 60, 20
+		content := m.View().Content
+		for _, line := range strings.Split(content, "\n") {
+			if ansi.StringWidth(line) > 60 {
+				t.Fatalf("%s overflow", mode)
+			}
+		}
+		if mode == "ascii" && strings.ContainsAny(content, "◆✓↑↓→─…·") {
+			t.Fatal("presentation did not use ASCII fallback")
+		}
 	}
 }

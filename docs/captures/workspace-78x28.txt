@@ -1,0 +1,28 @@
+ repodash  ~/dev/platform                             6 repos · ! 5 attention
+ All                                            / search · : actions · ? help
+
+ REPOSITORIES  6/6  ·  1–6
+      REPO                                        STATUS             SYNC
+  [ ] api-service                                 ✓ clean            —
+> [ ] design-system                               ◆ changed          ↑3 ↓0
+  [ ] docs                                        ↓ behind           ↑0 ↓4
+  [ ] experiment                                  ! no upstream      —
+  [ ] mobile                                      × failed           —
+  [ ] worker                                      ! conflict         ↑2 ↓1
+
+
+
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────────────
+ design-system · feat/tokens → origin/feat/tokens
+ /home/mark/projects/design-system
+ Press p to review a push. Only committed changes are included.
+  M src/theme/tokens.go                                                 +8 -2
+  M src/components/button.go                                            +4 -0
+ ?? tests/theme_test.go
+ Enter Open · d Changes · o Shell · p Push · : Actions

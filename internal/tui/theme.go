@@ -40,7 +40,7 @@ func truncateMiddle(s string, width int) string {
 		return ansi.Truncate(s, max(0, width), "")
 	}
 	left := (width - 1) / 2
-	return ansi.Truncate(ansi.Truncate(s, left, "")+"…"+ansi.Cut(s, ansi.StringWidth(s)-(width-1-left), ansi.StringWidth(s)), width, "")
+	return ansi.Truncate(ansi.Truncate(s, left, "")+"…"+tailCells(s, width-1-left), width, "")
 }
 func truncatePath(s string, width int) string {
 	if ansi.StringWidth(s) <= width {
@@ -49,6 +49,19 @@ func truncatePath(s string, width int) string {
 	if width < 2 {
 		return ansi.Truncate(s, max(0, width), "")
 	}
-	return ansi.Truncate("…"+ansi.Cut(s, ansi.StringWidth(s)-width+1, ansi.StringWidth(s)), width, "")
+	return "…" + tailCells(s, width-1)
 }
 func (m *Model) symbols() icons { return iconSet(m.iconMode) }
+
+// Cut may include a grapheme crossing its starting cell. Advance that boundary
+// instead of trimming the right edge, so a wide filename keeps its extension.
+func tailCells(s string, width int) string {
+	total := ansi.StringWidth(s)
+	for start := max(0, total-width); start <= total; start++ {
+		tail := ansi.Cut(s, start, total)
+		if ansi.StringWidth(tail) <= width {
+			return tail
+		}
+	}
+	return ""
+}

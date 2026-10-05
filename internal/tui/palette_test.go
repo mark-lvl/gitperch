@@ -121,3 +121,36 @@ func TestSearchNavigationEscapeAndFocusIdentity(t *testing.T) {
 		t.Fatal("All lost identity")
 	}
 }
+
+func TestPaletteAndHelpOverRepositoryDetails(t *testing.T) {
+	m := New(nil, nil, true)
+	m.applySnapshot(app.Snapshot{Rows: testRows()})
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.Update(key(":"))
+	if !strings.Contains(m.View().Content, " Actions") {
+		t.Fatal("palette hidden behind details")
+	}
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m.Update(key("?"))
+	if !strings.Contains(m.View().Content, "Keyboard guide") {
+		t.Fatal("help hidden behind details")
+	}
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.help || !m.details {
+		t.Fatal("help did not return to details")
+	}
+}
+func TestOperationFailureNeedsAttentionEvenWhenGitClean(t *testing.T) {
+	m := New(nil, nil, true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	row := m.rows[0]
+	m.results = map[string]app.Event{row.Path: {State: app.Failed, Message: "non-fast-forward"}}
+	m.scope = 1
+	if !m.inScope(row) || !strings.Contains(m.guidance(row), "Remote history") {
+		t.Fatal("operation failure invisible")
+	}
+	m.attentionFirst = true
+	if m.rows[m.visibleRows()[0]].Path != row.Path {
+		t.Fatal("failed operation not prioritized")
+	}
+}

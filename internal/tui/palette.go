@@ -143,6 +143,8 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 	case "sort":
 		return m.key(keyPress("s"))
 	case "focus":
+		m.details = false
+		m.help = false
 		path := ""
 		if row := m.highlightedRow(); row != nil {
 			path = row.Path

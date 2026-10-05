@@ -255,8 +255,37 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.palette {
 		return m.paletteKey(msg)
 	}
+	if m.help {
+		switch key {
+		case "?", "esc":
+			m.help = false
+		case "q":
+			m.closeReads()
+			if m.loadCancel != nil {
+				m.loadCancel()
+			}
+			return tea.Quit
+		case "j", "down":
+			m.helpOffset++
+		case "k", "up":
+			m.helpOffset = max(0, m.helpOffset-1)
+		case "pgdown":
+			_, _, _, page := m.documentParts(m.helpContent(), helpFooter)
+			m.helpOffset += max(1, page)
+		case "pgup":
+			_, _, _, page := m.documentParts(m.helpContent(), helpFooter)
+			m.helpOffset = max(0, m.helpOffset-max(1, page))
+		case "home":
+			m.helpOffset = 0
+		}
+		m.helpOffset = min(m.helpOffset, m.documentMaxOffset(m.helpContent(), helpFooter))
+		return nil
+	}
 	if m.details {
 		switch key {
+		case "?":
+			m.help = true
+			m.helpOffset = 0
 		case "q":
 			m.closeReads()
 			return tea.Quit
@@ -329,32 +358,6 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				m.highlight, m.scroll = 0, 0
 			}
 		}
-		return nil
-	}
-	if m.help {
-		switch key {
-		case "?", "esc":
-			m.help = false
-		case "q":
-			m.closeReads()
-			if m.loadCancel != nil {
-				m.loadCancel()
-			}
-			return tea.Quit
-		case "j", "down":
-			m.helpOffset++
-		case "k", "up":
-			m.helpOffset = max(0, m.helpOffset-1)
-		case "pgdown":
-			_, _, _, page := m.documentParts(m.helpContent(), helpFooter)
-			m.helpOffset += max(1, page)
-		case "pgup":
-			_, _, _, page := m.documentParts(m.helpContent(), helpFooter)
-			m.helpOffset = max(0, m.helpOffset-max(1, page))
-		case "home":
-			m.helpOffset = 0
-		}
-		m.helpOffset = min(m.helpOffset, m.documentMaxOffset(m.helpContent(), helpFooter))
 		return nil
 	}
 	indices := m.visibleRows()
@@ -562,8 +565,8 @@ func (m *Model) visibleRows() []int {
 	}
 	sort.SliceStable(indices, func(i, j int) bool {
 		a, b := m.rows[indices[i]], m.rows[indices[j]]
-		if m.attentionFirst && attentionRank(a) != attentionRank(b) {
-			return attentionRank(a) > attentionRank(b)
+		if m.attentionFirst && m.attentionRank(a) != m.attentionRank(b) {
+			return m.attentionRank(a) > m.attentionRank(b)
 		}
 		if a.Name != b.Name {
 			return a.Name < b.Name

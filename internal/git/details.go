@@ -2,7 +2,9 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -81,8 +83,9 @@ func (r Runner) Details(ctx context.Context, path string) (RepoDetails, error) {
 		d.Diff += string(out.Stdout)
 	}
 	// An unborn branch legitimately has no history.
-	head, headErr := r.Run(ctx, path, "rev-parse", "--verify", "--quiet", "HEAD")
-	if headErr != nil && ctx.Err() == nil && len(head.Stdout) == 0 {
+	_, headErr := r.Run(ctx, path, "rev-parse", "--verify", "--quiet", "HEAD")
+	var exitErr *exec.ExitError
+	if errors.As(headErr, &exitErr) && exitErr.ExitCode() == 1 {
 		return d, nil
 	}
 	if headErr != nil {

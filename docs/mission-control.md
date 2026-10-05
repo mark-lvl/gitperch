@@ -36,3 +36,25 @@ layer before adding commands or columns.
 The checkout contained uncommitted UI scaffolding before this task, including
 `model.go`, `actions.go`, `view.go`, and `view_test.go`. Redesign commits incorporate
 that scaffolding where the new UI depends on it; unrelated edits stay unstaged.
+
+## Completed validation
+
+The implementation retains bounded asynchronous workspace inspection and guarded
+Git actions, adding only on-demand read models to the runner. The UI now has
+responsive repository/preview layout, a single optional attention panel, semantic
+ANSI colors and icon modes, contextual fuzzy commands, keyboard filtering,
+path-stable selection, progressive details, and existing confirmed bulk workflows.
+There is no agent/task backend to surface; unsupported integrations remain absent.
+
+Deterministic render captures cover 160×45, 110×35, 78×28, and 60×20. Tests cover
+layout/columns, short heights, attention ordering, refresh identity, Unicode
+truncation, all icon modes, fuzzy filtering, contextual actions, search, selection,
+overlay precedence, asynchronous stale-result rejection, and read-only real Git
+file/patch/history inspection (including staged/unstaged and unborn/rename cases).
+
+Validation: `make check` (tests, vet, build) and `go test -race ./...`. A local Linux
+PTY smoke run against the disposable demo exercised navigation, palette, search,
+repository sections, help, six sizes from 160×45 to 45×8, quit, and alternate-screen
+restoration. Windows Terminal and specific installed Nerd Fonts were not tested.
+The linked design reference was inaccessible; the written UX specification guided
+the implementation. Full usage and captures are in `docs/ui.md`.
