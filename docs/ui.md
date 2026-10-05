@@ -104,11 +104,16 @@ PNG captures are rasterized from its actual ANSI output:
 
 Run `go test ./...`, `go vet ./...`, `go test -race ./...`, and
 `go build -o bin/repodash ./cmd/repodash`. Launch `bin/repodash /path/to/workspace`.
-To deliberately update reviewed captures:
-`UPDATE_RENDERS=1 go test ./internal/tui -run 'TestWorkspaceRenderCaptures|TestOverlayRenderCaptures'`.
-The tests also export color ANSI files into the system temporary directory. With
-optional development packages `pillow` and `pyte`, run
-`python scripts/render-captures.py` to regenerate the PNGs. These packages are not
+To deliberately update reviewed captures and regenerate the PNGs (the latter
+needs optional development packages `pillow` and `pyte`):
+
+```sh
+ansi=$(mktemp -d)
+UPDATE_RENDERS=1 REPODASH_ANSI_DIR="$ansi" go test ./internal/tui -run 'TestWorkspaceRenderCaptures|TestOverlayRenderCaptures'
+python scripts/render-captures.py "$ansi"
+```
+
+Without `REPODASH_ANSI_DIR` only the text captures are updated. These packages are not
 application dependencies.
 
 ## Deliberately unavailable

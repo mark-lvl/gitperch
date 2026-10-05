@@ -40,14 +40,20 @@ def render(source, target, width, height):
     target.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(target)
 
+CAPTURES = ['workspace-160x45', 'workspace-110x35', 'workspace-78x28',
+            'workspace-60x20', 'palette-110x35', 'details-110x35']
+
 if __name__ == '__main__':
-    for size in ('160x45', '110x35', '78x28', '60x20'):
-        width, height = map(int, size.split('x'))
-        render(Path('/tmp') / f'repodash-{size}.ansi',
-               Path('docs/captures') / f'workspace-{size}.png', width, height)
-    for mode in ('palette', 'details'):
-        source = Path('/tmp') / f'repodash-{mode}-110x35.ansi'
-        if source.exists():
-            render(source, Path('docs/captures') / f'{mode}-110x35.png', 110, 35)
     if len(sys.argv) == 5:
         render(Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
+        sys.exit(0)
+    if len(sys.argv) != 2:
+        sys.exit('usage: render-captures.py ANSI_DIR  (the REPODASH_ANSI_DIR used by the tests)')
+    source_dir = Path(sys.argv[1])
+    missing = [n for n in CAPTURES if not (source_dir / f'{n}.ansi').is_file()]
+    if missing:
+        sys.exit(f'missing ANSI captures in {source_dir}: {", ".join(missing)}')
+    target_dir = Path(__file__).resolve().parent.parent / 'docs' / 'captures'
+    for name in CAPTURES:
+        width, height = map(int, name.rsplit('-', 1)[1].split('x'))
+        render(source_dir / f'{name}.ansi', target_dir / f'{name}.png', width, height)

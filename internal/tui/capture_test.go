@@ -12,6 +12,20 @@ import (
 	"testing"
 )
 
+// writeANSICapture exports color output for scripts/render-captures.py into
+// REPODASH_ANSI_DIR, a directory the caller creates privately (mktemp -d).
+func writeANSICapture(t *testing.T, name, content string) {
+	t.Helper()
+	dir := os.Getenv("REPODASH_ANSI_DIR")
+	if dir == "" {
+		t.Log("REPODASH_ANSI_DIR unset; skipping color export for PNG rendering")
+		return
+	}
+	if err := os.WriteFile(filepath.Join(dir, name+".ansi"), []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // Captures use deterministic test fixtures only; production always loads Git.
 func TestWorkspaceRenderCaptures(t *testing.T) {
 	for _, size := range [][2]int{{160, 45}, {110, 35}, {78, 28}, {60, 20}} {
@@ -28,10 +42,7 @@ func TestWorkspaceRenderCaptures(t *testing.T) {
 			content := m.View().Content
 			if os.Getenv("UPDATE_RENDERS") == "1" {
 				m.noColor = false
-				path := filepath.Join(os.TempDir(), fmt.Sprintf("repodash-%dx%d.ansi", size[0], size[1]))
-				if err := os.WriteFile(path, []byte(m.View().Content), 0644); err != nil {
-					t.Fatal(err)
-				}
+				writeANSICapture(t, fmt.Sprintf("workspace-%dx%d", size[0], size[1]), m.View().Content)
 				m.noColor = true
 			}
 			// Trim trailing padding to keep checked-in artifacts readable.
@@ -91,9 +102,7 @@ func TestOverlayRenderCaptures(t *testing.T) {
 					t.Fatal(err)
 				}
 				m.noColor = false
-				if err := os.WriteFile(filepath.Join(os.TempDir(), "repodash-"+name+".ansi"), []byte(m.View().Content), 0644); err != nil {
-					t.Fatal(err)
-				}
+				writeANSICapture(t, name, m.View().Content)
 			}
 			expected, err := os.ReadFile(path)
 			if err != nil {
