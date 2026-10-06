@@ -18,6 +18,7 @@
 - "Merged" means reachable (`merge-base --is-ancestor`) from `refs/remotes/<remote>/HEAD` after a fresh fetch; with no remote, local `refs/heads/main`, else `refs/heads/master`, labelled "local default". No squash detection. gitperch never sets `<remote>/HEAD`.
 - Cleanup mutations stay TUI-only; `gitperch status` stays read-only and offline.
 - JSON schema version stays `1`; new fields are additive.
+- Below Git 2.36 (or when `git version` cannot be read) the whole feature is off: no inventory, no warnings, no `worktree` JSON object, no Clean up command. Gate every entry point on `SupportsWorktreeInventory`.
 - Tests touching Git use temporary repositories and local bare remotes only.
 - All user-visible text derived from Git passes through `gitcli.SafeText`.
 - After TUI changes, update render captures per `docs/ui.md#render-captures-and-validation`.
@@ -85,6 +86,11 @@
   }
   func ParseWorktrees(data []byte) ([]Worktree, error)
   func (r Runner) Worktrees(ctx context.Context, path string) ([]Worktree, error)
+  func parseGitVersion(out string) (major, minor int, ok bool)
+  // SupportsWorktreeInventory is true for Git ≥ 2.36; cached per executable,
+  // false (never an error) when the version cannot be read.
+  func (r Runner) SupportsWorktreeInventory(ctx context.Context) bool
+  // Service.SupportsWorktreeInventory delegates to Read.
   ```
 
 - [ ] **Step 1: Write the failing parser and integration tests**
@@ -175,6 +181,52 @@ func TestRunnerWorktreesListsLinkedAndStale(t *testing.T) {
 }
 ```
 
+Version gate tests (same file):
+```go
+func TestParseGitVersion(t *testing.T) {
+	for out, want := range map[string][2]int{
+		"git version 2.43.0\n":                {2, 43},
+		"git version 2.39.3 (Apple Git-146)\n": {2, 39},
+		"git version 2.45.1.windows.1\n":      {2, 45},
+	} {
+		major, minor, ok := parseGitVersion(out)
+		if !ok || major != want[0] || minor != want[1] {
+			t.Errorf("%q: %d.%d %v", out, major, minor, ok)
+		}
+	}
+	for _, out := range []string{"", "hub version 2.14\n", "git version x.y\n"} {
+		if _, _, ok := parseGitVersion(out); ok {
+			t.Errorf("%q parsed", out)
+		}
+	}
+}
+
+// fakeGit writes an executable that prints a version and fails otherwise.
+func fakeGit(t *testing.T, version string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "git")
+	script := "#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = version ] && { echo 'git version " + version + "'; exit 0; }; done\nexit 129\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestSupportsWorktreeInventory(t *testing.T) {
+	ctx := context.Background()
+	if (Runner{Executable: fakeGit(t, "2.35.8")}).SupportsWorktreeInventory(ctx) {
+		t.Fatal("Git 2.35 should not support the inventory")
+	}
+	if !(Runner{Executable: fakeGit(t, "2.36.0")}).SupportsWorktreeInventory(ctx) {
+		t.Fatal("Git 2.36 should support the inventory")
+	}
+	if (Runner{Executable: filepath.Join(t.TempDir(), "missing-git")}).SupportsWorktreeInventory(ctx) {
+		t.Fatal("an unreadable version must disable the feature")
+	}
+}
+```
+Each fake lives in its own temp directory, so the per-executable cache never mixes results.
+
 Append to `internal/git/readonly_test.go`:
 ```go
 func TestWorktreesReadOnly(t *testing.T) {
@@ -203,8 +255,8 @@ func TestWorktreesReadOnly(t *testing.T) {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `go test ./internal/git -run 'Worktree' -v`
-Expected: FAIL to compile, `undefined: ParseWorktrees` / `Runner.Worktrees`.
+Run: `go test ./internal/git -run 'Worktree|GitVersion' -v`
+Expected: FAIL to compile, `undefined: ParseWorktrees` / `Runner.Worktrees` / `parseGitVersion`.
 
 - [ ] **Step 3: Implement `internal/git/worktree.go`**
 
@@ -304,19 +356,59 @@ func (r Runner) Worktrees(ctx context.Context, path string) ([]Worktree, error) 
 }
 ```
 
+Add the version gate to the same file:
+```go
+var inventorySupport sync.Map // executable path → bool
+
+func parseGitVersion(out string) (major, minor int, ok bool) {
+	fields := strings.Fields(out)
+	if len(fields) < 3 || fields[0] != "git" || fields[1] != "version" {
+		return 0, 0, false
+	}
+	parts := strings.SplitN(fields[2], ".", 3)
+	if len(parts) < 2 {
+		return 0, 0, false
+	}
+	major, errMajor := strconv.Atoi(parts[0])
+	minor, errMinor := strconv.Atoi(parts[1])
+	return major, minor, errMajor == nil && errMinor == nil
+}
+
+// SupportsWorktreeInventory gates worktree listing and cleanup on Git 2.36,
+// which added `worktree list -z`. Older or unreadable Git turns the feature
+// off quietly instead of warning on every repository.
+func (r Runner) SupportsWorktreeInventory(ctx context.Context) bool {
+	key := r.Executable
+	if key == "" {
+		key = "git"
+	}
+	if cached, ok := inventorySupport.Load(key); ok {
+		return cached.(bool)
+	}
+	out, err := r.Run(ctx, ".", "version")
+	major, minor, ok := parseGitVersion(string(out.Stdout))
+	supported := err == nil && ok && (major > 2 || major == 2 && minor >= 36)
+	if ctx.Err() == nil { // do not cache a cancelled probe
+		inventorySupport.Store(key, supported)
+	}
+	return supported
+}
+```
+(imports: `strconv`, `sync`.) `Run` prefixes `-C .`; that is harmless for `git version`. Add `func (s Service) SupportsWorktreeInventory(ctx context.Context) bool { return s.Read.SupportsWorktreeInventory(ctx) }` to `service.go`.
+
 Note: if `objectID` rejects the all-zero OID Git prints for an unborn HEAD, accept it explicitly here (`value == strings.Repeat("0", len(value))` with length 40 or 64).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `go test ./internal/git -run 'Worktree' -v`
+Run: `go test ./internal/git -run 'Worktree|GitVersion' -v`
 Expected: PASS.
 
 - [ ] **Step 5: Run `make check` and commit**
 
 ```bash
 make check
-git add internal/git/worktree.go internal/git/worktree_test.go internal/git/readonly_test.go
-git commit -m "feat(git): list worktrees from porcelain output
+git add internal/git/worktree.go internal/git/worktree_test.go internal/git/readonly_test.go internal/git/service.go
+git commit -m "feat(git): list worktrees from porcelain output on Git 2.36+
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -349,6 +441,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   }
   // Row gains: Worktree *WorktreeInfo `json:"worktree,omitempty"`
   type WorktreeLister interface {
+      SupportsWorktreeInventory(context.Context) bool
       Worktrees(context.Context, string) ([]gitcli.Worktree, error)
   }
   func (r Row) Selectable() bool // false for stale, bare rows
@@ -484,10 +577,28 @@ func TestLoadWarnsWhenWorktreeListFails(t *testing.T) {
 		t.Fatalf("rows %+v warnings %+v", got, warnings)
 	}
 }
+
+type oldGit struct{ failingLister }
+
+func (oldGit) SupportsWorktreeInventory(context.Context) bool { return false }
+
+func TestLoadSkipsInventoryQuietlyOnOldGit(t *testing.T) {
+	repo := actionTestRepo(t)
+	actionTestWrite(t, filepath.Join(repo, "f"), "x\n")
+	actionTestCommit(t, repo, "initial")
+	rows := []Row{{Repository: repositoryAt(t, repo)}}
+	rows[0].Status = gitcli.Runner{}.Inspect(context.Background(), repo)
+	got, warnings := attachWorktrees(context.Background(), rows, oldGit{}, 1, []string{filepath.Dir(repo)})
+	if len(got) != 1 || got[0].Worktree != nil || len(warnings) != 0 {
+		t.Fatalf("old Git must disable the inventory silently: rows %+v warnings %+v", got, warnings)
+	}
+}
 ```
 Add helpers in the same file:
 ```go
 type failingLister struct{ gitcli.Runner }
+
+func (failingLister) SupportsWorktreeInventory(context.Context) bool { return true }
 
 func (failingLister) Worktrees(context.Context, string) ([]gitcli.Worktree, error) {
 	return nil, errors.New("git worktree: unknown option -z")
@@ -602,8 +713,8 @@ func underRoots(path string, roots []string) bool {
 // failure leaves that group's rows unlabelled and adds a warning.
 func attachWorktrees(ctx context.Context, rows []Row, service GitService, workers int, roots []string) ([]Row, []discovery.Warning) {
 	lister, ok := service.(WorktreeLister)
-	if !ok {
-		return rows, nil
+	if !ok || !lister.SupportsWorktreeInventory(ctx) {
+		return rows, nil // older Git: the feature is off, without warnings
 	}
 	groups := map[string][]int{}
 	var order []string
@@ -1197,7 +1308,7 @@ Review the regenerated `.txt` diffs by eye: badge `⑂2 · 1 stale` on design-sy
 
 - [ ] **Step 5: Docs**
 
-- `docs/usage.md`: a "Worktrees" section — grouping, `→`/`←`, stale/locked/bare states, worktrees outside roots, Git ≥ 2.36 requirement, and the JSON `worktree` object (field list from Task 2, schema still 1).
+- `docs/usage.md`: a "Worktrees" section — grouping, `→`/`←`, stale/locked/bare states, worktrees outside roots, Git ≥ 2.36 requirement (older Git: feature silently off, everything else unchanged), and the JSON `worktree` object (field list from Task 2, schema still 1).
 - `docs/ui.md`: add the `worktrees-110x35` capture to the capture list; mention child rows and badges.
 - `README.md`: features list — "Worktree inventory: every linked worktree, including nested, outside-root and stale ones, grouped under its repository"; remove "Group worktrees created by agents under their parent repository" from the roadmap.
 - `CHANGELOG.md` under `## [Unreleased]`:
@@ -1648,6 +1759,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   }
   type CleanupGit interface {
       ActionGit
+      SupportsWorktreeInventory(context.Context) bool
       Worktrees(context.Context, string) ([]gitcli.Worktree, error)
       ResolveRemote(context.Context, string, gitcli.Metadata, string) (gitcli.FetchTarget, error)
       RemoteDefaultRef(context.Context, string, string) (string, error)
@@ -1670,6 +1782,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1837,6 +1950,24 @@ func TestCleanupKeepsWorktreeWhenIgnoredListingOverflows(t *testing.T) {
 	}
 }
 
+type oldGitService struct{ gitcli.Service }
+
+func (oldGitService) SupportsWorktreeInventory(context.Context) bool { return false }
+
+func TestCleanupRefusedOnOldGit(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actions := NewActions(oldGitService{}, 1)
+	if actions.CleanupSupported(context.Background()) {
+		t.Fatal("old Git reported as supported")
+	}
+	if _, err := actions.PlanCleanup(context.Background(), []string{repo}); !errors.Is(err, ErrCleanupUnsupported) {
+		t.Fatalf("plan on old Git: %v", err)
+	}
+	if _, err := actions.Plan(context.Background(), Fetch, []string{repo}); err != nil {
+		t.Fatalf("a refused cleanup must not hold the active preview: %v", err)
+	}
+}
+
 func TestCleanupSharesTheActivePreview(t *testing.T) {
 	repo, _, _ := cleanupRepo(t)
 	actions := NewActions(gitcli.Service{}, 1)
@@ -1908,6 +2039,14 @@ import (
 
 // (types from the Interfaces block above)
 
+var ErrCleanupUnsupported = errors.New("worktree cleanup needs Git 2.36 or newer")
+
+// CleanupSupported lets the TUI hide Clean up on older Git.
+func (a *Actions) CleanupSupported(ctx context.Context) bool {
+	git, ok := a.service.(CleanupGit)
+	return ok && git.SupportsWorktreeInventory(ctx)
+}
+
 type plannedCleanup struct {
 	item   CleanupItem
 	common string
@@ -1928,8 +2067,8 @@ func kindOrder(k CleanupKind) int {
 // Discard.
 func (a *Actions) PlanCleanup(ctx context.Context, paths []string) (CleanupPreview, error) {
 	git, ok := a.service.(CleanupGit)
-	if !ok {
-		return CleanupPreview{}, errors.New("cleanup is not available")
+	if !ok || !git.SupportsWorktreeInventory(ctx) {
+		return CleanupPreview{}, ErrCleanupUnsupported
 	}
 	if len(paths) == 0 {
 		return CleanupPreview{}, errors.New("select repositories explicitly before a batch action")
@@ -2348,7 +2487,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   func (m *Model) prepareCleanup() tea.Cmd
   func (m *Model) cleanupKey(key string) tea.Cmd
   func (m *Model) cleanupView() tea.View
-  // Model gains: cleanup *app.CleanupPreview; cleanupTicked map[string]bool; cleanupCursor int
+  // Model gains: cleanup *app.CleanupPreview; cleanupTicked map[string]bool; cleanupCursor int; cleanupSupported bool
+  func (m *Model) EnableCleanup(supported bool)
   ```
 
 - [ ] **Step 1: Write the failing tests**
@@ -2362,6 +2502,7 @@ func cleanupModel(t *testing.T, repo string) *Model {
 		return app.Load(ctx, discovery.Options{Roots: []string{filepath.Dir(repo)}, MaxDepth: 2}, gitcli.Runner{}, 2)
 	}, true)
 	m.EnableActions(app.NewActions(gitcli.Service{}, 2))
+	m.EnableCleanup(true)
 	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
 	drain(m, m.Init())
 	highlightPath(t, m, repo)
@@ -2409,6 +2550,21 @@ func TestCleanupEscDiscards(t *testing.T) {
 	}
 	if _, err := os.Stat(merged); err != nil {
 		t.Fatal("cancelled cleanup removed a worktree")
+	}
+}
+
+func TestCleanupHiddenOnOldGit(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.EnableCleanup(false)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	for _, c := range m.commands() {
+		if c.id == "cleanup" {
+			t.Fatal("cleanup offered on old Git")
+		}
+	}
+	if cmd := m.key(key("c")); cmd != nil || !strings.Contains(m.message, "Git 2.36") {
+		t.Fatalf("c on old Git: %q", m.message)
 	}
 }
 
@@ -2493,8 +2649,14 @@ func (m *Model) cleanupPaths() []string {
 	return paths
 }
 
+func (m *Model) EnableCleanup(supported bool) { m.cleanupSupported = supported }
+
 func (m *Model) prepareCleanup() tea.Cmd {
 	if m.actions == nil {
+		return nil
+	}
+	if !m.cleanupSupported {
+		m.message = "Clean up needs Git 2.36 or newer"
 		return nil
 	}
 	paths := m.cleanupPaths()
@@ -2731,8 +2893,9 @@ Import `path/filepath`. Kept items are shown only in the review; Diagnostics lis
       content = append(content, gitcli.SafeText(result.Path)+": "+string(result.State)+" · "+gitcli.SafeText(result.Message))
   }
   ```
-- `palette.go` `commands()`: inside `if m.actions != nil`, append `command{"cleanup", "Clean up worktrees and branches · " + target}`; `executeCommand` `case "cleanup": return m.prepareCleanup()`; `commandHint("cleanup")` → `"Prune stale, remove merged clean worktrees and merged branches after review"`; `commandIcon("cleanup")` → a broom-free plain glyph consistent with the set (`"⌫"` unicode, `"x"` ascii).
-- Help (`view.go` near line 639): add `c  Clean up merged worktrees and branches (review first)`; workspace hint bar: add `[c] Clean up` where space allows (narrowest tier may omit).
+- `cmd/gitperch/tui.go`: after `model.EnableActions(actions)`, add `model.EnableCleanup(actions.CleanupSupported(ctx))` (one cached `git version` call).
+- `palette.go` `commands()`: inside `if m.actions != nil && m.cleanupSupported`, append `command{"cleanup", "Clean up worktrees and branches · " + target}`; `executeCommand` `case "cleanup": return m.prepareCleanup()`; `commandHint("cleanup")` → `"Prune stale, remove merged clean worktrees and merged branches after review"`; `commandIcon("cleanup")` → a broom-free plain glyph consistent with the set (`"⌫"` unicode, `"x"` ascii).
+- Help (`view.go` near line 639): add `c  Clean up merged worktrees and branches (review first)` only when `m.cleanupSupported`; workspace hint bar: add `[c] Clean up` where space allows and only when supported (narrowest tier may omit).
 
 - [ ] **Step 5: Run tests**
 

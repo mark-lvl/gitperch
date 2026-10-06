@@ -26,6 +26,7 @@ uncommitted, untracked, ignored or unmerged work.
 | Surface | TUI only: a "Clean up…" review screen. `status --json` gains read-only worktree fields. No headless mutation (plan.md). |
 | Grouping | Linked worktrees are grouped under their main repository in the workspace list, collapsed by default. |
 | Inventory source | `git worktree list --porcelain -z`, once per common Git directory (approach A). |
+| Older Git | Below Git 2.36 the feature is off entirely, without warnings or errors. |
 
 ## Delivery phases
 
@@ -73,10 +74,14 @@ New types:
   group, and `MainPath` always equals the group parent row's `Path`. Rows
   without worktree information (inspection or listing failed) form a group of
   one.
-- The inventory needs Git 2.36 or newer (`worktree list -z`); older Git
-  degrades to the per-group warning below.
+- The inventory and cleanup need Git 2.36 or newer (`worktree list -z`).
+  gitperch reads `git version` once per Git executable; on older Git, or when
+  the version cannot be read, the whole feature is disabled quietly: no
+  inventory step, no warnings, no grouping beyond today's flat rows, no
+  `worktree` JSON object, and no Clean up command (`c` explains the
+  requirement). Status, fetch, push and pull behave exactly as in v0.1.
 
-Failure handling: if `worktree list` fails for a group, that group keeps the
+Failure handling (supported Git only): if `worktree list` fails for a group, that group keeps the
 rows the scan found and a discovery warning is added. Loading never fails
 because of the inventory.
 
@@ -198,6 +203,9 @@ All Git tests use temporary repositories and local bare remotes.
   detached, bare, paths with spaces and newlines.
 - Inventory: nested, outside-roots and stale worktrees appear in the right
   group; a `worktree list` failure degrades to a warning.
+- Version gate: `git version` strings including vendor suffixes
+  (`2.39.3 (Apple Git-146)`, `2.45.1.windows.1`) parse; Git 2.35 or an
+  unreadable version disables inventory and cleanup with no warnings.
 - Eligibility table tests: each kept reason, including ignored files, missing
   `origin/HEAD`, local-default fallback, squash-merged branch kept.
 - Revalidation races: branch moved, worktree dirtied, lock added and new stale
