@@ -36,3 +36,6 @@ func (s Service) Push(ctx context.Context, path string, target PushTarget) error
 func (s Service) FastForward(ctx context.Context, path, commit string) error {
 	return s.Write.FastForward(ctx, path, commit)
 }
+func (s Service) SupportsWorktreeInventory(ctx context.Context) bool {
+	return s.Read.SupportsWorktreeInventory(ctx)
+}

@@ -158,3 +158,26 @@ func TestMetadataRejectsRemoteNamesThatBreakConfigOverrides(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestWorktreesReadOnly(t *testing.T) {
+	d := disposable(t)
+	write(t, filepath.Join(d, "tracked"), "committed\n")
+	commit(t, d)
+	linked := filepath.Join(t.TempDir(), "linked")
+	gitCmd(t, d, "worktree", "add", "-b", "linked", linked)
+	if err := os.RemoveAll(linked); err != nil {
+		t.Fatal(err)
+	}
+	admin := filepath.Join(d, ".git", "worktrees")
+	before, err := os.ReadDir(admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Runner{}).Worktrees(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadDir(admin)
+	if err != nil || len(after) != len(before) {
+		t.Fatalf("listing worktrees pruned administrative files: before %d, after %d, %v", len(before), len(after), err)
+	}
+}
