@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ func TestInvocation(t *testing.T) {
 		text string
 	}{
 		{[]string{"--help"}, 0, "Usage:"},
-		{[]string{"--version"}, 0, "gitperch dev"},
+		{[]string{"--version"}, 0, "gitperch "},
 		{[]string{"--unknown"}, 2, "flag provided but not defined"},
 	} {
 		var out, errOut bytes.Buffer
@@ -30,6 +31,27 @@ func TestInvocation(t *testing.T) {
 		}
 		if !strings.Contains(out.String()+errOut.String(), tc.text) {
 			t.Fatalf("%v: missing %q", tc.args, tc.text)
+		}
+	}
+}
+
+func TestDisplayVersion(t *testing.T) {
+	module := func(v string) *debug.BuildInfo {
+		return &debug.BuildInfo{Main: debug.Module{Version: v}}
+	}
+	for _, tc := range []struct {
+		stamped string
+		info    *debug.BuildInfo
+		want    string
+	}{
+		{"0.2.0", module("v0.1.0"), "0.2.0"},
+		{"dev", module("v0.1.0"), "0.1.0"},
+		{"dev", module("(devel)"), "dev"},
+		{"dev", module(""), "dev"},
+		{"dev", nil, "dev"},
+	} {
+		if got := displayVersion(tc.stamped, tc.info); got != tc.want {
+			t.Fatalf("displayVersion(%q, %v) = %q, want %q", tc.stamped, tc.info, got, tc.want)
 		}
 	}
 }

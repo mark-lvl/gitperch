@@ -79,10 +79,11 @@ missing-upstream, failed-remote and linked-worktree scenarios.
 
 ## Releases
 
-`make release-linux` builds a static, versioned Linux amd64 binary under
-`dist/` and prints its SHA-256. `VERSION=0.1.0` is the default; the target
-does not publish anything. Record user-visible changes in
-[CHANGELOG.md](../CHANGELOG.md) before tagging.
+Record user-visible changes under `Unreleased` in
+[CHANGELOG.md](../CHANGELOG.md) as you make them. `make dist` builds the
+release archives and `checksums.txt` under `dist/` without publishing
+anything. [releasing.md](releasing.md) covers versioning and how to cut a
+release.
 
 ## Project layout
 
@@ -94,7 +95,7 @@ internal/discovery/  repository discovery with depth and symlink safety
 internal/git/        Git CLI runner, porcelain parsing and sync commands
 internal/repository/ repository identity and status model
 internal/tui/        Bubble Tea v2 interface
-scripts/             demo, dev launcher and capture rendering
+scripts/             demo, dev launcher, capture rendering and release tooling
 testdata/            recorded Git output used by tests
 docs/                user guides, design notes, render captures and logo files
 ```

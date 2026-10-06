@@ -12,10 +12,25 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
+	"strings"
 	"time"
 )
 
+// version is stamped into release builds with -ldflags "-X main.version=X.Y.Z".
 var version = "dev"
+
+// displayVersion falls back to the module version Go records for
+// `go install github.com/mark-lvl/gitperch/cmd/gitperch@vX.Y.Z`.
+func displayVersion(stamped string, info *debug.BuildInfo) string {
+	if stamped != "dev" || info == nil {
+		return stamped
+	}
+	if v := info.Main.Version; v != "" && v != "(devel)" {
+		return strings.TrimPrefix(v, "v")
+	}
+	return stamped
+}
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
@@ -69,7 +84,8 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 		roots = roots[1:]
 	}
 	if *showVersion {
-		fmt.Fprintln(out, "gitperch", version)
+		info, _ := debug.ReadBuildInfo()
+		fmt.Fprintln(out, "gitperch", displayVersion(version, info))
 		return 0
 	}
 	explicit, depthSet := false, false

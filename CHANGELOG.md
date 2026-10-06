@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Recursive workspace discovery, TOML configuration, plain status output and
+  JSON status schema version 1.
+- Interactive dashboard with navigation, filtering, selection, command
+  palette, repository details, diagnostics, child shell and LazyGit launch.
+- Fetch, push of reviewed commits and fast-forward-only pull with plans,
+  confirmation and revalidation.
+- Prebuilt Linux amd64 and arm64 archives with SHA-256 checksums, published
+  to GitHub releases from version tags. `gitperch --version` also reports the
+  module version for `go install ...@vX.Y.Z` builds.
 - A logo: a songbird perched on a line of commits, in `docs/assets/` and at
   the top of the README. The dashboard draws it with text characters above the
   message while the first scan runs and when no repositories are found.
@@ -33,19 +42,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instructions (`AGENTS.md`), issue and pull request templates, and Dependabot
   configuration.
 
-## [0.1.0] - Unreleased draft
-
-First feature-complete version, prepared locally and not yet published. See
-the [draft release notes](docs/release-notes-v0.1.0.md).
-
-### Added
-
-- Recursive workspace discovery, TOML configuration, plain status output and
-  JSON status schema version 1.
-- Interactive dashboard with navigation, filtering, selection, command
-  palette, repository details, diagnostics, child shell and LazyGit launch.
-- Fetch, push of reviewed commits and fast-forward-only pull with plans,
-  confirmation and revalidation.
-
 [Unreleased]: https://github.com/mark-lvl/gitperch/commits/main
-[0.1.0]: docs/release-notes-v0.1.0.md

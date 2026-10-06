@@ -87,6 +87,16 @@ lazygit or a shell there and refreshes when you return.
 gitperch requires the `git` CLI at runtime. Linux and WSL2 are the supported
 platforms today; macOS and Windows are not yet validated.
 
+Prebuilt Linux binaries (amd64 and arm64) are attached to each
+[GitHub release](https://github.com/mark-lvl/gitperch/releases). Download the
+archive for your architecture and `checksums.txt`, then:
+
+```sh
+sha256sum --check --ignore-missing checksums.txt
+tar -xzf gitperch_*_linux_amd64.tar.gz
+install -m 0755 gitperch_*_linux_amd64/gitperch ~/.local/bin/
+```
+
 With Go 1.27.1 or newer:
 
 ```sh
@@ -100,10 +110,6 @@ git clone https://github.com/mark-lvl/gitperch.git
 cd gitperch
 make build          # writes bin/gitperch
 ```
-
-Prebuilt binaries will be attached to GitHub releases once the first version is
-published.
-
 ## Quick start
 
 ```sh
@@ -169,6 +175,8 @@ rule.
   authentication and limits
 - [Interface guide](docs/ui.md): layouts, key bindings and render captures
 - [Development guide](docs/development.md): building, testing and project layout
+- [Releasing](docs/releasing.md): versioning, changelog and the release workflow
+- [Changelog](CHANGELOG.md): changes in each version
 - [Design plan](docs/plan.md) and [mission control notes](docs/mission-control.md)
 - [Changelog](CHANGELOG.md)
 
