@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-06
+
 ### Changed
 
 - Repository details load much faster for large change sets: matching line
@@ -80,5 +82,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instructions (`AGENTS.md`), issue and pull request templates, and Dependabot
   configuration.
 
-[Unreleased]: https://github.com/mark-lvl/gitperch/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mark-lvl/gitperch/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mark-lvl/gitperch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mark-lvl/gitperch/releases/tag/v0.1.0
