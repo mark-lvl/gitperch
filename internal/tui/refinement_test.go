@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
-	"repodash/internal/app"
-	gitcli "repodash/internal/git"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 	"strings"
 	"testing"
 )

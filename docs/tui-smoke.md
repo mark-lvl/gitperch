@@ -9,7 +9,7 @@ and performs no network access.
    ```sh
    demo_root=$(bash scripts/demo.sh)
    printf '%s\n' "$demo_root"
-   bin/repodash --no-color "$demo_root/workspace"
+   bin/gitperch --no-color "$demo_root/workspace"
    ```
 
    Confirm workspace counts, paths, branches, independent worktree and sync
@@ -45,7 +45,7 @@ and performs no network access.
 9. Quit with `q`, relaunch and quit with Ctrl+C. Confirm the terminal remains
    usable. Repeat with `NO_COLOR=1`.
 10. Test fast-forward pull on `behind`: select only that row with Space and
-    press `l`. Repodash fetches without asking, then floats a small popup over
+    press `l`. Gitperch fetches without asking, then floats a small popup over
     the workspace naming the repository, `origin/main → main` and the short
     commit. Press Esc to cancel, then repeat and press Enter. Confirm `peer.txt`
     appears in the worktree and the refreshed status is current. Press `l` on a
@@ -83,7 +83,7 @@ and performs no network access.
     the target count and independent results after mixed eligible/skipped or
     failed targets.
 14. Redirect default-command output to a file and confirm it explains `status`.
-    Run `bin/repodash status --json .` redirected and confirm valid JSON instead.
+    Run `bin/gitperch status --json .` redirected and confirm valid JSON instead.
 
 Record exact commands, kernel/terminal context, results and untested behavior
 in the implementation log when asked to update it; a pseudo-terminal run is

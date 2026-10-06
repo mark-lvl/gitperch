@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	gitcli "repodash/internal/git"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 )
 
 func TestPushAcceptsOnlySelectedBranchFromShortFullAndWildcardMappings(t *testing.T) {

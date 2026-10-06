@@ -4,14 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	"github.com/markkaghazgarian/gitperch/internal/config"
+	"github.com/markkaghazgarian/gitperch/internal/discovery"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"repodash/internal/app"
-	"repodash/internal/config"
-	"repodash/internal/discovery"
-	gitcli "repodash/internal/git"
 	"time"
 )
 
@@ -26,7 +26,7 @@ func run(args []string, out, errOut io.Writer) int {
 }
 
 func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
-	fs := flag.NewFlagSet("repodash", flag.ContinueOnError)
+	fs := flag.NewFlagSet("gitperch", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	showVersion := fs.Bool("version", false, "print version")
 	asJSON := fs.Bool("json", false, "status: emit machine-readable JSON")
@@ -35,7 +35,7 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	depth := fs.Int("max-depth", 4, "override maximum descendant depth (root is zero)")
 	noColor := fs.Bool("no-color", false, "disable dashboard color")
 	fs.Usage = func() {
-		fmt.Fprintln(errOut, "Usage: repodash [OPTIONS] [ROOT ...]\n       repodash status [OPTIONS] [ROOT ...]\nTerminal dashboard for local Git repositories.")
+		fmt.Fprintln(errOut, "Usage: gitperch [OPTIONS] [ROOT ...]\n       gitperch status [OPTIONS] [ROOT ...]\nTerminal dashboard for local Git repositories.")
 		fs.PrintDefaults()
 	}
 	statusMode := false
@@ -69,7 +69,7 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 		roots = roots[1:]
 	}
 	if *showVersion {
-		fmt.Fprintln(out, "repodash", version)
+		fmt.Fprintln(out, "gitperch", version)
 		return 0
 	}
 	explicit, depthSet := false, false

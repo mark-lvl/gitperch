@@ -20,19 +20,19 @@ owned_private() {
 }
 
 if ! command -v -- "$go_command" >/dev/null 2>&1; then
-    toolchain=/tmp/repodash-toolchain
-    # Reuse the toolchain documented in README for this development environment.
+    toolchain=/tmp/gitperch-toolchain
+    # Optional private toolchain fallback for sandboxed development environments.
     if [[ "$go_command" != go || ! -x "$toolchain/go/bin/go" ]]; then
-        printf 'repodash: Go compiler unavailable (%s). Install Go or set GO to its executable path.\n' "$go_command" >&2
+        printf 'gitperch: Go compiler unavailable (%s). Install Go or set GO to its executable path.\n' "$go_command" >&2
         exit 1
     fi
-    cache=${GOCACHE:-/tmp/repodash-gocache}
-    gopath=${GOPATH:-/tmp/repodash-gopath}
+    cache=${GOCACHE:-/tmp/gitperch-gocache}
+    gopath=${GOPATH:-/tmp/gitperch-gopath}
     # Create the caches privately first so nobody else can claim the names.
     mkdir -p -m 700 -- "$cache" "$gopath" 2>/dev/null || true
     if ! untrusted=$(owned_private "$toolchain" "$toolchain/go" "$toolchain/go/bin" \
         "$toolchain/go/bin/go" "$cache" "$gopath"); then
-        printf 'repodash: refusing development toolchain fallback: %s is not privately owned by %s.\n' "$untrusted" "$(id -un)" >&2
+        printf 'gitperch: refusing development toolchain fallback: %s is not privately owned by %s.\n' "$untrusted" "$(id -un)" >&2
         printf 'Install Go or set GO to its executable path.\n' >&2
         exit 1
     fi
@@ -46,8 +46,8 @@ trap 'rm -rf -- "$build_dir"' EXIT
 
 # Go's cache makes unchanged launches inexpensive. Failed builds leave the last
 # good binary intact, but stop this launch so stale code is never run silently.
-"$go_command" -C "$repo_root" build -o "$build_dir/repodash" ./cmd/repodash
-mv -f -- "$build_dir/repodash" "$repo_root/bin/repodash"
+"$go_command" -C "$repo_root" build -o "$build_dir/gitperch" ./cmd/gitperch
+mv -f -- "$build_dir/gitperch" "$repo_root/bin/gitperch"
 rm -rf -- "$build_dir"
 trap - EXIT
-exec "$repo_root/bin/repodash" "$@"
+exec "$repo_root/bin/gitperch" "$@"

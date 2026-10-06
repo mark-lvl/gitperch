@@ -3,7 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 	"strconv"
 	"strings"
 )

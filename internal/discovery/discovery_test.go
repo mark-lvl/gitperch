@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 )
 
 func TestScanFindsGitDirectoryAndFile(t *testing.T) {

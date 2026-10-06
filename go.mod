@@ -1,4 +1,4 @@
-module repodash
+module github.com/markkaghazgarian/gitperch
 
 go 1.27.1
 

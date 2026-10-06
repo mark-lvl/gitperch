@@ -4,10 +4,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"context"
 	"fmt"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 	"os"
 	"path/filepath"
-	"repodash/internal/app"
-	gitcli "repodash/internal/git"
 	"strings"
 	"testing"
 	"time"
@@ -31,12 +31,12 @@ func captureCommits() []gitcli.Commit {
 }
 
 // writeANSICapture exports color output for scripts/render-captures.py into
-// REPODASH_ANSI_DIR, a directory the caller creates privately (mktemp -d).
+// GITPERCH_ANSI_DIR, a directory the caller creates privately (mktemp -d).
 func writeANSICapture(t *testing.T, name, content string) {
 	t.Helper()
-	dir := os.Getenv("REPODASH_ANSI_DIR")
+	dir := os.Getenv("GITPERCH_ANSI_DIR")
 	if dir == "" {
-		t.Log("REPODASH_ANSI_DIR unset; skipping color export for PNG rendering")
+		t.Log("GITPERCH_ANSI_DIR unset; skipping color export for PNG rendering")
 		return
 	}
 	if err := os.WriteFile(filepath.Join(dir, name+".ansi"), []byte(content), 0600); err != nil {

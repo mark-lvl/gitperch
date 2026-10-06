@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/term"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	"github.com/markkaghazgarian/gitperch/internal/config"
+	"github.com/markkaghazgarian/gitperch/internal/discovery"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	"github.com/markkaghazgarian/gitperch/internal/tui"
 	"io"
 	"os"
-	"repodash/internal/app"
-	"repodash/internal/config"
-	"repodash/internal/discovery"
-	gitcli "repodash/internal/git"
-	"repodash/internal/tui"
 	"strings"
 	"time"
 )
@@ -20,7 +20,7 @@ import (
 func runTUI(ctx context.Context, cfg config.Config, ws config.Workspace, noColor bool, out, errOut io.Writer) int {
 	file, ok := out.(*os.File)
 	if !ok || !term.IsTerminal(file.Fd()) || !term.IsTerminal(os.Stdin.Fd()) {
-		fmt.Fprintln(errOut, "Interactive dashboard requires a terminal. Run repodash status [ROOT ...] or repodash status --json [ROOT ...].")
+		fmt.Fprintln(errOut, "Interactive dashboard requires a terminal. Run gitperch status [ROOT ...] or gitperch status --json [ROOT ...].")
 		return 2
 	}
 	_, envNoColor := os.LookupEnv("NO_COLOR")

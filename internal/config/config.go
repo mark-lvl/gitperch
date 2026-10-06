@@ -1,4 +1,4 @@
-// Package config loads and resolves repodash's TOML configuration.
+// Package config loads and resolves gitperch's TOML configuration.
 package config
 
 import (
@@ -52,13 +52,13 @@ type Workspace struct {
 	IgnoreDirs []string
 }
 
-// DefaultPath returns the platform's user configuration path for repodash.
+// DefaultPath returns the platform's user configuration path for gitperch.
 func DefaultPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("find user config directory: %w", err)
 	}
-	return filepath.Join(dir, "repodash", "config.toml"), nil
+	return filepath.Join(dir, "gitperch", "config.toml"), nil
 }
 
 // Load reads and validates path. An absent implicit default file is equivalent

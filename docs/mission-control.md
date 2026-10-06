@@ -2,7 +2,7 @@
 
 ## Existing architecture
 
-The CLI resolves TOML configuration and discovery roots in `cmd/repodash`.
+The CLI resolves TOML configuration and discovery roots in `cmd/gitperch`.
 `app.Load` discovers repositories and calls `app.Inspect`, which uses a bounded
 worker pool and the existing deadline-limited Git runner. `app.Row` carries a
 repository identity (absolute path), independent Git status dimensions, and last

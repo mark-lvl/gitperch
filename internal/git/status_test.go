@@ -105,7 +105,7 @@ func TestRealStatusFixtures(t *testing.T) {
 				t.Fatalf("runner: %+v", actual)
 			}
 			fixture := filepath.Join("..", "..", "testdata", "git-status", name+".nul")
-			if os.Getenv("REPODASH_UPDATE_FIXTURES") == "1" {
+			if os.Getenv("GITPERCH_UPDATE_FIXTURES") == "1" {
 				if err := os.MkdirAll(filepath.Dir(fixture), 0755); err != nil {
 					t.Fatal(err)
 				}

@@ -1,9 +1,9 @@
-# repodash v0.1.0 — draft release notes
+# gitperch v0.1.0 — draft release notes
 
 This file contains prepared local release notes. It does not announce a
 published release. Local milestone gates passed; remote CI has not been run.
 
-repodash is a terminal dashboard for discovering local Git repositories,
+gitperch is a terminal dashboard for discovering local Git repositories,
 reviewing their status, and synchronizing selected worktrees. The current
 implementation targets Linux and WSL2. macOS and Windows have not been
 validated. Development and local validation used Go 1.27.1 and Git 2.43.0.
@@ -23,26 +23,26 @@ validated. Development and local validation used Go 1.27.1 and Git 2.43.0.
 
 ## Configuration and installation
 
-The config file defaults to `$XDG_CONFIG_HOME/repodash/config.toml` on
-Linux/WSL2, falling back to `~/.config/repodash/config.toml`. Configurable
+The config file defaults to `$XDG_CONFIG_HOME/gitperch/config.toml` on
+Linux/WSL2, falling back to `~/.config/gitperch/config.toml`. Configurable
 settings are `default_workspace`, `status_workers`, `action_workers`,
 `status_timeout_seconds`, `action_timeout_seconds`, and per-workspace `name`,
 `paths`, `max_depth`, and `ignore_dirs`. An absent default config scans the
-current directory. See the README for a TOML example and command details.
+current directory. See the [usage guide](usage.md) for a TOML example and command details.
 
 Build and run from a source checkout:
 
 ```sh
 make build
 make release-linux
-./bin/repodash --help
-./bin/repodash /path/to/projects
+./bin/gitperch --help
+./bin/gitperch /path/to/projects
 ```
 
 There are no remote installation instructions: the module has no known
 publication URL and no release artifact is being distributed.
 The locally prepared static Linux amd64 artifact is
-`dist/repodash_0.1.0_linux_amd64`, built with Go 1.27.1, with SHA-256
+`dist/gitperch_0.1.0_linux_amd64`, built with Go 1.27.1, with SHA-256
 `74db00624fca6675f67c460ac4039fc104022828d3d5f4a616048bb38bdf22e1`.
 
 Formatting, tests (including a fresh race-enabled run), vet, and both development
@@ -57,7 +57,7 @@ Fetch, push, and pull show their scope before execution. Push does not force,
 implicitly follow tags, or push submodules. Pull does not stash, merge
 divergent history, or rebase. Unsupported or ambiguous targets are skipped with
 reasons. Batches are best effort and have no rollback. A push timeout or
-cancellation can leave its remote outcome unknown; repodash does not retry it
+cancellation can leave its remote outcome unknown; gitperch does not retry it
 automatically. External Git processes and configured hooks can still affect a
 repository.
 

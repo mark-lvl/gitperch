@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 )
 
 type inspectFunc func(context.Context, string) repository.Status

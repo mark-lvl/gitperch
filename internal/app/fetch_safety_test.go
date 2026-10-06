@@ -2,8 +2,8 @@ package app
 
 import (
 	"context"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 	"os/exec"
-	gitcli "repodash/internal/git"
 	"strings"
 	"testing"
 )

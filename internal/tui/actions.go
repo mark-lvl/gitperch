@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 	"path/filepath"
-	"repodash/internal/app"
-	gitcli "repodash/internal/git"
 	"sort"
 	"strings"
 )

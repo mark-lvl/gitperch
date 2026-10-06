@@ -2,7 +2,7 @@ package git
 
 import (
 	"context"
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 	"time"
 )
 

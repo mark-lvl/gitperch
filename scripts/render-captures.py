@@ -2,7 +2,7 @@
 """Rasterize the actual ANSI View output exported by UPDATE_RENDERS tests.
 
 Optional development dependencies: pillow, pyte. No runtime dependency or demo
-mode is added to repodash. Captures use deterministic test fixtures.
+mode is added to gitperch. Captures use deterministic test fixtures.
 """
 from pathlib import Path
 import sys
@@ -48,7 +48,7 @@ if __name__ == '__main__':
         render(Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]))
         sys.exit(0)
     if len(sys.argv) != 2:
-        sys.exit('usage: render-captures.py ANSI_DIR  (the REPODASH_ANSI_DIR used by the tests)')
+        sys.exit('usage: render-captures.py ANSI_DIR  (the GITPERCH_ANSI_DIR used by the tests)')
     source_dir = Path(sys.argv[1])
     missing = [n for n in CAPTURES if not (source_dir / f'{n}.ansi').is_file()]
     if missing:

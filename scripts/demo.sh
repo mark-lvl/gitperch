@@ -3,13 +3,13 @@
 set -euo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-demo_root=$(mktemp -d "${TMPDIR:-/tmp}/repodash-demo.XXXXXX")
+demo_root=$(mktemp -d "${TMPDIR:-/tmp}/gitperch-demo.XXXXXX")
 # Remove a half-built demo on failure; success keeps it for inspection.
 trap 'rm -rf -- "$demo_root"' EXIT
 mkdir -p "$demo_root/remotes" "$demo_root/workspace"
 git init -q --bare -b main "$demo_root/remotes/origin.git"
 git init -q -b main "$demo_root/seed"
-git -C "$demo_root/seed" config user.name 'Repodash Demo'
+git -C "$demo_root/seed" config user.name 'Gitperch Demo'
 git -C "$demo_root/seed" config user.email 'demo@example.invalid'
 printf 'base\n' > "$demo_root/seed/tracked.txt"
 git -C "$demo_root/seed" add tracked.txt
@@ -18,7 +18,7 @@ git -C "$demo_root/seed" remote add origin "$demo_root/remotes/origin.git"
 git -C "$demo_root/seed" push -q -u origin main
 for demo_name in clean behind ahead dirty diverged no-upstream detached; do
   git clone -q "$demo_root/remotes/origin.git" "$demo_root/workspace/$demo_name"
-  git -C "$demo_root/workspace/$demo_name" config user.name 'Repodash Demo'
+  git -C "$demo_root/workspace/$demo_name" config user.name 'Gitperch Demo'
   git -C "$demo_root/workspace/$demo_name" config user.email 'demo@example.invalid'
 done
 printf 'peer update\n' > "$demo_root/seed/peer.txt"

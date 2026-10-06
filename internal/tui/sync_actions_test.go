@@ -8,9 +8,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"repodash/internal/app"
-	gitcli "repodash/internal/git"
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 )
 
 type syncActionFake struct {

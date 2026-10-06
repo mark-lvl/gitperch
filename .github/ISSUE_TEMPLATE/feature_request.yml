@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an idea or an agent-workflow use case
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do? Mention the agents or tools involved, if any.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How could gitperch help? Keys, views, config or CLI output you have in mind.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

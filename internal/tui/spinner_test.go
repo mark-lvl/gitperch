@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"repodash/internal/app"
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 )
 
 func TestSpinnerRunsOnlyWhileBusy(t *testing.T) {

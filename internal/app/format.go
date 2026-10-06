@@ -3,9 +3,9 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/markkaghazgarian/gitperch/internal/discovery"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 	"io"
-	"repodash/internal/discovery"
-	gitcli "repodash/internal/git"
 	"strings"
 	"text/tabwriter"
 )

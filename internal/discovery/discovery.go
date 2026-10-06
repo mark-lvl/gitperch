@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 )
 
 // Options controls filesystem traversal. Each root starts at depth zero;

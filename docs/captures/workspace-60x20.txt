@@ -1,5 +1,5 @@
 ╭──────────────────────────────────────────────────────────╮
-│ ◇ repodash  ~/dev/platform     [6 repos] [! 5 attention] │
+│ ◇ gitperch  ~/dev/platform     [6 repos] [! 5 attention] │
 │ ──────────────────────────────────────────────────────── │
 │        REPO                 STATUS            Δ          │
 │    1 ▱ api-service          ✓ clean           —          │

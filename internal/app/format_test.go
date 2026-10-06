@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"repodash/internal/repository"
+	"github.com/markkaghazgarian/gitperch/internal/repository"
 	"strings"
 	"testing"
 )

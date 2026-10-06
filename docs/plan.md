@@ -1,4 +1,9 @@
-# repodash — implementation plan
+# gitperch — original implementation plan
+
+> This plan was written while the project was called **repodash**. The
+> milestone log below is kept as a historical record, so it still uses the
+> old name, paths and commands. For current usage see the
+> [usage guide](usage.md).
 
 Status: M0–M7 implemented and locally verified. The user requested all milestones, overriding the first-session M1 stopping point. Checked items below record verified work; remaining platform/publication limitations are recorded in the log.
 

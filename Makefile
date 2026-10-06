@@ -13,12 +13,12 @@ race:
 vet:
 	$(GO) vet ./...
 build:
-	$(GO) build -o bin/repodash ./cmd/repodash
+	$(GO) build -o bin/gitperch ./cmd/gitperch
 install-dev:
 	bash scripts/install-dev.sh
 release-linux:
 	mkdir -p dist
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$(VERSION)" -o dist/repodash_$(VERSION)_linux_amd64 ./cmd/repodash
-	sha256sum dist/repodash_$(VERSION)_linux_amd64
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$(VERSION)" -o dist/gitperch_$(VERSION)_linux_amd64 ./cmd/gitperch
+	sha256sum dist/gitperch_$(VERSION)_linux_amd64
 # Mirrors CI.
 check: fmt-check test race vet build

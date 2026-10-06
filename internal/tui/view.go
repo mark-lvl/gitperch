@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"repodash/internal/app"
-	gitcli "repodash/internal/git"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 )
 
 var scopes = []string{"All", "Attention", "Changed", "Ahead", "Behind", "Issues"}
@@ -174,7 +174,7 @@ func (m *Model) summaryLineAt(w int) string {
 	if w >= 70 {
 		right += "  " + m.style(m.now().Format("15:04"), ink, false)
 	}
-	brand := m.style(m.symbols().brand+" repodash", accent, true)
+	brand := m.style(m.symbols().brand+" gitperch", accent, true)
 	locationWidth := w - ansi.StringWidth(brand) - ansi.StringWidth(right) - 5
 	left := brand
 	if locationWidth > 3 {
@@ -603,7 +603,7 @@ func (m *Model) footer() string {
 
 func (m *Model) helpContent() []string {
 	lines := []string{
-		m.style(" repodash / Keyboard guide", accent, true), m.rule(max(1, m.width)),
+		m.style(" gitperch / Keyboard guide", accent, true), m.rule(max(1, m.width)),
 		" NAVIGATION", " ↑↓ / j k      Move between repositories", " [ / ]         Scroll the selected preview's changed files", " PgUp / PgDn   Move one page · Home / End jump to first / last", " 1–9           Jump to that row (numbered in narrow layouts)",
 		" Tab / Shift+Tab  Toggle All / Focus; more filters live in Actions",
 		" /             Search name, path or branch · arrows move · Enter opens", " s             Toggle name / attention order · r refresh local status",

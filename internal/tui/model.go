@@ -11,8 +11,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"repodash/internal/app"
-	gitcli "repodash/internal/git"
+	"github.com/markkaghazgarian/gitperch/internal/app"
+	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
 )
 
 type loader func(context.Context) (app.Snapshot, error)
@@ -736,7 +736,7 @@ func (m *Model) pageSize() int {
 const detailsFooter = " ↑↓ scroll · Tab section · o shell · : actions · Esc back"
 
 func (m *Model) detailsContent() []string {
-	content := []string{m.style(" repodash / Diagnostics", accent, true), m.rule(max(1, m.width))}
+	content := []string{m.style(" gitperch / Diagnostics", accent, true), m.rule(max(1, m.width))}
 	if row := m.highlightedRow(); row != nil {
 		content = append(content, "Path: "+gitcli.SafeText(row.Path), m.detailLine(*row))
 		if row.Status.Error != "" {

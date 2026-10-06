@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in gitperch does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! For security issues, use the security policy instead of this form.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, ideally using `scripts/demo.sh` or a fresh temporary repository.
+      placeholder: |
+        1. git init /tmp/example && ...
+        2. gitperch /tmp
+        3. Press ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: gitperch version
+      description: Output of `gitperch --version`, or the commit you built.
+    validations:
+      required: true
+  - type: input
+    id: git-version
+    attributes:
+      label: Git version
+      description: Output of `git --version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and terminal
+      placeholder: Ubuntu 24.04 on WSL2, Windows Terminal
+    validations:
+      required: true
+  - type: textarea
+    id: status-json
+    attributes:
+      label: Status output
+      description: Relevant `gitperch status --json` output or a screenshot. Redact private paths and URLs.
+      render: json

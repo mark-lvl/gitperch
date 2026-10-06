@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/markkaghazgarian/gitperch/internal/app"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"repodash/internal/app"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +21,7 @@ func TestInvocation(t *testing.T) {
 		text string
 	}{
 		{[]string{"--help"}, 0, "Usage:"},
-		{[]string{"--version"}, 0, "repodash dev"},
+		{[]string{"--version"}, 0, "gitperch dev"},
 		{[]string{"--unknown"}, 2, "flag provided but not defined"},
 	} {
 		var out, errOut bytes.Buffer
@@ -96,7 +96,7 @@ func TestWorkspaceCLIAndExitCodes(t *testing.T) {
 func TestDefaultRequiresTerminalAndJSONRequiresStatus(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	var out, errOut bytes.Buffer
-	if code := run(nil, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "repodash status") {
+	if code := run(nil, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "gitperch status") {
 		t.Fatalf("default: exit %d, %s", code, &errOut)
 	}
 	errOut.Reset()
