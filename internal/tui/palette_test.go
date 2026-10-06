@@ -193,7 +193,9 @@ func TestOperationFailureNeedsAttentionEvenWhenGitClean(t *testing.T) {
 	m := New(nil, nil, true)
 	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
 	row := m.rows[0]
-	m.results = map[string]app.Event{row.Path: {State: app.Failed, Message: "non-fast-forward"}}
+	// The shape of a real rejected push result (see git.Runner.Push).
+	message := "[rejected] (fetch first) for refs/heads/main: git push: exit status 1: error: failed to push some refs"
+	m.results = map[string]app.Event{row.Path: {State: app.Failed, Message: message}}
 	m.scope = 1
 	if !m.inScope(row) || !strings.Contains(m.guidance(row), "Remote history") {
 		t.Fatal("operation failure invisible")

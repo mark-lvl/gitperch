@@ -247,6 +247,23 @@ func TestPushRefusesRemoteRaceWithoutForce(t *testing.T) {
 	}
 }
 
+// With --porcelain, Git reports why a ref was rejected on stdout; stderr only
+// says the push failed (plus optional advice), so the reason must be kept.
+func TestPushRejectionReportsGitReason(t *testing.T) {
+	repo, remote := actionTestRepoWithRemote(t)
+	actionGit(t, repo, "config", "advice.pushUpdateRejected", "false")
+	actionTestMakeLocalCommit(t, repo, "local outgoing commit")
+	actions, _, preview := actionPrepareSync(t, repo, Push)
+	actionTestAdvanceRemote(t, remote, "racing remote commit\n")
+	results, err := actions.Execute(context.Background(), preview.ID, nil)
+	if err != nil || len(results) != 1 || results[0].State != Failed {
+		t.Fatalf("remote race must fail: %+v, %v", results, err)
+	}
+	if want := "[rejected] (fetch first) for refs/heads/main"; !strings.Contains(results[0].Message, want) {
+		t.Fatalf("message %q lacks Git's reason %q", results[0].Message, want)
+	}
+}
+
 func TestPushConfigurationSafetyAndValidMapping(t *testing.T) {
 	cases := []struct {
 		name, reason string

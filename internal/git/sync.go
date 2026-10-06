@@ -155,8 +155,29 @@ func (r Runner) Push(ctx context.Context, path string, target PushTarget) error 
 	}
 	// Pin the reviewed branch's object ID, so an external local commit made
 	// after revalidation cannot accidentally join this push.
-	_, err := r.Run(ctx, path, "-c", "push.followTags=false", "-c", "push.recurseSubmodules=no", "push", "--porcelain", "--no-follow-tags", "--recurse-submodules=no", "--", target.Remote, target.HeadOID+":"+target.DestinationRef)
+	out, err := r.Run(ctx, path, "-c", "push.followTags=false", "-c", "push.recurseSubmodules=no", "push", "--porcelain", "--no-follow-tags", "--recurse-submodules=no", "--", target.Remote, target.HeadOID+":"+target.DestinationRef)
+	if err != nil {
+		if reasons := pushRejections(out.Stdout); reasons != "" {
+			return fmt.Errorf("%s: %w", reasons, err)
+		}
+	}
 	return err
+}
+
+// pushRejections summarizes rejected refs from porcelain push output, which
+// Git writes to stdout ("!\t<src>:<dst>\t[rejected] (fetch first)"), while
+// stderr carries only a generic failure and optional advice.
+func pushRejections(stdout []byte) string {
+	var reasons []string
+	for _, line := range strings.Split(string(stdout), "\n") {
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) != 3 || fields[0] != "!" {
+			continue
+		}
+		ref := fields[1][strings.LastIndex(fields[1], ":")+1:]
+		reasons = append(reasons, SafeText(fields[2]+" for "+ref))
+	}
+	return strings.Join(reasons, "; ")
 }
 
 func (r Runner) FastForward(ctx context.Context, path, commit string) error {

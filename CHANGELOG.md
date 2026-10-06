@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Starting an action during a status refresh no longer stops automatic
   refresh when the action ends without running (cancelled, nothing eligible
   or confirmation dismissed); the interrupted refresh now resumes.
+- A rejected push now reports Git's reason, such as
+  `[rejected] (fetch first) for refs/heads/main`, so the result and the
+  "remote history needs review" guidance appear even when Git's advice hints
+  are turned off.
 
 ## [0.1.0] - 2026-10-06
 
