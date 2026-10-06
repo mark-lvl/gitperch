@@ -43,7 +43,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 		if msg.err == nil && m.actionCtx != nil && m.actionCtx.Err() != nil {
 			m.actions.Discard(msg.preview.ID)
 			m.message = "Preview preparation cancelled"
-			return true, nil
+			return true, m.resumeInterruptedRefresh()
 		}
 		if msg.err != nil {
 			m.message = msg.err.Error()
@@ -51,7 +51,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 				m.actionCancel()
 				m.actionCancel = nil
 			}
-			return true, nil
+			return true, m.resumeInterruptedRefresh()
 		}
 		m.preview = &msg.preview
 		for _, target := range msg.preview.Targets {
@@ -125,6 +125,7 @@ func (m *Model) preparePreview(action app.Action, paths []string) tea.Cmd {
 		m.loadCancel = nil
 	}
 	m.generation++
+	m.refreshInterrupted = m.refreshInterrupted || m.loading
 	m.loading = false
 	m.refreshUntil = time.Time{}
 	m.actionGeneration++
@@ -171,7 +172,7 @@ func (m *Model) settlePreview() tea.Cmd {
 		if reason != "" {
 			m.message += ": " + gitcli.SafeText(reason)
 		}
-		return nil
+		return m.resumeInterruptedRefresh()
 	}
 	if m.preview.Targets[0].Action == app.Fetch {
 		return m.confirmPreview()
@@ -197,8 +198,18 @@ func (m *Model) previewKey(key string) tea.Cmd {
 	case "esc", "q", "ctrl+c":
 		m.discardPreview()
 		m.message = "Cancelled"
+		return m.resumeInterruptedRefresh()
 	}
 	return nil
+}
+
+// resumeInterruptedRefresh restarts the load an action cancelled once the
+// action ends without a batch. A finished batch refreshes on its own.
+func (m *Model) resumeInterruptedRefresh() tea.Cmd {
+	if !m.refreshInterrupted {
+		return nil
+	}
+	return m.refresh()
 }
 
 func (m *Model) confirmPreview() tea.Cmd {

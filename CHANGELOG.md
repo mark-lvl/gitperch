@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The search filter and command palette accept capital letters and other
   shifted characters instead of silently dropping them.
+- Starting an action during a status refresh no longer stops automatic
+  refresh when the action ends without running (cancelled, nothing eligible
+  or confirmation dismissed); the interrupted refresh now resumes.
 
 ## [0.1.0] - 2026-10-06
 

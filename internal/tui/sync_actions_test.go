@@ -247,3 +247,52 @@ func TestEscCancelsSyncPreparationAndReleasesPlan(t *testing.T) {
 	}
 	m.actions.Discard(preview.ID)
 }
+
+// Starting an action cancels an in-flight refresh. When the action then ends
+// without a batch (whose completion refreshes), the refresh must resume, or
+// automatic refresh would never be scheduled again.
+func TestActionWithoutBatchResumesInterruptedRefresh(t *testing.T) {
+	loader := func(context.Context) (app.Snapshot, error) {
+		return app.Snapshot{Rows: []app.Row{{Repository: repository.Repository{Name: "first", Path: "/repos/first"}}}}, nil
+	}
+	end := map[string]func(t *testing.T, m *Model) tea.Cmd{
+		"cancelled preparation": func(t *testing.T, m *Model) tea.Cmd {
+			plan := pressAction(m, "f")
+			pressAction(m, "esc")
+			_, cmd := m.Update(plan())
+			return cmd
+		},
+		"dismissed confirmation": func(t *testing.T, m *Model) tea.Cmd {
+			startSyncPreview(t, m, "p")
+			if m.preview == nil {
+				t.Fatal("push confirmation did not open")
+			}
+			return pressAction(m, "esc")
+		},
+	}
+	for name, finish := range end {
+		t.Run(name, func(t *testing.T) {
+			m := syncActionModel(newSyncActionFake(app.Push, false))
+			m.load = loader
+			m.SetAutoRefresh(time.Minute)
+			stale := m.refresh() // an automatic or manual refresh is in flight
+			cmd := finish(t, m)
+			m.Update(stale())
+			if !m.loading || cmd == nil {
+				t.Fatalf("interrupted refresh did not resume: loading=%v cmd=%v", m.loading, cmd != nil)
+			}
+			if _, ok := cmd().(snapshotMsg); !ok {
+				t.Fatal("resumed command did not load a snapshot")
+			}
+		})
+	}
+}
+
+func TestActionWithoutBatchDoesNotRefreshWhenIdle(t *testing.T) {
+	m := syncActionModel(newSyncActionFake(app.Push, false))
+	m.load = func(context.Context) (app.Snapshot, error) { return app.Snapshot{}, nil }
+	startSyncPreview(t, m, "p")
+	if cmd := pressAction(m, "esc"); cmd != nil || m.loading {
+		t.Fatal("dismissing a confirmation started an unrequested refresh")
+	}
+}

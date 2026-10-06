@@ -85,6 +85,9 @@ type Model struct {
 	autoRefresh      time.Duration // 0 disables automatic status refresh
 	autoGeneration   uint64        // only the newest scheduled autoRefreshMsg counts
 	refreshUntil     time.Time     // keeps a quick refresh's indicator readable instead of a blink
+	// refreshInterrupted records that an action cancelled an in-flight load,
+	// which must resume if the action ends without a batch to refresh after.
+	refreshInterrupted bool
 }
 
 type snapshotMsg struct {
@@ -195,6 +198,7 @@ func (m *Model) refresh() tea.Cmd {
 	ctx, cancel := context.WithCancel(m.ctx)
 	m.loadCancel = cancel
 	m.loading = true
+	m.refreshInterrupted = false
 	m.refreshUntil = m.now().Add(refreshIndicatorMin)
 	return func() tea.Msg {
 		snapshot, err := m.load(ctx)
