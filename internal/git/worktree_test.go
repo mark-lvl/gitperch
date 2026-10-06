@@ -83,9 +83,9 @@ func TestRunnerWorktreesListsLinkedAndStale(t *testing.T) {
 
 func TestParseGitVersion(t *testing.T) {
 	for out, want := range map[string][2]int{
-		"git version 2.43.0\n":                {2, 43},
+		"git version 2.43.0\n":                 {2, 43},
 		"git version 2.39.3 (Apple Git-146)\n": {2, 39},
-		"git version 2.45.1.windows.1\n":      {2, 45},
+		"git version 2.45.1.windows.1\n":       {2, 45},
 	} {
 		major, minor, ok := parseGitVersion(out)
 		if !ok || major != want[0] || minor != want[1] {
