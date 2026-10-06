@@ -125,7 +125,8 @@ max_depth = 4
 ignore_dirs = ["node_modules", "vendor", "target", ".cache", ".next", "dist", "build"]
 
 [ui]
-icons = "unicode"   # or "ascii", "nerd"
+icons = "unicode"     # or "ascii", "nerd"
+refresh_seconds = 30  # automatic local status refresh; 0 turns it off
 ```
 
 ```sh

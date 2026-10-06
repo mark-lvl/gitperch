@@ -597,7 +597,7 @@ func (m *Model) footer() string {
 			}
 		}
 	}
-	hints = append(hints, hint{"Space", "Select", 4}, hint{"o", "Shell", 4}, hint{"/", "Search", 3}, hint{":", "Command", 0}, hint{"?", "Help", 3})
+	hints = append(hints, hint{"Space", "Select", 4}, hint{"o", "Shell", 4}, hint{"/", "Search", 3}, hint{"r", "Refresh", 4}, hint{":", "Command", 0}, hint{"?", "Help", 3})
 	return m.hintBar("", hints, w)
 }
 
@@ -607,6 +607,7 @@ func (m *Model) helpContent() []string {
 		" NAVIGATION", " ↑↓ / j k      Move between repositories", " [ / ]         Scroll the selected preview's changed files", " PgUp / PgDn   Move one page · Home / End jump to first / last", " 1–9           Jump to that row (numbered in narrow layouts)",
 		" Tab / Shift+Tab  Toggle All / Focus; more filters live in Actions",
 		" /             Search name, path or branch · arrows move · Enter opens", " s             Toggle name / attention order · r refresh local status",
+		m.autoRefreshHelp(),
 		"", " REPOSITORY ACTIONS", " Enter / d     Open repository overview / changes · Tab switches section", " o             Open a shell in the highlighted worktree", " g             Open LazyGit in the highlighted worktree",
 		"", " BULK OPERATIONS", " Space         Toggle selection · a selects / deselects visible rows",
 		" f             Fetch selected repositories", " p / l         Fetch, then confirm push / FF pull in a popup",
@@ -615,6 +616,13 @@ func (m *Model) helpContent() []string {
 		" Esc cancels the confirmation popup; during a batch it requests cancellation.", " Esc clears search, then dismisses results. q quits; Ctrl+C interrupts.",
 	}
 	return lines
+}
+
+func (m *Model) autoRefreshHelp() string {
+	if m.autoRefresh <= 0 {
+		return "               Automatic refresh is off (ui.refresh_seconds = 0)"
+	}
+	return fmt.Sprintf("               Status also refreshes every %s while the list is idle", m.autoRefresh)
 }
 
 func (m *Model) rule(w int) string {

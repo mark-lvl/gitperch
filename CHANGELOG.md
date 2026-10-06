@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The dashboard refreshes local status automatically while idle, every 30
+  seconds by default (`[ui] refresh_seconds`, `0` disables). The footer now
+  shows the `r` manual refresh key.
 - MIT license, contributing guide, code of conduct, security policy, agent
   instructions (`AGENTS.md`), issue and pull request templates, and Dependabot
   configuration.

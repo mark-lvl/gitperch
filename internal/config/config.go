@@ -22,6 +22,8 @@ const (
 	DefaultActionTimeoutSeconds = 120
 	MaxWorkers                  = 64
 	DefaultMaxDepth             = 4
+	DefaultRefreshSeconds       = 30
+	MinRefreshSeconds           = 5
 )
 
 var defaultIgnoreDirs = []string{"node_modules", "vendor", "target", ".cache", ".next", "dist", "build"}
@@ -40,8 +42,10 @@ type Config struct {
 
 // UI is shared by the terminal presentation only.
 type UI struct {
-	Icons        string `toml:"icons"`
-	DefaultFocus bool   `toml:"default_focus"`
+	Icons        string
+	DefaultFocus bool
+	// RefreshSeconds is the automatic local status refresh interval; 0 disables it.
+	RefreshSeconds int
 }
 
 // Workspace defines discovery settings for a group of roots.
@@ -98,7 +102,8 @@ func Load(path string, explicit bool) (Config, error) {
 	}
 	cfg := defaults(filepath.Dir(abs))
 	if raw.UI != nil {
-		cfg.UI = *raw.UI
+		cfg.UI.Icons = raw.UI.Icons
+		cfg.UI.DefaultFocus = raw.UI.DefaultFocus
 		if cfg.UI.Icons == "" {
 			cfg.UI.Icons = "unicode"
 		}
@@ -106,6 +111,12 @@ func Load(path string, explicit bool) (Config, error) {
 		case "unicode", "ascii", "nerd":
 		default:
 			return Config{}, errors.New("ui.icons must be unicode, ascii, or nerd")
+		}
+		if seconds := raw.UI.RefreshSeconds; seconds != nil {
+			if *seconds != 0 && (*seconds < MinRefreshSeconds || *seconds > 86400) {
+				return Config{}, fmt.Errorf("ui.refresh_seconds must be 0 (off) or between %d and 86400", MinRefreshSeconds)
+			}
+			cfg.UI.RefreshSeconds = int(*seconds)
 		}
 	}
 	if raw.DefaultWorkspace != nil {
@@ -235,7 +246,7 @@ func (c Config) Resolve(workspace string, roots []string, cwd string) (Workspace
 }
 
 func defaults(configDir string) Config {
-	return Config{UI: UI{Icons: "unicode"}, StatusWorkers: DefaultStatusWorkers, ActionWorkers: DefaultActionWorkers,
+	return Config{UI: UI{Icons: "unicode", RefreshSeconds: DefaultRefreshSeconds}, StatusWorkers: DefaultStatusWorkers, ActionWorkers: DefaultActionWorkers,
 		StatusTimeoutSeconds: DefaultStatusTimeoutSeconds, ActionTimeoutSeconds: DefaultActionTimeoutSeconds,
 		configDir: configDir}
 }
@@ -310,13 +321,19 @@ func cloneWorkspace(w Workspace) Workspace {
 }
 
 type rawConfig struct {
-	UI                   *UI            `toml:"ui"`
+	UI                   *rawUI         `toml:"ui"`
 	DefaultWorkspace     *string        `toml:"default_workspace"`
 	StatusWorkers        *int64         `toml:"status_workers"`
 	ActionWorkers        *int64         `toml:"action_workers"`
 	StatusTimeoutSeconds *int64         `toml:"status_timeout_seconds"`
 	ActionTimeoutSeconds *int64         `toml:"action_timeout_seconds"`
 	Workspaces           []rawWorkspace `toml:"workspace"`
+}
+
+type rawUI struct {
+	Icons          string `toml:"icons"`
+	DefaultFocus   bool   `toml:"default_focus"`
+	RefreshSeconds *int64 `toml:"refresh_seconds"`
 }
 
 type rawWorkspace struct {

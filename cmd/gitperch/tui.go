@@ -39,6 +39,7 @@ func runTUI(ctx context.Context, cfg config.Config, ws config.Workspace, noColor
 	model.EnableDetails(read.Details)
 	model.EnablePatch(read.Patch)
 	model.Configure(strings.Join(ws.Paths, ", "), cfg.UI.Icons, cfg.UI.DefaultFocus)
+	model.SetAutoRefresh(time.Duration(cfg.UI.RefreshSeconds) * time.Second)
 	opts := []tea.ProgramOption{tea.WithContext(ctx), tea.WithInput(os.Stdin), tea.WithOutput(out)}
 	if noColor {
 		opts = append(opts, tea.WithColorProfile(colorprofile.NoTTY))

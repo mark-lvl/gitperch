@@ -190,3 +190,21 @@ func TestUISettings(t *testing.T) {
 		t.Fatal("invalid icons accepted")
 	}
 }
+
+func TestUIRefreshSeconds(t *testing.T) {
+	cfg, err := Load(writeConfig(t, "[ui]\nicons = \"ascii\"\n"), true)
+	if err != nil || cfg.UI.RefreshSeconds != DefaultRefreshSeconds {
+		t.Fatalf("default: %+v %v", cfg.UI, err)
+	}
+	for body, want := range map[string]int{"refresh_seconds = 0\n": 0, "refresh_seconds = 90\n": 90} {
+		cfg, err := Load(writeConfig(t, "[ui]\n"+body), true)
+		if err != nil || cfg.UI.RefreshSeconds != want {
+			t.Fatalf("%q: %+v %v", body, cfg.UI, err)
+		}
+	}
+	for _, body := range []string{"refresh_seconds = -1\n", "refresh_seconds = 2\n", "refresh_seconds = 100000\n"} {
+		if _, err := Load(writeConfig(t, "[ui]\n"+body), true); err == nil {
+			t.Fatalf("%q accepted", body)
+		}
+	}
+}

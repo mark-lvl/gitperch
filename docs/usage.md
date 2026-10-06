@@ -103,11 +103,14 @@ fast-forward pull the selected set, or the highlighted repository when no
 selection exists, after one confirmation popup. `f` fetches explicitly selected
 repositories straight away. Plans are still revalidated before anything runs.
 Search/scope changes clear selection; refresh preserves visible selections and
-the highlighted repository by path. Tab toggles All/Focus; the palette provides the other repository filters. `s` toggles attention/name ordering, `[ / ]` scroll preview files, and `r` refreshes.
+the highlighted repository by path. Tab toggles All/Focus; the palette provides the other repository filters. `s` toggles attention/name ordering, `[ / ]` scroll preview files, and `r` refreshes immediately.
 
 Colors supplement status symbols and text, using the terminal palette. Existing
 TOML configuration accepts `[ui]` with `icons = "unicode"` (also `ascii` or `nerd`)
-and `default_focus = false`. Agent/test/task actions are omitted because there is
+and `default_focus = false`. `refresh_seconds = 30` reloads local status
+automatically while the dashboard list is idle (not while details, a
+confirmation, the palette or an operation is open); `0` turns it off, otherwise
+the value must be between 5 and 86400. Automatic refresh never fetches. Agent/test/task actions are omitted because there is
 no real integration yet. See the [interface guide](ui.md) for all bindings,
 configuration, limitations, and wide/medium/narrow render captures.
 

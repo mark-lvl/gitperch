@@ -214,3 +214,35 @@ func TestWarningsReviewableWithoutRows(t *testing.T) {
 		t.Fatalf("warning not reviewable: details=%v\n%s", m.details, m.View().Content)
 	}
 }
+
+func TestAutoRefreshReloadsWhenIdleAndPausesOtherwise(t *testing.T) {
+	m := New(context.Background(), func(context.Context) (app.Snapshot, error) { return app.Snapshot{Rows: testRows()}, nil }, true)
+	m.SetAutoRefresh(time.Minute)
+	m.Init()
+	m.Update(snapshotMsg{generation: m.generation, snapshot: app.Snapshot{Rows: testRows()}})
+	scheduled := m.autoGeneration
+	if scheduled == 0 || m.loading {
+		t.Fatal("completed load did not schedule an automatic refresh")
+	}
+	m.Update(autoRefreshMsg{generation: scheduled - 1})
+	if m.loading {
+		t.Fatal("stale automatic refresh reloaded")
+	}
+	m.details = true
+	m.Update(autoRefreshMsg{generation: scheduled})
+	if m.loading || m.autoGeneration == scheduled {
+		t.Fatal("automatic refresh did not wait while details were open")
+	}
+	m.details = false
+	m.Update(autoRefreshMsg{generation: m.autoGeneration})
+	if !m.loading {
+		t.Fatal("idle automatic refresh did not reload")
+	}
+
+	off := New(context.Background(), func(context.Context) (app.Snapshot, error) { return app.Snapshot{}, nil }, true)
+	off.Init()
+	off.Update(snapshotMsg{generation: off.generation})
+	if off.autoGeneration != 0 {
+		t.Fatal("disabled automatic refresh was scheduled")
+	}
+}

@@ -80,6 +80,8 @@ type Model struct {
 	ticking          bool
 	spinning         bool // a spinnerMsg is scheduled
 	spinnerFrame     int
+	autoRefresh      time.Duration // 0 disables automatic status refresh
+	autoGeneration   uint64        // only the newest scheduled autoRefreshMsg counts
 }
 
 type snapshotMsg struct {
@@ -95,6 +97,9 @@ type clockMsg struct{}
 
 // spinnerMsg advances the busy spinner; it is scheduled only while busy.
 type spinnerMsg struct{}
+
+// autoRefreshMsg reloads local status after the configured idle interval.
+type autoRefreshMsg struct{ generation uint64 }
 
 const spinnerInterval = 100 * time.Millisecond
 
@@ -113,6 +118,23 @@ func (m *Model) tick() tea.Cmd {
 	m.ticking = true
 	wait := time.Minute - time.Duration(m.now().Second())*time.Second
 	return tea.Tick(wait, func(time.Time) tea.Msg { return clockMsg{} })
+}
+
+// scheduleAutoRefresh restarts the interval, so it always counts from the
+// latest completed load, whether manual or automatic.
+func (m *Model) scheduleAutoRefresh() tea.Cmd {
+	if m.autoRefresh <= 0 || m.closing {
+		return nil
+	}
+	m.autoGeneration++
+	generation := m.autoGeneration
+	return tea.Tick(m.autoRefresh, func(time.Time) tea.Msg { return autoRefreshMsg{generation} })
+}
+
+// autoRefreshPaused avoids reloading under the user while work runs or while a
+// view that would lose its loaded content (details, diff, confirmation) is open.
+func (m *Model) autoRefreshPaused() bool {
+	return m.busy() || m.preview != nil || m.details || m.palette
 }
 
 // New creates a TUI model. load must honor its context; refreshing cancels an
@@ -134,6 +156,9 @@ func New(ctx context.Context, load func(context.Context) (app.Snapshot, error), 
 		height:           24,
 	}
 }
+
+// SetAutoRefresh enables periodic local status refresh; zero or less disables it.
+func (m *Model) SetAutoRefresh(interval time.Duration) { m.autoRefresh = interval }
 
 // Configure uses the existing TOML configuration rather than a second settings source.
 func (m *Model) Configure(workspace, icons string, focus bool) {
@@ -236,9 +261,19 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		} else {
 			m.loadErr = ""
 		}
+		next := m.scheduleAutoRefresh()
 		if !m.ticking && !m.closing {
-			return m, m.tick()
+			next = tea.Batch(next, m.tick())
 		}
+		return m, next
+	case autoRefreshMsg:
+		if msg.generation != m.autoGeneration || m.closing {
+			return m, nil
+		}
+		if m.autoRefreshPaused() {
+			return m, m.scheduleAutoRefresh()
+		}
+		return m, m.refresh()
 	case childExitedMsg:
 		if msg.err != nil {
 			m.message = "Child process: " + msg.err.Error()
