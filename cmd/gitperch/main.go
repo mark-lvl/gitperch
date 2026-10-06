@@ -61,6 +61,7 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	// The flag package stops at the first positional argument; keep parsing so
 	// options may follow roots. A literal "--" still ends option parsing.
 	var roots []string
+	firstRootLiteral := false // the first root followed "--", so it is no subcommand
 	for {
 		if err := fs.Parse(args); err != nil {
 			if err == flag.ErrHelp {
@@ -73,13 +74,14 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 			break
 		}
 		if consumed := len(args) - len(rest); consumed > 0 && args[consumed-1] == "--" {
+			firstRootLiteral = len(roots) == 0
 			roots = append(roots, rest...)
 			break
 		}
 		roots = append(roots, rest[0])
 		args = rest[1:]
 	}
-	if !statusMode && len(roots) > 0 && roots[0] == "status" {
+	if !statusMode && !firstRootLiteral && len(roots) > 0 && roots[0] == "status" {
 		statusMode = true
 		roots = roots[1:]
 	}

@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   finished").
 - Cancelling an action while it is being prepared reports "Preview preparation
   cancelled" instead of the raw "context canceled".
+- `gitperch -- status` opens the dashboard on a directory named `status`
+  instead of running the `status` command; `--` now ends option and
+  subcommand parsing.
 
 ## [0.1.0] - 2026-10-06
 

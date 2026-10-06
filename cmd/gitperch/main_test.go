@@ -154,3 +154,19 @@ func TestSymlinkedWorkingDirectoryIsScanned(t *testing.T) {
 		t.Fatalf("got %d rows", len(report.Repositories))
 	}
 }
+
+func TestStatusAfterDoubleDashIsARoot(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	var out, errOut bytes.Buffer
+	// "--" ends options, so "status" names a directory for the dashboard,
+	// which needs a terminal here.
+	if code := run([]string{"--", "status"}, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "requires a terminal") {
+		t.Fatalf("-- status: exit %d, stdout %q, stderr %q", code, &out, &errOut)
+	}
+	// Options may still precede the subcommand.
+	out.Reset()
+	errOut.Reset()
+	if code := run([]string{"--max-depth", "0", "status", t.TempDir()}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "REPOSITORY") {
+		t.Fatalf("options before status: exit %d, stdout %q, stderr %q", code, &out, &errOut)
+	}
+}
