@@ -12,7 +12,7 @@
 │      ╭──────────────────────────────────────────────────────────────────────────────────────────────╮      │
 │      │ Clean up 3 items?                                                                            │      │
 │      │ design-system                                                                                │      │
-│      │   [x] prune 1 stale worktree record                                        directory is gone │      │
+│      │   [x] prune 1 stale worktree record                               1 stale worktree record(s) │      │
 │      │ ▌ [x] remove worktree fix-tokens  fix/tokens                         merged into origin/main │      │
 │      │   [x] remove worktree add-icons  feat/icons                          merged into origin/main │      │
 │      │                                                                                              │      │
@@ -31,5 +31,5 @@
 │ │ ?  tests/theme_test.go                                                                                 │ │
 │ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                            │
-│ [↑↓] Move  [↵] Open  [d] Diff  [p] Push  [Space] Select  [c] Clean up  [/] Search  [:] Command  [?] Help   │
+│ [↑↓] Move  [↵] Open  [d] Diff  [p] Push  [Space] Select  [o] Shell  [/] Search  [:] Command  [?] Help      │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

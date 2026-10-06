@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -224,7 +225,7 @@ func TestCleanupOfferedInPaletteHintsAndHelp(t *testing.T) {
 	m.EnableActions(app.NewActions(newActionFake(false), 1))
 	m.EnableCleanup(true)
 	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
-	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m.Update(tea.WindowSizeMsg{Width: 200, Height: 30}) // Clean up is the first hint to drop
 	found := false
 	for _, c := range m.commands() {
 		found = found || c.id == "cleanup"
@@ -241,5 +242,111 @@ func TestCleanupOfferedInPaletteHintsAndHelp(t *testing.T) {
 	m.EnableCleanup(false)
 	if strings.Contains(strings.Join(m.helpContent(), "\n"), "Clean up") {
 		t.Fatal("help mentions Clean up on old Git")
+	}
+}
+
+func TestCleanupEscWhilePreparingOpensNoReviewAndReleasesSlot(t *testing.T) {
+	repo, merged, _ := tuiCleanupRepo(t)
+	m := cleanupModel(t, repo)
+	cmd := m.key(key("c"))
+	if !m.preparing || cmd == nil {
+		t.Fatalf("preparation did not start: %q", m.message)
+	}
+	m.key(key("esc")) // cancels the context before the plan result arrives
+	drain(m, cmd)
+	if m.cleanup != nil || m.preparing || m.message != "Cleanup preparation cancelled" {
+		t.Fatalf("cancelled preparation: review=%v preparing=%v message=%q", m.cleanup, m.preparing, m.message)
+	}
+	if m.actionCancel != nil {
+		t.Fatal("cancel function not released")
+	}
+	if _, err := os.Stat(merged); err != nil {
+		t.Fatal("cancelled preparation removed a worktree")
+	}
+	drain(m, m.key(key("c")))
+	if m.cleanup == nil {
+		t.Fatalf("active slot not released; cannot plan again: %q", m.message)
+	}
+}
+
+func TestCleanupErrorAndEmptyPlanReleaseCancel(t *testing.T) {
+	for name, msg := range map[string]cleanupMsg{
+		"error": {generation: 1, err: context.DeadlineExceeded},
+		"empty": {generation: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := New(context.Background(), nil, true)
+			m.EnableActions(app.NewActions(newActionFake(false), 1))
+			m.EnableCleanup(true)
+			ctx, cancel := context.WithCancel(context.Background())
+			m.actionGeneration, m.actionCancel, m.actionCtx, m.preparing = 1, cancel, ctx, true
+			m.cleanupMessage(msg)
+			if m.cleanup != nil || m.actionCancel != nil || ctx.Err() == nil {
+				t.Fatalf("cancel leaked: review=%v cancel=%v ctxErr=%v", m.cleanup, m.actionCancel != nil, ctx.Err())
+			}
+		})
+	}
+}
+
+func TestCleanupUntickedItemIsNotRun(t *testing.T) {
+	repo, merged, _ := tuiCleanupRepo(t)
+	second := filepath.Join(t.TempDir(), "merged2")
+	tuiGit(t, repo, "worktree", "add", "-b", "merged2", second)
+	m := cleanupModel(t, repo)
+	drain(m, m.key(key("c")))
+	if m.cleanup == nil {
+		t.Fatalf("no review: %q", m.message)
+	}
+	eligible := m.eligibleCleanup()
+	if len(eligible) != 2 {
+		t.Fatalf("want two eligible items, got %+v", eligible)
+	}
+	keep, remove := eligible[0].Path, eligible[1].Path
+	m.key(key(" ")) // untick the first eligible item under the cursor
+	drain(m, m.key(key("enter")))
+	if _, err := os.Stat(keep); err != nil {
+		t.Fatalf("unticked worktree %s was touched: %v", keep, err)
+	}
+	if _, err := os.Stat(remove); !os.IsNotExist(err) {
+		t.Fatalf("ticked worktree %s still exists", remove)
+	}
+	if !strings.Contains(m.message, "1 succeeded") {
+		t.Fatalf("summary: %q", m.message)
+	}
+	_ = merged
+}
+
+func TestCleanupKeptListShowsFailedFirstAndNoFalsePointer(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.EnableCleanup(true)
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
+	items := []app.CleanupItem{}
+	for i := 0; i < 6; i++ {
+		items = append(items, app.CleanupItem{ID: fmt.Sprint("k", i), Group: "/repos/a", Kind: app.RemoveWorktree, Path: fmt.Sprint("/w/k", i), Reason: "dirty (1 files)"})
+	}
+	items = append(items, app.CleanupItem{ID: "fail", Group: "/repos/a", Kind: app.CleanupGroup, Path: "/repos/a", Reason: "preflight fetch failed: no route", Failed: true})
+	m.cleanup = &app.CleanupPreview{ID: 1, Items: items}
+	m.cleanupTicked = map[string]bool{}
+	view := m.View().Content
+	if !strings.Contains(view, "preflight fetch failed: no route") {
+		t.Fatalf("failed item hidden:\n%s", view)
+	}
+	if !strings.Contains(view, "+3 more kept") || strings.Contains(view, "d details") {
+		t.Fatalf("overflow text wrong:\n%s", view)
+	}
+}
+
+func TestCleanupLateResultAfterCancelDoesNotOpenReview(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.EnableCleanup(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	m.actionGeneration, m.actionCancel, m.actionCtx, m.preparing = 1, cancel, ctx, true
+	cancel() // Esc arrived after the plan's last context check
+	items := []app.CleanupItem{{ID: "a", Group: "/r", Kind: app.PruneStale, Path: "/r", Eligible: true}}
+	m.cleanupMessage(cleanupMsg{generation: 1, preview: app.CleanupPreview{ID: 1, Items: items}})
+	if m.cleanup != nil || m.message != "Cleanup preparation cancelled" || m.actionCancel != nil {
+		t.Fatalf("review opened after cancel: %v %q", m.cleanup, m.message)
 	}
 }

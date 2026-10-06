@@ -58,7 +58,7 @@ func captureCleanup(main string) *app.CleanupPreview {
 		return app.CleanupItem{ID: id, Group: main, Kind: app.RemoveWorktree, Path: "/home/mark/worktrees/" + name, Branch: branch, BaseName: base, Eligible: eligible, Reason: reason}
 	}
 	return &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{
-		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Eligible: true, Reason: "directory is gone"},
+		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Eligible: true, Reason: "1 stale worktree record(s)"},
 		remove("fix-tokens", "fix-tokens", "fix/tokens", true, "merged into "+base),
 		remove("add-icons", "add-icons", "feat/icons", true, "merged into "+base),
 		remove("wip-dark", "wip-dark", "wip/dark-mode", false, "dirty (3 files)"),

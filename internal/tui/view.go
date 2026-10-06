@@ -673,7 +673,7 @@ func (m *Model) footer() string {
 	}
 	hints = append(hints, hint{"Space", "Select", 4})
 	if m.cleanupSupported && m.actions != nil {
-		hints = append(hints, hint{"c", "Clean up", 4})
+		hints = append(hints, hint{"c", "Clean up", 5})
 	}
 	hints = append(hints, hint{"o", "Shell", 4}, hint{"/", "Search", 3}, hint{"r", "Refresh", 4}, hint{":", "Command", 0}, hint{"?", "Help", 3})
 	return m.hintBar("", hints, w)

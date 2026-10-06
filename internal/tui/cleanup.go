@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -104,16 +105,29 @@ func (m *Model) cleanupMessage(msg cleanupMsg) tea.Cmd {
 		return nil
 	}
 	m.preparing = false
+	// Every path that does not open a review releases the cancel function.
+	release := func() {
+		if m.actionCancel != nil {
+			m.actionCancel()
+			m.actionCancel = nil
+		}
+	}
+	cancelled := m.actionCtx != nil && m.actionCtx.Err() != nil
+	if cancelled && (msg.err == nil || errors.Is(msg.err, context.Canceled)) {
+		m.actions.Discard(msg.preview.ID)
+		m.message = "Cleanup preparation cancelled"
+		release()
+		return m.resumeInterruptedRefresh()
+	}
 	if msg.err != nil {
 		m.message = gitcli.SafeText(msg.err.Error())
-		if m.actionCtx != nil && m.actionCtx.Err() != nil {
-			m.message = "Cleanup preparation cancelled"
-		}
+		release()
 		return m.resumeInterruptedRefresh()
 	}
 	if len(msg.preview.Items) == 0 {
 		m.actions.Discard(msg.preview.ID)
 		m.message = "Nothing to clean up"
+		release()
 		return m.resumeInterruptedRefresh()
 	}
 	m.cleanup = &msg.preview
@@ -259,20 +273,35 @@ func (m *Model) cleanupView() tea.View {
 		}
 		lines = append(lines, m.between(pointer+box+" "+m.cleanupLabel(item), m.style(gitcli.SafeText(item.Reason), muted, false), inner))
 	}
-	kept := 0
+	// Failed checks come first and always show; ordinary kept items fill the
+	// remaining budget of four lines.
+	var kept []app.CleanupItem
+	failed := 0
 	for _, item := range m.cleanup.Items {
-		if item.Eligible {
-			continue
+		if !item.Eligible && item.Failed {
+			kept = append(kept, item)
+			failed++
 		}
-		if kept == 4 {
-			lines = append(lines, m.style("  … more kept · d details after closing", muted, false))
-			break
+	}
+	for _, item := range m.cleanup.Items {
+		if !item.Eligible && !item.Failed {
+			kept = append(kept, item)
 		}
-		if kept == 0 {
+	}
+	shown := max(4, failed)
+	for i, item := range kept {
+		if i == 0 {
 			lines = append(lines, "", m.style("kept", amber, true))
 		}
-		kept++
-		lines = append(lines, m.style("  "+m.cleanupLabel(item)+": "+gitcli.SafeText(item.Reason), amber, false))
+		if i == shown {
+			lines = append(lines, m.style(fmt.Sprintf("  +%d more kept", len(kept)-shown), muted, false))
+			break
+		}
+		color := amber
+		if item.Failed {
+			color = danger
+		}
+		lines = append(lines, m.style("  "+m.cleanupLabel(item)+": "+gitcli.SafeText(item.Reason), color, false))
 	}
 	footer := "Space toggle · ↑↓ move · " + m.symbols().enter + " clean up · Esc cancel"
 	if len(eligible) == 0 {

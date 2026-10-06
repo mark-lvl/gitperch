@@ -186,9 +186,11 @@ files another program writes in the instant between that check and
 after the fresh fetch. There is no squash or rebase-merge detection: a branch
 merged that way shows as not merged and is kept. A repository without a remote
 uses local `main`, else `master`, labelled "local default". When the remote's
-default branch is unknown, nothing in the repository is eligible; run
+default branch is unknown, no worktree in the repository is eligible for
+removal (stale records can still be pruned); run
 `git remote set-head <remote> -a` yourself, because gitperch never sets it. A
-failed fetch also makes the repository ineligible and is shown with its error.
+failed fetch likewise makes no worktree eligible for removal, and the error is
+shown among the kept items; stale records can still be pruned.
 
 ## Fetch
 
