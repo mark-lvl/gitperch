@@ -352,8 +352,10 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	for _, warning := range snapshot.Warnings {
 		m.warnings = append(m.warnings, gitcli.SafeText(warning.Path+": "+warning.Message))
 	}
+	// Selection stays visible: a row in a collapsed group is dropped.
 	m.selected = make(map[string]bool)
-	for _, row := range m.rows {
+	for _, index := range m.visibleRows() {
+		row := m.rows[index]
 		if oldSelection[row.Path] && m.matchesView(row) && row.Selectable() {
 			m.selected[row.Path] = true
 		}
@@ -631,6 +633,12 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				}
 			} else {
 				delete(m.expanded, parent)
+				// Collapsing hides the children, so they leave the selection.
+				for _, other := range m.rows {
+					if other.Path != parent && groupKey(other) == parent {
+						delete(m.selected, other.Path)
+					}
+				}
 			}
 			m.keepHighlightVisible()
 		}

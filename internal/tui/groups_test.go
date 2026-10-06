@@ -148,3 +148,48 @@ func TestPromotedChildWhenParentRowIsAbsent(t *testing.T) {
 		t.Fatal("promoted child stands as the group's first row")
 	}
 }
+
+const fixAuthPath = "/home/mark/projects/api/.claude/worktrees/fix-auth"
+
+func selectFixAuth(t *testing.T, m *Model) {
+	t.Helper()
+	m.key(key("right"))
+	for i, index := range m.visibleRows() {
+		if m.rows[index].Name == "fix-auth" {
+			m.highlight = i
+		}
+	}
+	m.key(key(" "))
+	if !m.selected[fixAuthPath] {
+		t.Fatalf("child not selected: %v", m.selected)
+	}
+}
+
+func TestCollapseDropsHiddenChildSelection(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: groupedRows()})
+	selectFixAuth(t, m)
+	m.key(key("left")) // to the parent
+	m.key(key("left")) // collapse
+	if len(m.selected) != 0 || len(m.selectedPaths()) != 0 {
+		t.Fatalf("hidden child still selected: %v", m.selected)
+	}
+}
+
+func TestRefreshDropsSelectionHiddenByCollapse(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: groupedRows()})
+	selectFixAuth(t, m)
+	delete(m.expanded, "/home/mark/projects/api") // collapse without going through the key
+	m.applySnapshot(app.Snapshot{Rows: groupedRows()})
+	if len(m.selected) != 0 {
+		t.Fatalf("refresh kept a hidden selection: %v", m.selected)
+	}
+	// A still-visible selection survives a refresh.
+	m.highlight = 0
+	selectFixAuth(t, m)
+	m.applySnapshot(app.Snapshot{Rows: groupedRows()})
+	if !m.selected[fixAuthPath] {
+		t.Fatalf("visible selection lost: %v", m.selected)
+	}
+}
