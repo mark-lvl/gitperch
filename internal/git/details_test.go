@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,5 +62,42 @@ func TestDetailsUnbornAndRename(t *testing.T) {
 	data, err = (Runner{}).Details(context.Background(), d)
 	if err != nil || len(data.Files) != 1 || data.Files[0].Path != "after" {
 		t.Fatalf("rename: %+v %v", data, err)
+	}
+}
+
+func TestAddLineStatsMatchesNumstatPasses(t *testing.T) {
+	files := []ChangedFile{{Code: "MM", Path: "tracked"}, {Code: "R ", Path: "after"}, {Code: " M", Path: "image.png"}, {Code: "??", Path: "new"}}
+	unstaged := "2\t1\ttracked\x00-\t-\timage.png\x00"
+	staged := "3\t0\ttracked\x00" + "1\t1\t\x00before\x00after\x00"
+	if err := addLineStats(files, unstaged, staged); err != nil {
+		t.Fatal(err)
+	}
+	want := []ChangedFile{{Code: "MM", Path: "tracked", Added: 5, Deleted: 1}, {Code: "R ", Path: "after", Added: 1, Deleted: 1}, {Code: " M", Path: "image.png", Binary: true}, {Code: "??", Path: "new"}}
+	for i := range want {
+		if files[i] != want[i] {
+			t.Fatalf("file %d = %+v, want %+v", i, files[i], want[i])
+		}
+	}
+	if err := addLineStats(files, "x\t1\ttracked\x00"); err == nil {
+		t.Fatal("invalid line statistics accepted")
+	}
+}
+
+// Agents can leave tens of thousands of changed files; matching statistics
+// to them must not grow with the square of the count.
+func BenchmarkAddLineStats(b *testing.B) {
+	const n = 20000
+	files := make([]ChangedFile, n)
+	var numstat strings.Builder
+	for i := range files {
+		files[i] = ChangedFile{Code: " M", Path: fmt.Sprintf("dir/file%05d.txt", i)}
+		fmt.Fprintf(&numstat, "1\t0\tdir/file%05d.txt\x00", i)
+	}
+	out := numstat.String()
+	b.ResetTimer()
+	for range b.N {
+		if err := addLineStats(files, out); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

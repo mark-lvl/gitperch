@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Repository details load much faster for large change sets: matching line
+  statistics to 20,000 changed files dropped from about 650 ms to 2 ms.
+
 ### Fixed
 
 - The search filter and command palette accept capital letters and other
