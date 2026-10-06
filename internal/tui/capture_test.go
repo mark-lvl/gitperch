@@ -50,6 +50,22 @@ func writeANSICapture(t *testing.T, name, content string) {
 	}
 }
 
+// captureCleanup is a fixed review: one prune, two eligible removals and two
+// kept worktrees. It never touches Git.
+func captureCleanup(main string) *app.CleanupPreview {
+	base := "origin/main"
+	remove := func(id, name, branch string, eligible bool, reason string) app.CleanupItem {
+		return app.CleanupItem{ID: id, Group: main, Kind: app.RemoveWorktree, Path: "/home/mark/worktrees/" + name, Branch: branch, BaseName: base, Eligible: eligible, Reason: reason}
+	}
+	return &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{
+		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Eligible: true, Reason: "directory is gone"},
+		remove("fix-tokens", "fix-tokens", "fix/tokens", true, "merged into "+base),
+		remove("add-icons", "add-icons", "feat/icons", true, "merged into "+base),
+		remove("wip-dark", "wip-dark", "wip/dark-mode", false, "dirty (3 files)"),
+		remove("agent-run", "agent-run", "agent/run-42", false, "locked: agent session"),
+	}}
+}
+
 // Captures use deterministic test fixtures only; production always loads Git.
 func TestWorkspaceRenderCaptures(t *testing.T) {
 	for _, size := range [][2]int{{160, 45}, {110, 35}, {78, 28}, {60, 20}} {
@@ -60,6 +76,7 @@ func TestWorkspaceRenderCaptures(t *testing.T) {
 			m.clock = func() time.Time { return captureNow }
 			m.applySnapshot(app.Snapshot{Rows: captureRows()})
 			m.EnableActions(app.NewActions(newActionFake(false), 1))
+			m.EnableCleanup(true)
 			m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
 			m.highlight = 1
 			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Commits: captureCommits(), Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: " M", Path: "src/components/button.go", Added: 4}, {Code: "??", Path: "tests/theme_test.go"}}}}
@@ -127,7 +144,7 @@ func TestScanningRenderCapture(t *testing.T) {
 }
 
 func TestOverlayRenderCaptures(t *testing.T) {
-	for _, mode := range []string{"palette", "details", "worktrees"} {
+	for _, mode := range []string{"palette", "details", "worktrees", "cleanup"} {
 		t.Run(mode, func(t *testing.T) {
 			m := New(nil, nil, true)
 			m.Configure("~/dev/platform", "unicode", false)
@@ -137,6 +154,7 @@ func TestOverlayRenderCaptures(t *testing.T) {
 			m.width, m.height = 110, 35
 			m.lazyGitAvailable = false
 			m.EnableActions(app.NewActions(newActionFake(false), 1))
+			m.EnableCleanup(true)
 			m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
 			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: "??", Path: "tests/theme_test.go"}}, Commits: captureCommits()}}
 			switch mode {
@@ -145,6 +163,13 @@ func TestOverlayRenderCaptures(t *testing.T) {
 				m.paletteQuery = "push"
 			case "worktrees":
 				m.expanded["/home/mark/projects/design-system"] = true
+			case "cleanup":
+				m.cleanup = captureCleanup(m.highlightedRow().Path)
+				m.cleanupTicked = map[string]bool{}
+				for _, item := range m.cleanup.Items {
+					m.cleanupTicked[item.ID] = item.Eligible
+				}
+				m.cleanupCursor = 1
 			default:
 				m.details = true
 			}

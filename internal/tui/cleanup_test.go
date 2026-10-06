@@ -1,0 +1,245 @@
+package tui
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/mark-lvl/gitperch/internal/app"
+	"github.com/mark-lvl/gitperch/internal/discovery"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
+)
+
+func tuiGit(t *testing.T, path string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", path}, args...)...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v: %s", args, err, output)
+	}
+}
+
+func tuiWrite(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// tuiCleanupRepo builds a repository under its own parent with a local bare
+// remote, origin/HEAD set, a merged clean worktree and an unmerged one. The
+// worktrees live outside the repository's parent so discovery sees one row.
+func tuiCleanupRepo(t *testing.T) (repo, merged, ahead string) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "no-global-config"))
+	parent := t.TempDir()
+	repo = filepath.Join(parent, "repo")
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tuiGit(t, repo, "init", "-b", "main")
+	tuiGit(t, repo, "config", "user.name", "Cleanup Test")
+	tuiGit(t, repo, "config", "user.email", "cleanup-test@example.invalid")
+	tuiGit(t, repo, "config", "commit.gpgsign", "false")
+	tuiGit(t, filepath.Dir(remote), "init", "--bare", "-b", "main", remote)
+	tuiWrite(t, filepath.Join(repo, "tracked"), "initial\n")
+	tuiGit(t, repo, "add", "--all")
+	tuiGit(t, repo, "commit", "-m", "initial")
+	tuiGit(t, repo, "remote", "add", "origin", remote)
+	tuiGit(t, repo, "push", "--set-upstream", "origin", "main")
+	// Git 2.48+ would recreate origin/HEAD on fetch; older Git ignores this key.
+	tuiGit(t, repo, "config", "remote.origin.followRemoteHEAD", "never")
+	tuiGit(t, repo, "remote", "set-head", "origin", "main")
+	base := t.TempDir()
+	merged, ahead = filepath.Join(base, "merged"), filepath.Join(base, "ahead")
+	tuiGit(t, repo, "worktree", "add", "-b", "merged", merged)
+	tuiGit(t, repo, "worktree", "add", "-b", "ahead", ahead)
+	tuiWrite(t, filepath.Join(ahead, "new"), "work\n")
+	tuiGit(t, ahead, "add", "--all")
+	tuiGit(t, ahead, "commit", "-m", "unmerged work")
+	return repo, merged, ahead
+}
+
+// drain runs cmd and feeds every resulting message back into the model until
+// none remain.
+func drain(m *Model, cmd tea.Cmd) {
+	queue := []tea.Cmd{cmd}
+	for n := 0; len(queue) > 0 && n < 1000; n++ {
+		next := queue[0]
+		queue = queue[1:]
+		if next == nil {
+			continue
+		}
+		switch msg := next().(type) {
+		case nil:
+		case tea.BatchMsg:
+			queue = append(queue, msg...)
+		default:
+			_, follow := m.Update(msg)
+			queue = append(queue, follow)
+		}
+	}
+}
+
+func highlightPath(t *testing.T, m *Model, path string) {
+	t.Helper()
+	for i, index := range m.visibleRows() {
+		if m.rows[index].Path == path {
+			m.highlight = i
+			return
+		}
+	}
+	t.Fatalf("%s is not visible", path)
+}
+
+// cleanupModel loads a real temporary workspace and highlights repo.
+func cleanupModel(t *testing.T, repo string) *Model {
+	t.Helper()
+	m := New(context.Background(), func(ctx context.Context) (app.Snapshot, error) {
+		return app.Load(ctx, discovery.Options{Roots: []string{filepath.Dir(repo)}, MaxDepth: 2}, gitcli.Runner{}, 2)
+	}, true)
+	m.EnableActions(app.NewActions(gitcli.Service{}, 2))
+	m.EnableCleanup(true)
+	m.spinning, m.ticking = true, true // keep drained commands free of timers
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
+	drain(m, m.Init())
+	highlightPath(t, m, repo)
+	return m
+}
+
+func TestCleanupReviewTogglesAndRuns(t *testing.T) {
+	repo, merged, ahead := tuiCleanupRepo(t)
+	m := cleanupModel(t, repo)
+	drain(m, m.key(key("c")))
+	if m.cleanup == nil {
+		t.Fatalf("no review opened: %q", m.message)
+	}
+	view := m.View().Content
+	for _, want := range []string{"Clean up", "[x]", filepath.Base(merged), "merged into origin/main", "kept", filepath.Base(ahead), "not merged"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+	m.key(key(" ")) // untick the only eligible item
+	if strings.Contains(m.View().Content, "[x]") {
+		t.Fatal("toggle did not untick")
+	}
+	m.key(key("enter"))
+	if m.cleanup == nil || !strings.Contains(m.message, "Nothing ticked") {
+		t.Fatalf("empty run should be refused: %q", m.message)
+	}
+	m.key(key(" "))
+	drain(m, m.key(key("enter")))
+	if _, err := os.Stat(merged); !os.IsNotExist(err) {
+		t.Fatal("merged worktree not removed")
+	}
+	if !strings.Contains(m.message, "Clean up finished · 1 succeeded") {
+		t.Fatalf("summary: %q", m.message)
+	}
+}
+
+func TestCleanupEscDiscards(t *testing.T) {
+	repo, merged, _ := tuiCleanupRepo(t)
+	m := cleanupModel(t, repo)
+	drain(m, m.key(key("c")))
+	m.key(key("esc"))
+	if m.cleanup != nil || m.message != "Cancelled" {
+		t.Fatalf("esc: %v %q", m.cleanup, m.message)
+	}
+	if _, err := os.Stat(merged); err != nil {
+		t.Fatal("cancelled cleanup removed a worktree")
+	}
+}
+
+func TestCleanupHiddenOnOldGit(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.EnableCleanup(false)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	for _, c := range m.commands() {
+		if c.id == "cleanup" {
+			t.Fatal("cleanup offered on old Git")
+		}
+	}
+	if cmd := m.key(key("c")); cmd != nil || !strings.Contains(m.message, "Git 2.36") {
+		t.Fatalf("c on old Git: %q", m.message)
+	}
+}
+
+func TestCleanupTargetsWholeGroupFromChild(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: groupedRows()})
+	m.key(key("right"))
+	m.highlight = 1
+	if got := m.cleanupPaths(); len(got) != 1 || got[0] != "/home/mark/projects/api" {
+		t.Fatalf("paths: %v", got)
+	}
+}
+
+func TestCleanupResultsSurviveRemovedRows(t *testing.T) {
+	repo, merged, _ := tuiCleanupRepo(t)
+	m := cleanupModel(t, repo)
+	drain(m, m.key(key("c")))
+	drain(m, m.key(key("enter")))
+	if _, err := os.Stat(merged); !os.IsNotExist(err) {
+		t.Fatal("merged worktree not removed")
+	}
+	found := false
+	for _, line := range m.detailsContent() {
+		found = found || strings.Contains(line, merged)
+	}
+	if !found {
+		t.Fatalf("removed worktree missing from batch results: %v", m.detailsContent())
+	}
+}
+
+func TestCleanupPreflightFailureMarksActionFailed(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.EnableCleanup(true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.actionGeneration = 1
+	m.cleanupMessage(cleanupMsg{generation: 1, preview: app.CleanupPreview{ID: 1, Items: []app.CleanupItem{
+		{ID: "x", Group: "/repos/a", Kind: app.CleanupGroup, Path: "/repos/a", Reason: "fetch failed", Failed: true},
+	}}})
+	if m.cleanup == nil || !m.actionFailed {
+		t.Fatalf("failed preflight not flagged: %v %v", m.cleanup, m.actionFailed)
+	}
+	view := m.View().Content
+	for _, want := range []string{"kept", "fetch failed", "Nothing can be cleaned up safely"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestCleanupOfferedInPaletteHintsAndHelp(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.EnableCleanup(true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	found := false
+	for _, c := range m.commands() {
+		found = found || c.id == "cleanup"
+	}
+	if !found {
+		t.Fatal("cleanup missing from palette")
+	}
+	if !strings.Contains(m.View().Content, "Clean up") {
+		t.Fatal("hint bar lacks Clean up")
+	}
+	if !strings.Contains(strings.Join(m.helpContent(), "\n"), "Clean up merged worktrees") {
+		t.Fatal("help lacks c")
+	}
+	m.EnableCleanup(false)
+	if strings.Contains(strings.Join(m.helpContent(), "\n"), "Clean up") {
+		t.Fatal("help mentions Clean up on old Git")
+	}
+}

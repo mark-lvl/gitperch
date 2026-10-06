@@ -95,6 +95,7 @@ expanded group.
 | a | Select/deselect all visible repositories (existing binding) |
 | p / l | Push / fast-forward pull selection or highlighted repository; one confirmation popup |
 | f | Fetch explicitly selected repositories (no confirmation) |
+| c | Clean up: review stale worktree records and merged clean worktrees (Git 2.36+); Space toggles, Enter runs, Esc cancels |
 | o | Open an interactive shell in the selected worktree |
 | g | Open LazyGit; palette lists it only when installed |
 | r | Refresh workspace and invalidate cached details |
@@ -151,6 +152,7 @@ rasterizer draws block elements and braille as shapes rather than font glyphs:
 - [Command palette](captures/palette-110x35.png)
 - [Repository overview](captures/details-110x35.png)
 - [Worktree group expanded](captures/worktrees-110x35.png) · [text](captures/worktrees-110x35.txt)
+- [Clean up review](captures/cleanup-110x35.png) · [text](captures/cleanup-110x35.txt)
 - [First scan, 80×24](captures/scanning-80x24.png) · [text](captures/scanning-80x24.txt)
 
 Run `go test ./...`, `go vet ./...`, `go test -race ./...`, and

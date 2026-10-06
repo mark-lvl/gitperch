@@ -33,6 +33,8 @@ func (m *Model) EnableActions(actions *app.Actions) { m.actions = actions }
 
 func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 	switch msg := msg.(type) {
+	case cleanupMsg:
+		return true, m.cleanupMessage(msg)
 	case previewMsg:
 		if msg.generation != m.actionGeneration {
 			if m.actions != nil {
@@ -70,7 +72,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 		if msg.generation != m.actionGeneration || !m.running {
 			return true, nil
 		}
-		m.results[msg.event.Path] = msg.event
+		m.results[resultKey(msg.event)] = msg.event
 		return true, m.nextEvent()
 	case batchDoneMsg:
 		if msg.generation != m.actionGeneration {
@@ -79,7 +81,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 		m.running = false
 		m.events = nil
 		for _, result := range msg.results {
-			m.results[result.Path] = result
+			m.results[resultKey(result)] = result
 			if result.State == app.Failed || result.State == app.OutcomeUnknown || result.State == app.Cancelled {
 				m.actionFailed = true
 			}

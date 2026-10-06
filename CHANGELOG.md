@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   worktrees nested inside a repository, outside the scanned roots, or whose
   directory no longer exists. `→`/`←` expand and collapse a group, and the
   details Worktree section lists the group.
+- Clean up (`c`) reviews and removes stale worktree records and clean linked
+  worktrees already merged into the remote default branch. Dirty, locked,
+  unmerged worktrees and worktrees with ignored files are kept with the reason
+  shown; nothing is forced.
 - `gitperch status --json` reports a `worktree` object per repository (schema
   version 1, additive).
 

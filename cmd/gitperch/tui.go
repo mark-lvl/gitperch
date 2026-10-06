@@ -36,6 +36,7 @@ func runTUI(ctx context.Context, cfg config.Config, ws config.Workspace, noColor
 	}
 	model := tui.New(ctx, load, noColor)
 	model.EnableActions(actions)
+	model.EnableCleanup(actions.CleanupSupported(ctx))
 	model.EnableDetails(read.Details)
 	model.EnablePatch(read.Patch)
 	model.Configure(strings.Join(ws.Paths, ", "), cfg.UI.Icons, cfg.UI.DefaultFocus)

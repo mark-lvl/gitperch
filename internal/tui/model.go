@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,6 +70,10 @@ type Model struct {
 	preparing        bool
 	running          bool
 	preview          *app.Preview
+	cleanup          *app.CleanupPreview
+	cleanupTicked    map[string]bool
+	cleanupCursor    int
+	cleanupSupported bool
 	syncIntent       app.Action
 	runningAction    app.Action
 	actionCancel     context.CancelFunc
@@ -147,7 +152,7 @@ func (m *Model) scheduleAutoRefresh() tea.Cmd {
 // autoRefreshPaused avoids reloading under the user while work runs or while a
 // view that would lose its loaded content (details, diff, confirmation) is open.
 func (m *Model) autoRefreshPaused() bool {
-	return m.busy() || m.preview != nil || m.details || m.palette
+	return m.busy() || m.preview != nil || m.cleanup != nil || m.details || m.palette
 }
 
 // New creates a TUI model. load must honor its context; refreshing cancels an
@@ -391,6 +396,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.preview != nil {
 		return m.previewKey(key)
 	}
+	if m.cleanup != nil {
+		return m.cleanupKey(key)
+	}
 	if key == "ctrl+c" {
 		m.closeReads()
 		m.interrupted = true
@@ -454,6 +462,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return m.executeCommand("pull")
 		case "f":
 			return m.executeCommand("fetch")
+		case "c":
+			return m.prepareCleanup()
 		case "o":
 			return m.launchShell()
 		case "g":
@@ -674,6 +684,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				m.selected[m.rows[index].Path] = true
 			}
 		}
+	case "c":
+		return m.prepareCleanup()
 	case "f", "p", "l":
 		if len(m.selected) == 0 && m.actions != nil && (key == "p" || key == "l") {
 			id := "push"
@@ -840,10 +852,15 @@ func (m *Model) detailsContent() []string {
 	}
 	if len(m.results) > 0 {
 		content = append(content, "", m.style(" BATCH RESULTS", accent, true))
-		for _, row := range m.rows {
-			if result, ok := m.results[row.Path]; ok {
-				content = append(content, gitcli.SafeText(result.Path)+": "+string(result.State)+" · "+gitcli.SafeText(result.Message))
-			}
+		// Sorted by key so removed worktrees, which are no longer rows, still show.
+		keys := make([]string, 0, len(m.results))
+		for k := range m.results {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			result := m.results[k]
+			content = append(content, gitcli.SafeText(result.Path)+": "+string(result.State)+" · "+gitcli.SafeText(result.Message))
 		}
 	}
 	if len(m.warnings) > 0 {

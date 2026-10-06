@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -126,6 +127,9 @@ func (m *Model) layout() dashboardLayout {
 func (m *Model) View() tea.View {
 	if m.preview != nil {
 		return m.previewView()
+	}
+	if m.cleanup != nil {
+		return m.cleanupView()
 	}
 	if m.palette {
 		return m.paletteView()
@@ -648,7 +652,12 @@ func (m *Model) footer() string {
 		return m.hintBar("", []hint{{"↑↓", "Choose", 1}, {enter, "Open", 0}, {"Esc", "Clear", 0}}, w)
 	}
 	if len(m.selected) > 0 && m.actions != nil {
-		return m.hintBar(fmt.Sprintf("%d selected  ", len(m.selected)), []hint{{"f", "Fetch", 1}, {"p", "Push", 0}, {"l", "Pull", 0}, {"Space", "Toggle", 2}, {":", "Command", 0}}, w)
+		selected := []hint{{"f", "Fetch", 1}, {"p", "Push", 0}, {"l", "Pull", 0}}
+		if m.cleanupSupported {
+			selected = append(selected, hint{"c", "Clean up", 3})
+		}
+		selected = append(selected, hint{"Space", "Toggle", 2}, hint{":", "Command", 0})
+		return m.hintBar(fmt.Sprintf("%d selected  ", len(m.selected)), selected, w)
 	}
 	hints := []hint{{"↑↓", "Move", 2}, {enter, "Open", 0}, {"d", "Diff", 1}}
 	if row := m.highlightedRow(); row != nil && m.actions != nil {
@@ -662,7 +671,11 @@ func (m *Model) footer() string {
 			}
 		}
 	}
-	hints = append(hints, hint{"Space", "Select", 4}, hint{"o", "Shell", 4}, hint{"/", "Search", 3}, hint{"r", "Refresh", 4}, hint{":", "Command", 0}, hint{"?", "Help", 3})
+	hints = append(hints, hint{"Space", "Select", 4})
+	if m.cleanupSupported && m.actions != nil {
+		hints = append(hints, hint{"c", "Clean up", 4})
+	}
+	hints = append(hints, hint{"o", "Shell", 4}, hint{"/", "Search", 3}, hint{"r", "Refresh", 4}, hint{":", "Command", 0}, hint{"?", "Help", 3})
 	return m.hintBar("", hints, w)
 }
 
@@ -680,6 +693,15 @@ func (m *Model) helpContent() []string {
 		" Search/view changes clear selection. Push/pull use the highlighted row when none are selected.",
 		"", " GLOBAL COMMANDS", " : / Ctrl+K    Fuzzy command palette · arrows choose · Enter runs", " ?             Help · q quit · Ctrl+C interrupt", "", " AGENT ACTIONS", " No agent integration is configured in this application.", "", " Sync counts use locally known refs. Fetch checks the remote.", " ↑ ahead · ↓ behind · unknown never means up to date.",
 		" Esc cancels the confirmation popup; during a batch it requests cancellation.", " Esc clears search, then dismisses results. q quits; Ctrl+C interrupts.",
+	}
+	if m.cleanupSupported {
+		// Documented only where Clean up is offered.
+		for i, line := range lines {
+			if strings.HasPrefix(line, " p / l ") {
+				lines = slices.Insert(lines, i+1, " c             Clean up merged worktrees and branches (review first)")
+				break
+			}
+		}
 	}
 	return lines
 }

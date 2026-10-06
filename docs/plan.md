@@ -45,6 +45,12 @@ Success means I can open repodash over my projects directory, see which projects
 
 Staging, commits, diffs, conflict resolution, rebasing, force push, deletion, automatic stashing, branch creation, initial upstream setup, cloning, GitHub/GitLab APIs, PR management, credential management, AI integration, embedded terminals, databases, daemons, and automatic background synchronization.
 
+> Update 2026-10-06: removing clean, merged linked worktrees and pruning stale
+> worktree records (and, in a later phase, deleting merged branches) are now in
+> scope under
+> [the worktree and branch cleanup design](superpowers/specs/2026-10-06-worktree-and-branch-cleanup-design.md).
+> Everything else excluded here, including force removal, stays excluded.
+
 Bare repositories are not dashboard targets. Submodules contribute to their parent status but are not recursively managed. A nested repository can be included by explicitly configuring it as a root.
 
 ## 4. Technology and structure

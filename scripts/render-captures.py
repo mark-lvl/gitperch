@@ -82,7 +82,7 @@ def render(source, target, width, height):
 
 CAPTURES = ['workspace-160x45', 'workspace-110x35', 'workspace-78x28',
             'workspace-60x20', 'palette-110x35', 'details-110x35',
-            'worktrees-110x35', 'scanning-80x24']
+            'worktrees-110x35', 'cleanup-110x35', 'scanning-80x24']
 
 if __name__ == '__main__':
     if len(sys.argv) == 5:

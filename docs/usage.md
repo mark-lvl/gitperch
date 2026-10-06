@@ -98,7 +98,7 @@ Tab switches sections and arrows/PgUp/PgDn scroll. `:` or Ctrl+K opens the fuzzy
 action palette; arrows choose, Enter executes, and Esc closes it. `/` filters by
 name/path/branch with arrow navigation and Enter to open a result. `?` opens help.
 
-Space selects repositories; `a` toggles all visible rows. `p`/`l` push or
+Space selects repositories; `a` toggles all visible rows. `c` reviews worktree cleanup. `p`/`l` push or
 fast-forward pull the selected set, or the highlighted repository when no
 selection exists, after one confirmation popup. `f` fetches explicitly selected
 repositories straight away. Plans are still revalidated before anything runs.
@@ -133,8 +133,9 @@ section lists every worktree in the group with its branch, state and path.
 States: a worktree whose directory is missing is `stale` (Git calls it
 prunable) and is listed but cannot be selected or acted on; a `locked`
 worktree shows its lock reason when Git has one; a bare repository is shown as
-`bare` and is not selectable. These are read-only views: gitperch does not
-prune, remove or lock worktrees.
+`bare` and is not selectable. These are read-only views; the only changes
+gitperch makes to worktrees are the reviewed ones under
+[Cleaning up worktrees](#cleaning-up-worktrees). It never creates or locks them.
 
 The inventory needs Git 2.36 or newer. With older Git, or when the Git version
 cannot be read, the feature is silently off: no grouping, no stale worktrees, no
@@ -152,6 +153,42 @@ inventory is available (schema version still 1; the field is additive):
 | `prunable`, `prunable_reason` | Stale worktree and Git's reason, if any (omitted when empty) |
 | `main_path` | Path of the main worktree that owns this group |
 | `outside_roots` | Listed by Git but outside the scanned roots (omitted when false) |
+
+## Cleaning up worktrees
+
+Press `c` (or choose Clean up from the palette) to review leftover worktrees,
+typically after agents finish. It targets the selected repositories, or the
+highlighted one; a selected or highlighted linked worktree targets its whole
+group. Clean up is hidden below Git 2.36, where `c` explains the requirement.
+
+gitperch first fetches each repository's default remote, so "merged" is judged
+against fresh data, then opens a review. Eligible items start ticked: Space
+toggles the highlighted item, `a` toggles all, Enter runs the ticked items and
+Esc discards the review without changing anything. Items that are kept stay
+listed below with the reason. Only the ticked items you reviewed run, each
+revalidated right before it runs; if anything changed in the meantime
+(HEAD, status, lock state, ignored files, reachability) the item is skipped with
+a reason. Results appear in the status line and in details under Batch results.
+
+| Item | Removed when | Command |
+| --- | --- | --- |
+| Stale worktree records (one item per repository) | At least one record is stale (directory missing) and not locked | `git worktree prune` |
+| Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
+
+Reasons a worktree is kept include `dirty (3 files)`, `locked: agent session`,
+`4 ignored file(s) (.env, node_modules/, …)`, and `not merged into origin/main`.
+Nothing is forced: gitperch never passes `--force` and never removes the main
+worktree. gitperch checks for ignored files immediately before removal, but
+files another program writes in the instant between that check and
+`git worktree remove` cannot be protected.
+
+"Merged" means the worktree's HEAD is reachable from `refs/remotes/<remote>/HEAD`
+after the fresh fetch. There is no squash or rebase-merge detection: a branch
+merged that way shows as not merged and is kept. A repository without a remote
+uses local `main`, else `master`, labelled "local default". When the remote's
+default branch is unknown, nothing in the repository is eligible; run
+`git remote set-head <remote> -a` yourself, because gitperch never sets it. A
+failed fetch also makes the repository ineligible and is shown with its error.
 
 ## Fetch
 
@@ -237,6 +274,7 @@ normal user permissions; gitperch is not a sandbox for untrusted repositories.
 
 The dashboard does not stage, commit, stash, reset, clean, rebase, resolve
 conflicts, create branches, configure upstreams, or force push. It does not
+force-remove worktrees or delete unmerged work. It does not
 support triangular push workflows, multiple push URLs, arbitrary push
 refspecs, or headless bulk mutation. See [plan.md](plan.md) for the full v0.1
 scope and action policy.

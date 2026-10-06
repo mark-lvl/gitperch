@@ -3,25 +3,25 @@
 │ ────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │      REPO                                   STATUS                                   Δ                     │
 │    ▱ api-service                            ✓ clean                                  —                     │
-│ ▌  ▱ design-system                          ● changed ↑3                             +8 -2                 │
-│    ▱ ├─ fix-tokens                          ! no upstream                            —                     │
-│    ▱ └─ old-spike                           ◌ stale · directory missing              —                     │
+│ ▌  ▱ design-system ⑂2 · 1 stale             ● changed ↑3                             +8 -2                 │
 │    ▱ docs                                   ↓ 4 behind                               —                     │
 │    ▱ experiment                             ! no upstream                            —                     │
 │    ▱ mobile                                 × failed                                 —                     │
 │    ▱ worker                                 ! conflict ↑2 ↓1                         1 file                │
 │                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
-│                                                                                                            │
+│      ╭──────────────────────────────────────────────────────────────────────────────────────────────╮      │
+│      │ Clean up 3 items?                                                                            │      │
+│      │ design-system                                                                                │      │
+│      │   [x] prune 1 stale worktree record                                        directory is gone │      │
+│      │ ▌ [x] remove worktree fix-tokens  fix/tokens                         merged into origin/main │      │
+│      │   [x] remove worktree add-icons  feat/icons                          merged into origin/main │      │
+│      │                                                                                              │      │
+│      │ kept                                                                                         │      │
+│      │   remove worktree wip-dark  wip/dark-mode: dirty (3 files)                                   │      │
+│      │   remove worktree agent-run  agent/run-42: locked: agent session                             │      │
+│      │                                                                                              │      │
+│      │ Space toggle · ↑↓ move · ↵ clean up · Esc cancel                                             │      │
+│      ╰──────────────────────────────────────────────────────────────────────────────────────────────╯      │
 │                                                                                                            │
 │ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ ▱ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │

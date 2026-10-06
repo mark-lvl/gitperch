@@ -35,6 +35,9 @@ func (m *Model) commands() []command {
 			target = fmt.Sprintf("%d selected repositories", len(m.selected))
 		}
 		commands = append(commands, command{"fetch", "Fetch " + target})
+		if m.cleanupSupported {
+			commands = append(commands, command{"cleanup", "Clean up worktrees and branches · " + target})
+		}
 		s := row.Status
 		bulk := len(m.selected) > 0
 		syncable := s.Error == "" && s.Conflicts == 0 && s.Operation == "" && !s.Detached && !s.Unborn && s.Upstream != "" && s.ComparisonKnown
@@ -166,6 +169,8 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 			scope = 0
 		}
 		m.setScope(scope)
+	case "cleanup":
+		return m.prepareCleanup()
 	case "fetch", "push", "pull":
 		if m.actions == nil {
 			return nil
@@ -276,6 +281,8 @@ func (m *Model) commandHint(id string) string {
 		return "Fetch, then confirm outgoing commits"
 	case "pull":
 		return "Fetch, then confirm fast-forward"
+	case "cleanup":
+		return "Prune stale, remove merged clean worktrees and merged branches after review"
 	case "focus":
 		return "Switch between all repos and needs attention"
 	case "sort":
@@ -312,6 +319,9 @@ func (m *Model) setScope(scope int) {
 // commandIcon uses single-cell glyphs so labels align in every icon mode.
 func (m *Model) commandIcon(id string) (string, string) {
 	if m.iconMode == "ascii" {
+		if id == "cleanup" {
+			return "x", amber
+		}
 		return "*", accent
 	}
 	switch id {
@@ -329,6 +339,8 @@ func (m *Model) commandIcon(id string) (string, string) {
 		return m.symbols().ahead, accent
 	case "pull":
 		return m.symbols().behind, amber
+	case "cleanup":
+		return "⌫", amber
 	case "refresh":
 		return "↻", success
 	case "focus":
