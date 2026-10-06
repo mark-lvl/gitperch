@@ -78,6 +78,8 @@ type Model struct {
 	actionFailed     bool
 	clock            func() time.Time // header clock and relative ages; fixed in captures
 	ticking          bool
+	spinning         bool // a spinnerMsg is scheduled
+	spinnerFrame     int
 }
 
 type snapshotMsg struct {
@@ -91,7 +93,19 @@ type childExitedMsg struct{ err error }
 // clockMsg redraws the header clock and relative ages; it never reads Git.
 type clockMsg struct{}
 
+// spinnerMsg advances the busy spinner; it is scheduled only while busy.
+type spinnerMsg struct{}
+
+const spinnerInterval = 100 * time.Millisecond
+
 func (m *Model) now() time.Time { return m.clock() }
+
+func (m *Model) busy() bool { return m.loading || m.preparing || m.running }
+
+func (m *Model) spin() tea.Cmd {
+	m.spinning = true
+	return tea.Tick(spinnerInterval, func(time.Time) tea.Msg { return spinnerMsg{} })
+}
 
 // The tick starts with the first snapshot rather than in Init, so Init stays a
 // single cancellable load. Ticks align to the minute to keep the clock exact.
@@ -170,6 +184,11 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		if extra := m.ensurePatch(); extra != nil {
 			cmd = tea.Batch(cmd, extra)
 		}
+		// Every busy state starts through Update, so one check here keeps the
+		// spinner going without each start site scheduling it.
+		if m.busy() && !m.spinning && !m.closing {
+			cmd = tea.Batch(cmd, m.spin())
+		}
 	}()
 	if handled, cmd := m.actionMessage(msg); handled {
 		return m, cmd
@@ -232,6 +251,14 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 			return m, nil
 		}
 		return m, m.tick()
+	case spinnerMsg:
+		m.spinning = false
+		if !m.busy() || m.closing {
+			m.spinnerFrame = 0
+			return m, nil
+		}
+		m.spinnerFrame++
+		return m, m.spin()
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
 	}

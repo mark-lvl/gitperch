@@ -169,7 +169,7 @@ func (m *Model) summaryLineAt(w int) string {
 		activity = m.progressLabel()
 	}
 	if activity != "" && w >= 100 {
-		right = m.style(activity, working, false) + "  " + right
+		right = m.style(m.spinner()+" "+activity, working, false) + "  " + right
 	}
 	if w >= 70 {
 		right += "  " + m.style(m.now().Format("15:04"), ink, false)
@@ -209,7 +209,7 @@ func (m *Model) searchLineAt(w int) string {
 		position = fmt.Sprintf("%d–%d/%d", m.scroll+1, min(visible, m.scroll+l.slots), visible)
 	}
 	if m.loading {
-		position = "Refreshing local status…"
+		position = m.spinner() + " Refreshing local status…"
 	}
 	if m.scope == 0 {
 		return m.labelRule(position, w)
@@ -310,7 +310,7 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 		case app.Failed, app.OutcomeUnknown:
 			return icons.failed + " failed", danger
 		case app.Running:
-			return "● running", working
+			return m.spinner() + " running", working
 		case app.Queued:
 			return "◐ queued", muted
 		case app.Cancelled:
@@ -577,7 +577,7 @@ func (m *Model) footer() string {
 	w := max(1, m.width-4)
 	enter := m.symbols().enter
 	if m.preparing || m.running {
-		return m.hintBar("", []hint{{"Esc", "Cancel", 0}}, w) + "  " + m.style(m.progressLabel(), muted, false)
+		return m.hintBar("", []hint{{"Esc", "Cancel", 0}}, w) + "  " + m.style(m.spinner()+" "+m.progressLabel(), working, false)
 	}
 	if m.filtering {
 		return m.hintBar("", []hint{{"↑↓", "Choose", 1}, {enter, "Open", 0}, {"Esc", "Clear", 0}}, w)

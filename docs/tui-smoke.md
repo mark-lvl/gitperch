@@ -23,7 +23,10 @@ and performs no network access.
 3. Enter `/`, type a name/path/branch filter and confirm selection clears. Try
    no matches, Backspace, Enter and Esc. Hidden rows must not stay selected.
 4. Press `r` repeatedly. Confirm the UI responds while refreshing, results retain
-   path identity and the latest refresh wins.
+   path identity and the latest refresh wins. A spinner turns beside the
+   refresh label while it runs and stops once results arrive; during fetch,
+   push and pull it also turns in the footer, the wide header and each running
+   row. With `[ui] icons = "ascii"` it shows `|/-\` instead.
 5. Show help with `?` and scroll to the end; return with Esc. Use `d` and
    arrows or PgUp/PgDn to inspect full diagnostics and root warnings,
    including long errors. Inspect the highlighted repository's error details when

@@ -29,13 +29,22 @@ const (
 )
 
 // branch is empty outside nerd mode: no fork glyph is common to terminal fonts.
-type icons struct{ clean, changed, ahead, behind, failed, pointer, rule, repo, brand, branch, enter string }
+// spinner frames are each one cell wide so the busy labels never shift.
+type icons struct {
+	clean, changed, ahead, behind, failed, pointer, rule, repo, brand, branch, enter string
+	spinner                                                                          []string
+}
+
+var (
+	brailleSpinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	asciiSpinner   = []string{"|", "/", "-", "\\"}
+)
 
 func iconSet(mode string) icons {
-	i := icons{clean: "✓", changed: "●", ahead: "↑", behind: "↓", failed: "×", pointer: "▌", rule: "─", repo: "▱", brand: "◇", enter: "↵"}
+	i := icons{clean: "✓", changed: "●", ahead: "↑", behind: "↓", failed: "×", pointer: "▌", rule: "─", repo: "▱", brand: "◇", enter: "↵", spinner: brailleSpinner}
 	switch mode {
 	case "ascii":
-		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*", enter: "Enter"}
+		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*", enter: "Enter", spinner: asciiSpinner}
 	case "nerd":
 		i.clean = "\uf00c"
 		i.changed = "\uf044"
@@ -111,6 +120,12 @@ func truncatePath(s string, width int) string {
 	return "…" + tailCells(s, width-1)
 }
 func (m *Model) symbols() icons { return iconSet(m.iconMode) }
+
+// spinner is the current busy frame; captures never tick, so they show frame 0.
+func (m *Model) spinner() string {
+	frames := m.symbols().spinner
+	return frames[m.spinnerFrame%len(frames)]
+}
 
 // Cut may include a grapheme crossing its starting cell. Advance that boundary
 // instead of trimming the right edge, so a wide filename keeps its extension.

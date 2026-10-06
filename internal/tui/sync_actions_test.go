@@ -74,6 +74,7 @@ func syncActionModel(fake *syncActionFake) *Model {
 		{Repository: repository.Repository{Name: "second", Path: "/repos/second"}},
 	}})
 	m.EnableActions(app.NewActions(fake, 1))
+	m.spinning = true // keep returned commands free of spinner ticks
 	m.selected["/repos/first"] = true
 	return m
 }

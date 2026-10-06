@@ -71,6 +71,7 @@ func actionModel(fake *actionFake, selected ...string) *Model {
 		{Repository: repository.Repository{Name: "second", Path: "/repos/second"}},
 	}})
 	m.EnableActions(app.NewActions(fake, 1))
+	m.spinning = true // keep returned commands free of spinner ticks
 	for _, path := range selected {
 		m.selected[path] = true
 	}
