@@ -69,8 +69,12 @@ New types:
 - `Row.Worktree *WorktreeInfo` (`json:"worktree,omitempty"`):
   `Main, Linked, Locked, LockReason, Prunable, PrunableReason, MainPath,
   OutsideRoots`.
-- `Snapshot.Groups []Group` with `Group{Main int; Children []int}` indexing
-  into `Rows`. Repositories without linked worktrees form a group of one.
+- Groups are not stored separately: rows sharing `Worktree.MainPath` form a
+  group, and `MainPath` always equals the group parent row's `Path`. Rows
+  without worktree information (inspection or listing failed) form a group of
+  one.
+- The inventory needs Git 2.36 or newer (`worktree list -z`); older Git
+  degrades to the per-group warning below.
 
 Failure handling: if `worktree list` fails for a group, that group keeps the
 rows the scan found and a discovery warning is added. Loading never fails
@@ -107,14 +111,14 @@ child targets its whole group.
 
 ### App layer
 
-New action `app.Cleanup` in the existing `app.Actions` engine, so it shares
-the single active preview and the per-common-directory locks. Cleanup targets
-are items, not paths: `CleanupItem{Group, Kind, Path, Branch, OID, Eligible,
-Reason}` with `Kind` one of `PruneStale`, `RemoveWorktree`, `DeleteBranch`.
-
-`executeOne` currently re-resolves fetch configuration for every target; the
-cleanup path branches before that so repositories without a remote still
-work.
+`app.Actions` gains `PlanCleanup` and `ExecuteCleanup`. They share the single
+active preview and the per-common-directory locks with fetch, push and pull,
+but keep their own item-shaped plan, so `executeOne` and push/pull are
+untouched. `app.Cleanup` is the action label shown in progress and results.
+Cleanup targets are items, not paths: `CleanupItem{ID, Group, Kind, Path,
+Branch, OID, Base, Eligible, Reason}` with `Kind` one of `PruneStale`,
+`RemoveWorktree`, `DeleteBranch`. Events gain an `Item` field holding the item
+ID, so several results per repository stay distinct.
 
 ### Preflight, per group (up to `workers` groups in parallel)
 
@@ -143,6 +147,9 @@ work.
   not the remote default ref. `update-ref -d` with the expected OID is an
   atomic compare-and-delete, so a branch that moved after review is refused by
   Git. The config removal is best-effort; a missing section is not an error.
+- Kept branches are listed only when they are merged but still checked out,
+  or when their upstream is gone without being merged; ordinary unmerged
+  branches are omitted so repositories with many branches stay readable.
 - Kept items carry reasons, for example "dirty (3 files)", "locked: agent
   session", "4 ignored files (.env, node_modules/, …)", "not merged into
   origin/main", "upstream gone but not merged — squash merge?".
