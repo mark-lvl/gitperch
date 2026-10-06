@@ -8,6 +8,7 @@
 │    4 ▱ experiment           ! no upstream     —          │
 │    5 ▱ mobile               × failed          —          │
 │    6 ▱ worker               ! conflict ↑2 ↓1  1 file     │
+│                                                          │
 │ ╭──────────────────────────────────────────────────────╮ │
 │ │ ▱ design-system  feat/tokens                  2m ago │ │
 │ │ ↑3 ahead · locally known refs                        │ │

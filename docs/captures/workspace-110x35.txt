@@ -8,6 +8,20 @@
 │    ▱ experiment                             ! no upstream                            —                     │
 │    ▱ mobile                                 × failed                                 —                     │
 │    ▱ worker                                 ! conflict ↑2 ↓1                         1 file                │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
 │ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ ▱ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
 │ │ ↑3 ahead · locally known refs                                                                          │ │

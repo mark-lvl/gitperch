@@ -83,7 +83,7 @@ func (m *Model) selectedPreview(w, h int) []string {
 		}
 		if split {
 			right := ""
-			if i < len(result.data.Commits) {
+			if i < min(len(result.data.Commits), previewCommits) {
 				right = m.renderCommit(result.data.Commits[i], rightWidth)
 			}
 			line = cell(line, leftWidth) + m.style(" │ ", border, false) + cell(right, rightWidth)

@@ -24,7 +24,12 @@ the tracking state (`↑ 3 commits`, `↓ 4 behind`). Zero tracking counts stay 
 
 The highlighted repository's preview is a bordered card: name, branch → upstream
 and last activity, then its status line and changed files with colored status
-chips. Key hints are filled keycaps at the bottom; the least important ones drop
+chips. The dashboard fills the terminal height: the list starts at the top and
+the preview card stays docked just above the key hints. On wide terminals the
+card is sized for the last 10 commits beside the changed files; more than 10
+changed files make it taller, up to the rows the list leaves free minus a blank
+margin below the list. With a long list it keeps about a third of the screen.
+Remaining spare rows sit between the list and the card. Key hints are filled keycaps on the bottom row; the least important ones drop
 first on narrow terminals, and only keys that work for the highlighted
 repository appear.
 

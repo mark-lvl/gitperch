@@ -70,11 +70,20 @@ type dashboardLayout struct {
 	listWidth, body, slots, bottom int
 }
 
-// Geometry follows content as well as the viewport. A small workspace must not
-// create a screenful of blank rows between repositories and their context.
+const (
+	previewCommits = 10 // commits the card is sized for when files do not need more
+	previewMargin  = 1  // blank rows kept between the list and a grown card
+)
+
+// Geometry follows content as well as the viewport. Spare height goes between
+// the repository list and the preview, which stays docked above the footer.
 func (m *Model) layout() dashboardLayout {
 	w, h := max(1, m.width), max(1, m.height)
 	l := dashboardLayout{listWidth: max(1, w-4), bottom: 2}
+	notice := 0
+	if m.notice() != "" {
+		notice = 1
+	}
 	preview := 0
 	if h >= 20 {
 		desired := 6
@@ -83,16 +92,17 @@ func (m *Model) layout() dashboardLayout {
 			if result, ok := m.detailCache[row.Path]; ok {
 				count = len(result.data.Files)
 				if w >= 120 {
-					count = max(count, len(result.data.Commits))
+					// Beside the files, the card always has room for the last
+					// previewCommits commits; only more files make it taller.
+					count = max(count, min(len(result.data.Commits), previewCommits))
 				}
 			}
 			desired = max(6, count+5)
 		}
-		preview = min(desired, 12, max(6, h/3))
-	}
-	notice := 0
-	if m.notice() != "" {
-		notice = 1
+		// The card grows into rows the list does not need, keeping a margin
+		// below the list; a long list still leaves it a third of the screen.
+		listNeed := max(4, len(m.visibleRows())+1)
+		preview = min(desired, max(6, h/3, h-6-notice-listNeed-previewMargin))
 	}
 	capacity := max(1, h-6-preview-notice)
 	l.body = min(max(4, len(m.visibleRows())+1), capacity)
@@ -126,6 +136,9 @@ func (m *Model) workspaceLines() []string {
 	w := l.listWidth
 	lines := []string{m.summaryLineAt(w), m.searchLineAt(w)}
 	lines = append(lines, m.repositoryList(l)...)
+	// The frame fills the terminal: header and list at the top, preview,
+	// notice and key hints anchored to the bottom.
+	lines = append(lines, make([]string, max(0, m.height-2-len(lines)-l.bottom))...)
 	previewHeight := l.bottom - 2
 	if m.notice() != "" {
 		previewHeight--

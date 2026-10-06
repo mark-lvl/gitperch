@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The dashboard refreshes local status automatically while idle, every 30
   seconds by default (`[ui] refresh_seconds`, `0` disables). The footer now
   shows the `r` manual refresh key.
+- The dashboard fills the terminal height, keeping the selected repository
+  preview and the key hints anchored to the bottom. The preview shows the last
+  10 commits beside the changed files and grows to fit more than 10 changed
+  files when the terminal has room.
 - MIT license, contributing guide, code of conduct, security policy, agent
   instructions (`AGENTS.md`), issue and pull request templates, and Dependabot
   configuration.

@@ -87,7 +87,7 @@ func (r Runner) Details(ctx context.Context, path string) (RepoDetails, error) {
 	if headErr != nil {
 		return d, headErr
 	}
-	out, err = r.Run(ctx, path, "log", "-8", "--format=%h%x00%ct%x00%s%x00")
+	out, err = r.Run(ctx, path, "log", "-30", "--format=%h%x00%ct%x00%s%x00")
 	if err != nil {
 		return d, err
 	}

@@ -13,22 +13,21 @@ import (
 	"testing"
 )
 
-func TestSmallWorkspaceKeepsPreviewNextToList(t *testing.T) {
-	m := New(nil, nil, true)
-	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
-	m.width, m.height = 160, 45
-	lines := strings.Split(m.View().Content, "\n")
-	last, preview := -1, -1
-	for i, line := range lines {
-		if strings.Contains(line, "worker") {
-			last = i
+func TestPreviewAndFooterDockToBottom(t *testing.T) {
+	for _, size := range [][2]int{{160, 45}, {110, 35}, {78, 28}, {60, 20}} {
+		m := New(nil, nil, true)
+		m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+		m.width, m.height = size[0], size[1]
+		lines := strings.Split(m.View().Content, "\n")
+		if len(lines) != m.height || !strings.HasPrefix(lines[len(lines)-1], "╰") {
+			t.Fatalf("%v: frame does not fill the terminal: %d lines", size, len(lines))
 		}
-		if strings.Contains(line, "╭") && last >= 0 && preview < 0 {
-			preview = i
+		if !strings.Contains(lines[len(lines)-2], "Help") && !strings.Contains(lines[len(lines)-2], "Move") {
+			t.Fatalf("%v: footer not on the bottom row: %q", size, lines[len(lines)-2])
 		}
-	}
-	if last < 0 || preview != last+1 {
-		t.Fatalf("preview separated from list: %d -> %d", last, preview)
+		if m.layout().bottom > 2 && !strings.Contains(lines[len(lines)-4], "╰") {
+			t.Fatalf("%v: preview not docked above the footer: %q", size, lines[len(lines)-4])
+		}
 	}
 }
 func TestTabTogglesFocusAndRetainsRepository(t *testing.T) {
@@ -196,5 +195,53 @@ func TestSuggestedPushWorksInDetails(t *testing.T) {
 	}
 	if m.actionCancel != nil {
 		m.actionCancel()
+	}
+}
+
+func TestPreviewHeightFollowsContentAndRoom(t *testing.T) {
+	files := make([]gitcli.ChangedFile, 30)
+	for i := range files {
+		files[i] = gitcli.ChangedFile{Code: " M", Path: fmt.Sprintf("file%02d.go", i)}
+	}
+	m := New(nil, nil, true)
+	m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.width, m.height = 160, 45
+	path := m.highlightedRow().Path
+	commits := make([]gitcli.Commit, 30)
+	for i := range commits {
+		commits[i] = gitcli.Commit{OID: fmt.Sprintf("c%02d", i), Subject: "change"}
+	}
+	m.detailCache[path] = detailResult{data: gitcli.RepoDetails{Files: files[:2]}}
+	if got := m.layout().bottom - 2; got != 7 {
+		t.Fatalf("two files: preview %d rows, want 7", got)
+	}
+	for _, n := range []int{0, 2, 10} {
+		m.detailCache[path] = detailResult{data: gitcli.RepoDetails{Files: files[:n], Commits: commits}}
+		if got := m.layout().bottom - 2; got != previewCommits+5 {
+			t.Fatalf("%d files: preview %d rows, want room for %d commits", n, got, previewCommits)
+		}
+	}
+	if v := m.View().Content; !strings.Contains(v, "c09") || strings.Contains(v, "c10") {
+		t.Fatal("preview did not show exactly the last ten commits")
+	}
+	m.detailCache[path] = detailResult{data: gitcli.RepoDetails{Files: files, Commits: commits}}
+	l := m.layout()
+	if got := l.bottom - 2; got != 45-6-(len(m.visibleRows())+1)-previewMargin || l.slots < len(m.visibleRows()) {
+		t.Fatalf("many files: preview %d rows, list %d slots", got, l.slots)
+	}
+	if !strings.Contains(m.View().Content, "file20.go") {
+		t.Fatal("tall preview did not list more files")
+	}
+
+	many := make([]app.Row, 60)
+	for i := range many {
+		many[i] = dashboardRows()[0]
+		many[i].Path = fmt.Sprintf("/repo/%02d", i)
+	}
+	m.applySnapshot(app.Snapshot{Rows: many})
+	m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Files: files}}
+	if got := m.layout().bottom - 2; got != 45/3 {
+		t.Fatalf("long list: preview %d rows, want a third", got)
 	}
 }
