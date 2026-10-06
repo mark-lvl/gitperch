@@ -97,3 +97,47 @@ func TestResolveFetchStillValidatesRemote(t *testing.T) {
 		t.Fatal("unknown remote accepted")
 	}
 }
+
+func TestPruneWorktreesKeepsLockedRecords(t *testing.T) {
+	repo := disposable(t)
+	write(t, filepath.Join(repo, "f"), "x\n")
+	commit(t, repo)
+	base := t.TempDir()
+	gitCmd(t, repo, "worktree", "add", "-b", "a", filepath.Join(base, "a"))
+	gitCmd(t, repo, "worktree", "add", "--lock", "-b", "b", filepath.Join(base, "b"))
+	os.RemoveAll(filepath.Join(base, "a"))
+	os.RemoveAll(filepath.Join(base, "b"))
+	if err := (Runner{}).PruneWorktrees(context.Background(), repo); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := (Runner{}).Worktrees(context.Background(), repo)
+	if len(got) != 2 || !got[1].Locked {
+		t.Fatalf("after prune: %+v", got)
+	}
+}
+
+func TestRemoveWorktreeRefusesDirtyAndForceIsNeverUsed(t *testing.T) {
+	repo := disposable(t)
+	write(t, filepath.Join(repo, "f"), "x\n")
+	commit(t, repo)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitCmd(t, repo, "worktree", "add", "-b", "wt", wt)
+	write(t, filepath.Join(wt, "new"), "untracked")
+	r := Runner{}
+	if err := r.RemoveWorktree(context.Background(), repo, wt); err == nil {
+		t.Fatal("dirty worktree removed")
+	}
+	if _, err := os.Stat(filepath.Join(wt, "new")); err != nil {
+		t.Fatal("untracked file lost")
+	}
+	os.Remove(filepath.Join(wt, "new"))
+	if err := r.RemoveWorktree(context.Background(), repo, "relative/wt"); err == nil {
+		t.Fatal("relative path accepted")
+	}
+	if err := r.RemoveWorktree(context.Background(), repo, wt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Fatalf("worktree still present: %v", err)
+	}
+}

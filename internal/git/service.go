@@ -57,3 +57,9 @@ func (s Service) IsAncestor(ctx context.Context, path, oid, ref string) (bool, e
 func (s Service) IgnoredFiles(ctx context.Context, path string) ([]string, error) {
 	return s.Read.IgnoredFiles(ctx, path)
 }
+func (s Service) PruneWorktrees(ctx context.Context, path string) error {
+	return s.Write.PruneWorktrees(ctx, path)
+}
+func (s Service) RemoveWorktree(ctx context.Context, path, worktree string) error {
+	return s.Write.RemoveWorktree(ctx, path, worktree)
+}

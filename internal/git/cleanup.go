@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -76,4 +77,21 @@ func (r Runner) IgnoredFiles(ctx context.Context, path string) ([]string, error)
 		}
 	}
 	return files, nil
+}
+
+// PruneWorktrees drops administrative records of worktrees whose directory
+// is gone. Git never prunes locked records.
+func (r Runner) PruneWorktrees(ctx context.Context, path string) error {
+	_, err := r.Run(ctx, path, "worktree", "prune")
+	return err
+}
+
+// RemoveWorktree deletes a clean linked worktree. Without --force Git refuses
+// modified or untracked files, locked worktrees and the main worktree.
+func (r Runner) RemoveWorktree(ctx context.Context, path, worktree string) error {
+	if !filepath.IsAbs(worktree) {
+		return fmt.Errorf("invalid reviewed worktree path")
+	}
+	_, err := r.Run(ctx, path, "worktree", "remove", worktree)
+	return err
 }
