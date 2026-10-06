@@ -82,7 +82,7 @@ func TestDetailLoaderCachesAndRejectsStaleResults(t *testing.T) {
 		t.Fatal("detail not cached")
 	}
 	m.applySnapshot(app.Snapshot{Rows: testRows()})
-	if len(m.detailCache) != 0 {
+	if !m.detailStale["/two/same"] || m.ensureDetail() == nil {
 		t.Fatal("refresh did not invalidate detail")
 	}
 	m.closeReads()

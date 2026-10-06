@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
 	"github.com/mark-lvl/gitperch/internal/discovery"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 	"github.com/mark-lvl/gitperch/internal/repository"
 	"strings"
 	"testing"
@@ -244,5 +245,49 @@ func TestAutoRefreshReloadsWhenIdleAndPausesOtherwise(t *testing.T) {
 	off.Update(snapshotMsg{generation: off.generation})
 	if off.autoGeneration != 0 {
 		t.Fatal("disabled automatic refresh was scheduled")
+	}
+}
+
+func TestRefreshKeepsDetailsUntilReloaded(t *testing.T) {
+	m := New(context.Background(), func(context.Context) (app.Snapshot, error) { return app.Snapshot{}, nil }, true)
+	m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
+	m.applySnapshot(app.Snapshot{Rows: testRows()})
+	m.detailCache["/one/same"] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Path: "old.go"}}}}
+	m.detailCache["/gone"] = detailResult{}
+	m.applySnapshot(app.Snapshot{Rows: testRows()})
+	if _, ok := m.detailCache["/one/same"]; !ok || !m.detailStale["/one/same"] {
+		t.Fatal("refresh discarded the shown details instead of marking them stale")
+	}
+	if _, ok := m.detailCache["/gone"]; ok {
+		t.Fatal("details of a vanished repository kept")
+	}
+	if m.ensureDetail() == nil {
+		t.Fatal("stale details were not reloaded")
+	}
+	m.Update(detailMsg{"/one/same", m.detailGeneration, detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Path: "new.go"}}}}})
+	if m.detailStale["/one/same"] || m.detailCache["/one/same"].data.Files[0].Path != "new.go" {
+		t.Fatal("reloaded details not applied")
+	}
+
+}
+
+func TestRefreshIndicatorStaysUpBriefly(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	m := New(context.Background(), func(context.Context) (app.Snapshot, error) { return app.Snapshot{}, nil }, true)
+	m.clock = func() time.Time { return now }
+	m.SetAutoRefresh(time.Minute)
+	m.Update(snapshotMsg{generation: m.generation, snapshot: app.Snapshot{Rows: testRows()}})
+	m.Update(autoRefreshMsg{generation: m.autoGeneration})
+	if !strings.Contains(m.View().Content, "Refreshing") {
+		t.Fatal("automatic refresh showed no indicator")
+	}
+	m.Update(snapshotMsg{generation: m.generation, snapshot: app.Snapshot{Rows: testRows()}})
+	if m.loading || !strings.Contains(m.View().Content, "Refreshing") || !m.spinning {
+		t.Fatal("quick refresh indicator blinked away")
+	}
+	now = now.Add(refreshIndicatorMin)
+	m.Update(spinnerMsg{})
+	if strings.Contains(m.View().Content, "Refreshing") || m.spinning {
+		t.Fatal("refresh indicator outlived its minimum")
 	}
 }

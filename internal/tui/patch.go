@@ -38,7 +38,7 @@ func (m *Model) ensurePatch() tea.Cmd {
 	if m.loadPatch == nil {
 		return nil
 	}
-	if m.patch != nil && m.patch.path == row.Path {
+	if m.patch != nil && m.patch.path == row.Path && !m.patchStale {
 		return nil
 	}
 	if m.patchPath == row.Path {

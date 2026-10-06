@@ -159,7 +159,7 @@ func (m *Model) summaryLineAt(w int) string {
 		right += " " + m.chip(fmt.Sprintf("! %d attention", attention), amber)
 	}
 	activity := ""
-	if m.loading {
+	if m.refreshing() {
 		activity = "refreshing"
 	}
 	if m.preparing {
@@ -208,7 +208,7 @@ func (m *Model) searchLineAt(w int) string {
 	if l := m.layout(); visible > l.slots {
 		position = fmt.Sprintf("%d–%d/%d", m.scroll+1, min(visible, m.scroll+l.slots), visible)
 	}
-	if m.loading {
+	if m.refreshing() {
 		position = m.spinner() + " Refreshing local status…"
 	}
 	if m.scope == 0 {

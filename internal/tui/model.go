@@ -28,6 +28,7 @@ type Model struct {
 	palette          bool
 	loadDetails      detailLoader
 	detailCache      map[string]detailResult
+	detailStale      map[string]bool // cached before the latest snapshot; shown until reloaded
 	detailPath       string
 	detailGeneration uint64
 	detailCancel     context.CancelFunc
@@ -37,6 +38,7 @@ type Model struct {
 	patchPath        string
 	patchCancel      context.CancelFunc
 	patchGeneration  uint64
+	patchStale       bool // patch predates the latest snapshot; shown until reloaded
 	paletteQuery     string
 	paletteCursor    int
 	lazyGitAvailable bool
@@ -82,6 +84,7 @@ type Model struct {
 	spinnerFrame     int
 	autoRefresh      time.Duration // 0 disables automatic status refresh
 	autoGeneration   uint64        // only the newest scheduled autoRefreshMsg counts
+	refreshUntil     time.Time     // keeps a quick refresh's indicator readable instead of a blink
 }
 
 type snapshotMsg struct {
@@ -103,9 +106,16 @@ type autoRefreshMsg struct{ generation uint64 }
 
 const spinnerInterval = 100 * time.Millisecond
 
+// refreshIndicatorMin is the shortest time the refresh indicator stays up.
+const refreshIndicatorMin = time.Second
+
 func (m *Model) now() time.Time { return m.clock() }
 
 func (m *Model) busy() bool { return m.loading || m.preparing || m.running }
+
+// refreshing reports whether the refresh indicator shows: during the load and
+// for the rest of its minimum display time.
+func (m *Model) refreshing() bool { return m.loading || m.now().Before(m.refreshUntil) }
 
 func (m *Model) spin() tea.Cmd {
 	m.spinning = true
@@ -148,6 +158,7 @@ func New(ctx context.Context, load func(context.Context) (app.Snapshot, error), 
 		lazyGitAvailable: lazyGitErr == nil,
 		clock:            time.Now,
 		detailCache:      make(map[string]detailResult),
+		detailStale:      make(map[string]bool),
 		ctx:              ctx,
 		load:             load,
 		noColor:          noColor,
@@ -184,7 +195,7 @@ func (m *Model) refresh() tea.Cmd {
 	ctx, cancel := context.WithCancel(m.ctx)
 	m.loadCancel = cancel
 	m.loading = true
-	m.loadErr = ""
+	m.refreshUntil = m.now().Add(refreshIndicatorMin)
 	return func() tea.Msg {
 		snapshot, err := m.load(ctx)
 		return snapshotMsg{generation: generation, snapshot: snapshot, err: err}
@@ -211,7 +222,7 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		}
 		// Every busy state starts through Update, so one check here keeps the
 		// spinner going without each start site scheduling it.
-		if m.busy() && !m.spinning && !m.closing {
+		if (m.busy() || m.refreshing()) && !m.spinning && !m.closing {
 			cmd = tea.Batch(cmd, m.spin())
 		}
 	}()
@@ -222,6 +233,7 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 	case patchMsg:
 		if msg.generation == m.patchGeneration {
 			m.patch = &msg.result
+			m.patchStale = false
 			m.patchPath = ""
 			if m.patchCancel != nil {
 				m.patchCancel()
@@ -231,6 +243,7 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 	case detailMsg:
 		if msg.generation == m.detailGeneration {
 			m.detailCache[msg.path] = msg.result
+			delete(m.detailStale, msg.path)
 			m.detailPath = ""
 			if m.detailCancel != nil {
 				m.detailCancel()
@@ -288,7 +301,7 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		return m, m.tick()
 	case spinnerMsg:
 		m.spinning = false
-		if !m.busy() || m.closing {
+		if !(m.busy() || m.refreshing()) || m.closing {
 			m.spinnerFrame = 0
 			return m, nil
 		}
@@ -314,9 +327,22 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	}
 	m.detailGeneration++
 	m.detailPath = ""
-	m.detailCache = make(map[string]detailResult)
+	// Earlier details stay on screen until their reload arrives, so a refresh
+	// does not blank the preview; repositories that disappeared are dropped.
+	present := make(map[string]bool, len(m.rows))
+	for _, row := range m.rows {
+		present[row.Path] = true
+	}
+	for path := range m.detailCache {
+		if present[path] {
+			m.detailStale[path] = true
+		} else {
+			delete(m.detailCache, path)
+			delete(m.detailStale, path)
+		}
+	}
 	m.cancelPatch()
-	m.patch = nil
+	m.patchStale = m.patch != nil
 	m.warnings = m.warnings[:0]
 	for _, warning := range snapshot.Warnings {
 		m.warnings = append(m.warnings, gitcli.SafeText(warning.Path+": "+warning.Message))

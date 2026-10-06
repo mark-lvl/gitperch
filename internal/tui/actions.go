@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 type previewMsg struct {
@@ -125,6 +126,7 @@ func (m *Model) preparePreview(action app.Action, paths []string) tea.Cmd {
 	}
 	m.generation++
 	m.loading = false
+	m.refreshUntil = time.Time{}
 	m.actionGeneration++
 	generation := m.actionGeneration
 	ctx, cancel := context.WithCancel(m.ctx)

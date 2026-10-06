@@ -30,7 +30,7 @@ func (m *Model) ensureDetail() tea.Cmd {
 	if row == nil {
 		return nil
 	}
-	if _, ok := m.detailCache[row.Path]; ok {
+	if _, ok := m.detailCache[row.Path]; ok && !m.detailStale[row.Path] {
 		return nil
 	}
 	if m.detailPath == row.Path {

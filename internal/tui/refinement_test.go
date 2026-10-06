@@ -143,8 +143,8 @@ func TestPatchLoadsOnlyInChangesAndRejectsCancelledResults(t *testing.T) {
 		t.Fatal("patch not cached")
 	}
 	m.applySnapshot(app.Snapshot{Rows: testRows()})
-	if m.patch != nil {
-		t.Fatal("refresh retained obsolete patch")
+	if !m.patchStale || m.ensurePatch() == nil {
+		t.Fatal("refresh did not reload obsolete patch")
 	}
 }
 func TestPaletteFitsEverySupportedWidth(t *testing.T) {
