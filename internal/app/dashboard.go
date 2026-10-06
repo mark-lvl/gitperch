@@ -17,5 +17,11 @@ func Load(ctx context.Context, opts discovery.Options, service GitService, worke
 		return s, err
 	}
 	s.Rows, err = Inspect(ctx, result.Repositories, service, workers)
-	return s, err
+	if err != nil {
+		return s, err
+	}
+	var warnings []discovery.Warning
+	s.Rows, warnings = attachWorktrees(ctx, s.Rows, service, workers, opts.Roots)
+	s.Warnings = append(s.Warnings, warnings...)
+	return s, ctx.Err()
 }

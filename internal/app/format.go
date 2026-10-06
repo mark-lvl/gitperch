@@ -58,7 +58,17 @@ func WriteTable(w io.Writer, rows []Row) error {
 		if s.Detached {
 			markers = append(markers, "detached")
 		}
-		if s.Upstream == "" {
+		if w := row.Worktree; w != nil {
+			switch {
+			case w.Bare:
+				markers = append(markers, "bare repository")
+			case w.Prunable:
+				markers = append(markers, "stale worktree: "+w.PrunableReason)
+			case w.Locked:
+				markers = append(markers, "locked worktree")
+			}
+		}
+		if s.Upstream == "" && (row.Worktree == nil || !row.Worktree.Prunable && !row.Worktree.Bare) {
 			markers = append(markers, "no upstream")
 		}
 		if s.Synchronized() {

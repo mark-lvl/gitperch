@@ -21,6 +21,22 @@ type Row struct {
 	repository.Repository
 	Status    repository.Status `json:"status"`
 	LastFetch time.Time         `json:"last_successful_fetch,omitzero"`
+	Worktree  *WorktreeInfo     `json:"worktree,omitempty"`
+}
+
+// Selectable reports whether fetch, push and pull can target the row: stale
+// records have no directory and a bare main repository has no worktree.
+func (r Row) Selectable() bool {
+	return r.Worktree == nil || (!r.Worktree.Prunable && !r.Worktree.Bare)
+}
+
+func sortRows(rows []Row) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].Name != rows[j].Name {
+			return rows[i].Name < rows[j].Name
+		}
+		return rows[i].Path < rows[j].Path
+	})
 }
 
 // Inspect inspects repositories with a bounded worker pool. workers must be
