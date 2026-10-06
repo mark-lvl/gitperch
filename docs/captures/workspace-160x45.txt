@@ -1,9 +1,9 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ◇ gitperch  ~/dev/platform                                                                                                  [6 repos] [! 5 attention]  19:42 │
+│ ◇ gitperch  ~/dev/platform                                                                                                  [8 repos] [! 7 attention]  19:42 │
 │ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │      REPO                                   BRANCH                                             STATUS                         Δ                    UPDATED   │
 │    ▱ api-service                            main                                               ✓ clean                        —                    3h ago    │
-│ ▌  ▱ design-system                          feat/tokens                                        ● changed ↑3                   +12 -2               2m ago    │
+│ ▌  ▱ design-system ⑂2 · 1 stale             feat/tokens                                        ● changed ↑3                   +12 -2               2m ago    │
 │    ▱ docs                                   main                                               ↓ 4 behind                     —                    1d ago    │
 │    ▱ experiment                             prototype                                          ! no upstream                  —                    —         │
 │    ▱ mobile                                 main                                               × failed                       —                    7m ago    │

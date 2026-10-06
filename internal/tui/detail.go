@@ -142,6 +142,7 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 		if !row.LastFetch.IsZero() {
 			lines = append(lines, " Last successful fetch: "+row.LastFetch.Format("2006-01-02 15:04:05"))
 		}
+		lines = append(lines, m.worktreeGroupLines(*row)...)
 	}
 	if m.loadDetails != nil && !loaded {
 		lines = append(lines, m.style(" Loading repository context…", muted, false))
@@ -160,6 +161,50 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 		lines = append(lines, "Load error: "+gitcli.SafeText(m.loadErr))
 	}
 	return lines, patchAt
+}
+
+// worktreeGroupLines lists the highlighted row's group (its main repository and
+// linked worktrees) for the Worktree section. It reads only the snapshot, so it
+// renders for rows whose details cannot be loaded, such as stale worktrees.
+// A repository without linked worktrees has no group to list.
+func (m *Model) worktreeGroupLines(row app.Row) []string {
+	key := groupKey(row)
+	var members []app.Row
+	for _, other := range m.rows {
+		if groupKey(other) == key {
+			members = append(members, other)
+		}
+	}
+	if len(members) < 2 {
+		return nil
+	}
+	lines := []string{"", m.style(" Worktrees", accent, true)}
+	for _, other := range members {
+		state, color := worktreeLabel(other)
+		kind := "linked"
+		if isParent(other) {
+			kind = "main"
+		}
+		if w := other.Worktree; w != nil {
+			switch {
+			case w.Bare:
+				state, color = "bare", muted
+			case w.Prunable:
+				state, color = "stale · "+gitcli.SafeText(w.PrunableReason), amber
+			case w.Locked && w.LockReason != "":
+				state += " · locked: " + gitcli.SafeText(w.LockReason)
+			case w.Locked:
+				state += " · locked"
+			}
+			if w.OutsideRoots {
+				kind += ", outside roots"
+			}
+		}
+		lines = append(lines,
+			" "+gitcli.SafeText(other.Name)+"  "+m.style(branchLabel(other), muted, false)+"  "+m.style(state, color, false)+"  "+m.style("("+kind+")", muted, false),
+			"   "+m.style(gitcli.SafeText(other.Path), muted, false))
+	}
+	return lines
 }
 
 var detailTabs = []string{"Overview", "Changes", "Commits", "Worktree"}

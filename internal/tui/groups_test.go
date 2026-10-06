@@ -193,3 +193,16 @@ func TestRefreshDropsSelectionHiddenByCollapse(t *testing.T) {
 		t.Fatalf("visible selection lost: %v", m.selected)
 	}
 }
+
+func TestWorktreeTabListsGroup(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: groupedRows()})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 40})
+	m.details, m.detailTab = true, 3
+	view := m.View().Content
+	for _, want := range []string{"Worktrees", "fix-auth", "2 changed", "old", "stale"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+}

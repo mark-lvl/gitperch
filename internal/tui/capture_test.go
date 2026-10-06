@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/mark-lvl/gitperch/internal/app"
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
+	"github.com/mark-lvl/gitperch/internal/repository"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,12 @@ func captureRows() []app.Row {
 			rows[i].Status.LastActivity = captureNow.Add(-age)
 		}
 	}
-	return rows
+	// design-system owns two linked worktrees: one clean, one stale.
+	main := rows[1].Path
+	rows[1].Worktree = &app.WorktreeInfo{Main: true, MainPath: main}
+	fixTokens := app.Row{Repository: repository.Repository{Name: "fix-tokens", Path: main + "/.worktrees/fix-tokens"}, Status: repository.Status{Branch: "fix-tokens"}, Worktree: &app.WorktreeInfo{Linked: true, MainPath: main}}
+	oldSpike := app.Row{Repository: repository.Repository{Name: "old-spike", Path: "/home/mark/worktrees/old-spike"}, Status: repository.Status{Branch: "old-spike"}, Worktree: &app.WorktreeInfo{Linked: true, Prunable: true, PrunableReason: "gitdir file points to non-existent location", OutsideRoots: true, MainPath: main}}
+	return append(rows, fixTokens, oldSpike)
 }
 
 func captureCommits() []gitcli.Commit {
@@ -121,7 +127,7 @@ func TestScanningRenderCapture(t *testing.T) {
 }
 
 func TestOverlayRenderCaptures(t *testing.T) {
-	for _, mode := range []string{"palette", "details"} {
+	for _, mode := range []string{"palette", "details", "worktrees"} {
 		t.Run(mode, func(t *testing.T) {
 			m := New(nil, nil, true)
 			m.Configure("~/dev/platform", "unicode", false)
@@ -133,10 +139,13 @@ func TestOverlayRenderCaptures(t *testing.T) {
 			m.EnableActions(app.NewActions(newActionFake(false), 1))
 			m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
 			m.detailCache[m.highlightedRow().Path] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Code: " M", Path: "src/theme/tokens.go", Added: 8, Deleted: 2}, {Code: "??", Path: "tests/theme_test.go"}}, Commits: captureCommits()}}
-			if mode == "palette" {
+			switch mode {
+			case "palette":
 				m.palette = true
 				m.paletteQuery = "push"
-			} else {
+			case "worktrees":
+				m.expanded["/home/mark/projects/design-system"] = true
+			default:
 				m.details = true
 			}
 			content := m.View().Content

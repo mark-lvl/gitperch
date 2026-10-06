@@ -46,6 +46,8 @@ or resets, and re-validates every action right before it runs.
 - **Attention-first overview**: changes, untracked files, conflicts, branch,
   upstream and ahead/behind counts for every repository, sorted by what needs
   you first.
+- **Worktree inventory**: every linked worktree, including nested, outside-root
+  and stale ones, grouped under its repository.
 - **Repository details**: overview, changed files, recent commits and worktree
   state, plus a diff view.
 - **Safe synchronization**: fetch, push and fast-forward-only pull across a
@@ -186,7 +188,6 @@ and will only be added on top of real integrations, not guessed from
 heuristics:
 
 - Show which agent session is active in which repository or worktree.
-- Group worktrees created by agents under their parent repository.
 - Surface "waiting for review" and "agent finished" states next to Git status.
 - Run project checks (tests, linters) from the dashboard.
 - Validated macOS and Windows support, with release binaries for both

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The workspace groups linked worktrees under their main repository, including
+  worktrees nested inside a repository, outside the scanned roots, or whose
+  directory no longer exists. `→`/`←` expand and collapse a group, and the
+  details Worktree section lists the group.
+- `gitperch status --json` reports a `worktree` object per repository (schema
+  version 1, additive).
+
 ## [0.1.1] - 2026-10-06
 
 ### Changed

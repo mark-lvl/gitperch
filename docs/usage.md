@@ -120,6 +120,39 @@ directory. Missing LazyGit is reported visibly. Git errors, discovery warnings,
 and operation results remain accessible in repository details. `q` quits and
 Ctrl+C interrupts; during operations they request cancellation and wait.
 
+## Worktrees
+
+gitperch asks Git for each repository's worktree list, so linked worktrees are
+grouped under their main repository even when they are nested inside it, live
+outside the scanned roots (marked `outside roots`), or have been deleted from
+disk. A collapsed group shows a badge such as `⑂2 · 1 stale`. `→` expands the
+group, `←` collapses it, and `←` on a worktree jumps to its repository. Search
+and scopes show matching worktrees without expanding. The details Worktree
+section lists every worktree in the group with its branch, state and path.
+
+States: a worktree whose directory is missing is `stale` (Git calls it
+prunable) and is listed but cannot be selected or acted on; a `locked`
+worktree shows its lock reason when Git has one; a bare repository is shown as
+`bare` and is not selectable. These are read-only views: gitperch does not
+prune, remove or lock worktrees.
+
+The inventory needs Git 2.36 or newer. With older Git, or when the Git version
+cannot be read, the feature is silently off: no grouping, no stale worktrees, no
+warnings and no `worktree` object in JSON. Everything else works unchanged.
+
+`gitperch status --json` adds a `worktree` object per repository when the
+inventory is available (schema version still 1; the field is additive):
+
+| Field | Meaning |
+| --- | --- |
+| `main` | The repository is the main worktree |
+| `linked` | The repository is a linked worktree |
+| `bare` | Bare repository (omitted when false) |
+| `locked`, `lock_reason` | Locked worktree and Git's reason, if any (omitted when empty) |
+| `prunable`, `prunable_reason` | Stale worktree and Git's reason, if any (omitted when empty) |
+| `main_path` | Path of the main worktree that owns this group |
+| `outside_roots` | Listed by Git but outside the scanned roots (omitted when false) |
+
 ## Fetch
 
 Select repositories explicitly and press `f`; fetch starts without a

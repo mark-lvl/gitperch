@@ -671,6 +671,7 @@ func (m *Model) helpContent() []string {
 		m.style(" gitperch / Keyboard guide", accent, true), m.rule(max(1, m.width)),
 		" NAVIGATION", " ↑↓ / j k      Move between repositories", " [ / ]         Scroll the selected preview's changed files", " PgUp / PgDn   Move one page · Home / End jump to first / last", " 1–9           Jump to that row (numbered in narrow layouts)",
 		" Tab / Shift+Tab  Toggle All / Focus; more filters live in Actions",
+		" → / ←         Expand / collapse a repository's worktrees · ← on a worktree selects its repository",
 		" /             Search name, path or branch · arrows move · Enter opens", " s             Toggle name / attention order · r refresh local status",
 		m.autoRefreshHelp(),
 		"", " REPOSITORY ACTIONS", " Enter / d     Open repository overview / changes · Tab switches section", " o             Open a shell in the highlighted worktree", " g             Open LazyGit in the highlighted worktree",

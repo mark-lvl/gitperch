@@ -1,9 +1,9 @@
 ╭────────────────────────────────────────────────────────────────────────────╮
-│ ◇ gitperch  ~/dev/platform                [6 repos] [! 5 attention]  19:42 │
+│ ◇ gitperch  ~/dev/platform                [8 repos] [! 7 attention]  19:42 │
 │ ────────────────────────────────────────────────────────────────────────── │
 │        REPO                           STATUS                Δ              │
 │    1 ▱ api-service                    ✓ clean               —              │
-│ ▌  2 ▱ design-system                  ● changed ↑3          +12 -2         │
+│ ▌  2 ▱ design-system ⑂2 · 1 stale     ● changed ↑3          +12 -2         │
 │    3 ▱ docs                           ↓ 4 behind            —              │
 │    4 ▱ experiment                     ! no upstream         —              │
 │    5 ▱ mobile                         × failed              —              │

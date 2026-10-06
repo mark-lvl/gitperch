@@ -64,12 +64,25 @@ ANSI cell measurement handles wide characters and colored strings. Bubble Tea
 converts theme colors to the detected terminal profile, including 256/16-color
 terminals. `--no-color`, `NO_COLOR`, and ASCII icons remain supported.
 
+## Worktrees in the list
+
+A repository with linked worktrees shows a badge while collapsed, for example
+`⑂2 · 1 stale` (two linked worktrees, one whose directory is gone). Expanding the
+group lists each worktree as a child row beneath its main repository, joined by
+tree lines. Child rows show the same status columns as any repository; a stale
+worktree shows `stale` instead and, like a bare repository, cannot be selected.
+Search and scopes reveal matching children without expanding their group. The
+Worktree section of the details lists the whole group, including stale ones,
+with branch, state and path. The `worktrees-110x35` capture below shows an
+expanded group.
+
 ## Keyboard
 
 | Keys | Action |
 | --- | --- |
 | ↑/↓ or j/k | Navigate repositories |
 | PgUp/PgDn, Home/End | Page or jump through the list |
+| →/← | Expand / collapse a repository's worktrees; ← on a worktree selects its repository |
 | 1–9 | Jump to that visible row; narrow layouts show the numbers |
 | Enter | Open repository Overview; while searching, open the selected result |
 | d | Open Changes, including the tracked patch |
@@ -137,6 +150,7 @@ rasterizer draws block elements and braille as shapes rather than font glyphs:
 - [Minimum width, 60×20](captures/workspace-60x20.png) · [text](captures/workspace-60x20.txt)
 - [Command palette](captures/palette-110x35.png)
 - [Repository overview](captures/details-110x35.png)
+- [Worktree group expanded](captures/worktrees-110x35.png) · [text](captures/worktrees-110x35.txt)
 - [First scan, 80×24](captures/scanning-80x24.png) · [text](captures/scanning-80x24.txt)
 
 Run `go test ./...`, `go vet ./...`, `go test -race ./...`, and
