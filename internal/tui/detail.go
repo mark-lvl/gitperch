@@ -74,12 +74,22 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 		}
 		lines = append(lines, " "+strings.Join(tabs, "  "))
 	}
+	label, color := m.primaryStatus(*row)
+	if !row.Selectable() {
+		// A stale or bare worktree has no repository to inspect: show what Git
+		// reported instead of values derived from an empty status.
+		lines = append(lines, m.style(" Path: "+gitcli.SafeText(row.Path), muted, false), " "+m.style(label, color, false))
+		lines = append(lines, "", m.style(" "+unavailableFact(*row), muted, false))
+		if m.detailTab == 3 {
+			lines = append(lines, m.worktreeGroupLines(*row)...)
+		}
+		return m.appendDetailDiagnostics(lines), patchAt
+	}
 	lines = append(lines, " "+m.detailActions(*row), m.style(" Path: "+gitcli.SafeText(row.Path), muted, false))
 	branch := branchLabel(*row)
 	if row.Status.Upstream != "" {
 		branch += " → " + gitcli.SafeText(row.Status.Upstream)
 	}
-	label, color := m.primaryStatus(*row)
 	lines = append(lines, " "+m.style(branch, branchColor, false), " "+m.style(label, color, false)+"  "+m.previewHint(*row))
 	result, loaded := m.detailCache[row.Path]
 	if row.Status.Error != "" {
@@ -150,6 +160,12 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 	if m.attentionRank(*row) > 0 {
 		lines = append(lines, "", m.style(" Next step", accent, true), " "+m.guidance(*row))
 	}
+	return m.appendDetailDiagnostics(lines), patchAt
+}
+
+// appendDetailDiagnostics adds batch results, workspace warnings and a load
+// error to the details document.
+func (m *Model) appendDetailDiagnostics(lines []string) []string {
 	diagnostics := m.detailsContent()
 	for i, line := range diagnostics {
 		if strings.Contains(line, "BATCH RESULTS") || strings.Contains(line, "WORKSPACE WARNINGS") {
@@ -160,7 +176,19 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 	if m.loadErr != "" {
 		lines = append(lines, "Load error: "+gitcli.SafeText(m.loadErr))
 	}
-	return lines, patchAt
+	return lines
+}
+
+// unavailableFact explains why a row has no repository context.
+func unavailableFact(row app.Row) string {
+	if w := row.Worktree; w != nil && w.Bare {
+		return "Bare repository · no working tree"
+	}
+	reason := "directory missing"
+	if w := row.Worktree; w != nil && w.PrunableReason != "" {
+		reason = gitcli.SafeText(w.PrunableReason)
+	}
+	return "Directory missing · no repository context · " + reason
 }
 
 // worktreeGroupLines lists the highlighted row's group (its main repository and

@@ -206,3 +206,45 @@ func TestWorktreeTabListsGroup(t *testing.T) {
 		}
 	}
 }
+
+func TestDetailsOnUnselectableRowsStateFacts(t *testing.T) {
+	rows := groupedRows()
+	bare := app.Row{Repository: repository.Repository{Name: "hub", Path: "/srv/hub.git"}, Worktree: &app.WorktreeInfo{Main: true, Bare: true, MainPath: "/srv/hub.git"}}
+	rows = append(rows, bare)
+	for _, tc := range []struct{ name, want string }{
+		{"old", "Directory missing · no repository context · gitdir file points to non-existent location"},
+		{"hub", "Bare repository · no working tree"},
+	} {
+		for tab := 0; tab < len(detailTabs); tab++ {
+			m := New(context.Background(), nil, true)
+			m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
+			m.applySnapshot(app.Snapshot{Rows: rows})
+			m.expanded["/home/mark/projects/api"] = true
+			m.Update(tea.WindowSizeMsg{Width: 110, Height: 40})
+			for i, idx := range m.visibleRows() {
+				if m.rows[idx].Name == tc.name {
+					m.highlight = i
+				}
+			}
+			if m.highlightedRow().Name != tc.name {
+				t.Fatalf("could not highlight %s", tc.name)
+			}
+			m.details, m.detailTab = true, tab
+			view := m.View().Content
+			if strings.Contains(view, "Loading") {
+				t.Fatalf("%s tab %d promises a load that never happens:\n%s", tc.name, tab, view)
+			}
+			if !strings.Contains(view, tc.want) {
+				t.Fatalf("%s tab %d missing %q:\n%s", tc.name, tab, tc.want, view)
+			}
+			for _, bad := range []string{"Upstream: none", "Common Git directory", "locally known refs"} {
+				if strings.Contains(view, bad) {
+					t.Fatalf("%s tab %d shows %q derived from an empty status:\n%s", tc.name, tab, bad, view)
+				}
+			}
+			if tab == 3 && tc.name == "old" && !strings.Contains(view, "Worktrees") {
+				t.Fatalf("group list missing:\n%s", view)
+			}
+		}
+	}
+}
