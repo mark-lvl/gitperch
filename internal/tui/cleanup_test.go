@@ -127,7 +127,9 @@ func TestCleanupReviewTogglesAndRuns(t *testing.T) {
 			t.Fatalf("missing %q:\n%s", want, view)
 		}
 	}
-	m.key(key(" ")) // untick the only eligible item
+	m.key(key(" ")) // untick the worktree, then its merged branch
+	m.key(key("down"))
+	m.key(key(" "))
 	if strings.Contains(m.View().Content, "[x]") {
 		t.Fatal("toggle did not untick")
 	}
@@ -136,11 +138,13 @@ func TestCleanupReviewTogglesAndRuns(t *testing.T) {
 		t.Fatalf("empty run should be refused: %q", m.message)
 	}
 	m.key(key(" "))
+	m.key(key("up"))
+	m.key(key(" "))
 	drain(m, m.key(key("enter")))
 	if _, err := os.Stat(merged); !os.IsNotExist(err) {
 		t.Fatal("merged worktree not removed")
 	}
-	if !strings.Contains(m.message, "Clean up finished · 1 succeeded") {
+	if !strings.Contains(m.message, "Clean up finished · 2 succeeded") {
 		t.Fatalf("summary: %q", m.message)
 	}
 }
@@ -298,8 +302,8 @@ func TestCleanupUntickedItemIsNotRun(t *testing.T) {
 		t.Fatalf("no review: %q", m.message)
 	}
 	eligible := m.eligibleCleanup()
-	if len(eligible) != 2 {
-		t.Fatalf("want two eligible items, got %+v", eligible)
+	if len(eligible) != 4 { // two worktrees, then their two branches
+		t.Fatalf("want four eligible items, got %+v", eligible)
 	}
 	keep, remove := eligible[0].Path, eligible[1].Path
 	m.key(key(" ")) // untick the first eligible item under the cursor
@@ -310,7 +314,9 @@ func TestCleanupUntickedItemIsNotRun(t *testing.T) {
 	if _, err := os.Stat(remove); !os.IsNotExist(err) {
 		t.Fatalf("ticked worktree %s still exists", remove)
 	}
-	if !strings.Contains(m.message, "1 succeeded") {
+	// The removed worktree and its branch succeed; the kept worktree's branch
+	// is skipped because that worktree still has it checked out.
+	if !strings.Contains(m.message, "2 succeeded · 1 skipped") {
 		t.Fatalf("summary: %q", m.message)
 	}
 	_ = merged

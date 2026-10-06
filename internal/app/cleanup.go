@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -56,6 +57,8 @@ type CleanupGit interface {
 	IgnoredFiles(context.Context, string) ([]string, error)
 	PruneWorktrees(context.Context, string) error
 	RemoveWorktree(context.Context, string, string) error
+	LocalBranches(context.Context, string) ([]gitcli.Branch, error)
+	DeleteBranch(context.Context, string, string, string) error
 }
 
 var ErrCleanupUnsupported = errors.New("worktree cleanup needs Git 2.36 or newer")
@@ -73,6 +76,7 @@ type plannedCleanup struct {
 
 type cleanupBase struct {
 	ref, name, reason string
+	branch            string // raw default branch name, never shown; skipped when deleting branches
 	failed            bool
 }
 
@@ -196,7 +200,7 @@ func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, 
 	if len(m.Remotes) == 0 {
 		for _, name := range []string{"main", "master"} {
 			if _, err := git.ResolveCommit(ctx, path, "refs/heads/"+name); err == nil {
-				return cleanupBase{ref: "refs/heads/" + name, name: name + " (local default)"}
+				return cleanupBase{ref: "refs/heads/" + name, name: name + " (local default)", branch: name}
 			}
 		}
 		return cleanupBase{reason: "no remote and no local main or master branch"}
@@ -229,7 +233,7 @@ func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, 
 	if err != nil {
 		return cleanupBase{reason: "default branch unknown: " + gitcli.SafeText(err.Error())}
 	}
-	return cleanupBase{ref: ref, name: gitcli.SafeText(strings.TrimPrefix(ref, "refs/remotes/"))}
+	return cleanupBase{ref: ref, name: gitcli.SafeText(strings.TrimPrefix(ref, "refs/remotes/")), branch: strings.TrimPrefix(ref, "refs/remotes/"+remote+"/")}
 }
 
 func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path string, m gitcli.Metadata) []plannedCleanup {
@@ -275,6 +279,48 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 	if len(stale) > 0 {
 		sort.Strings(stale)
 		add(CleanupItem{Kind: PruneStale, Path: group, Stale: stale, Eligible: true, Reason: fmt.Sprintf("%d stale worktree record(s)", len(stale))})
+	}
+	if base.ref == "" {
+		return out
+	}
+	// A branch whose worktree is planned for removal counts as free; a branch
+	// checked out only in a stale record is too, because prune runs first.
+	removed := map[string]bool{}
+	for _, p := range out {
+		if p.item.Kind == RemoveWorktree && p.item.Eligible && p.item.Branch != "" {
+			removed[p.item.Branch] = true
+		}
+	}
+	checkedOut := map[string]string{}
+	for _, wt := range worktrees {
+		if wt.Branch != "" && !isStale(wt) && !removed[wt.Branch] {
+			checkedOut[wt.Branch] = wt.Path
+		}
+	}
+	branches, err := git.LocalBranches(ctx, path)
+	if err != nil {
+		add(CleanupItem{Kind: CleanupGroup, Path: group, Reason: "branch list failed: " + gitcli.SafeText(err.Error()), Failed: true})
+		return out
+	}
+	for _, b := range branches {
+		if b.Name == base.branch {
+			continue
+		}
+		merged, err := git.IsAncestor(ctx, path, b.OID, base.ref)
+		item := CleanupItem{Kind: DeleteBranch, Path: group, Branch: b.Name, OID: b.OID}
+		switch {
+		case err != nil:
+			item.Reason = "merge check failed: " + gitcli.SafeText(err.Error())
+		case merged && checkedOut[b.Name] != "":
+			item.Reason = "merged but checked out in " + gitcli.SafeText(filepath.Base(checkedOut[b.Name]))
+		case merged:
+			item.Eligible, item.Reason = true, "merged into "+base.name
+		case b.Gone:
+			item.Reason = "upstream gone but not merged into " + base.name + " — squash merge?"
+		default:
+			continue // ordinary unmerged branch: not a cleanup candidate
+		}
+		add(item)
 	}
 	return out
 }
@@ -427,6 +473,14 @@ func (a *Actions) executeCleanupItem(ctx context.Context, git CleanupGit, p plan
 		err = git.PruneWorktrees(ctx, item.Group)
 	case RemoveWorktree:
 		err = git.RemoveWorktree(ctx, item.Group, item.Path)
+	case DeleteBranch:
+		err = git.DeleteBranch(ctx, item.Group, item.Branch, item.OID)
+		if err != nil && strings.HasPrefix(err.Error(), "branch deleted;") {
+			// The ref is gone; report success and keep the recovery command.
+			result.State = Succeeded
+			result.Message = deletedBranchMessage(item) + " · " + gitcli.SafeText(err.Error())
+			return result
+		}
 	default:
 		err = fmt.Errorf("unsupported cleanup item %q", item.Kind)
 	}
@@ -444,8 +498,15 @@ func (a *Actions) executeCleanupItem(ctx context.Context, git CleanupGit, p plan
 		result.Message = fmt.Sprintf("pruned %d stale worktree record(s)", len(item.Stale))
 	case RemoveWorktree:
 		result.Message = "removed worktree " + gitcli.SafeText(item.Path)
+	case DeleteBranch:
+		result.Message = deletedBranchMessage(item)
 	}
 	return result
+}
+
+func deletedBranchMessage(item CleanupItem) string {
+	b := gitcli.SafeText(item.Branch)
+	return fmt.Sprintf("deleted %s · restore: git branch %s %s", b, b, item.OID)
 }
 
 func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) error {
@@ -483,6 +544,34 @@ func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item Cl
 			return nil
 		}
 		return errors.New("worktree no longer exists")
+	case DeleteBranch:
+		// update-ref does not look at worktrees, so check them here.
+		for _, wt := range worktrees {
+			if wt.Branch == item.Branch && !isStale(wt) {
+				return fmt.Errorf("checked out in %s", filepath.Base(wt.Path))
+			}
+		}
+		branches, err := git.LocalBranches(ctx, item.Group)
+		if err != nil {
+			return err
+		}
+		for _, b := range branches {
+			if b.Name != item.Branch {
+				continue
+			}
+			if b.OID != item.OID {
+				return errors.New("branch moved since review")
+			}
+			merged, err := git.IsAncestor(ctx, item.Group, b.OID, item.Base)
+			if err != nil {
+				return err
+			}
+			if !merged {
+				return errors.New("no longer merged into " + item.BaseName)
+			}
+			return nil
+		}
+		return errors.New("branch no longer exists")
 	}
 	return fmt.Errorf("unsupported cleanup item %q", item.Kind)
 }

@@ -263,3 +263,214 @@ func TestCleanupSkipsWhenInspectedHeadDiffersFromReviewed(t *testing.T) {
 		t.Fatal("worktree removed")
 	}
 }
+
+func TestCleanupPlansMergedBranchesAfterTheirWorktree(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	actionGit(t, repo, "branch", "done") // merged, not checked out
+	actionGit(t, repo, "branch", "gone-squash", "ahead")
+	actionGit(t, repo, "push", "-u", "origin", "gone-squash")
+	actionGit(t, repo, "push", "origin", "--delete", "gone-squash")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	group := preview.Items[0].Group
+	branch := func(name string) *CleanupItem {
+		for i, item := range preview.Items {
+			if item.Kind == DeleteBranch && item.Branch == name {
+				return &preview.Items[i]
+			}
+		}
+		return nil
+	}
+	if b := branch("done"); b == nil || !b.Eligible {
+		t.Fatalf("done: %+v", b)
+	}
+	if b := branch("merged"); b == nil || !b.Eligible {
+		t.Fatalf("branch of a removable worktree should be eligible: %+v", b)
+	}
+	if b := branch("gone-squash"); b == nil || b.Eligible || !strings.Contains(b.Reason, "squash merge?") {
+		t.Fatalf("gone-squash: %+v", b)
+	}
+	if b := branch("ahead"); b != nil {
+		t.Fatalf("ordinary unmerged branch listed: %+v", b)
+	}
+	var ids []string
+	for _, item := range preview.Items {
+		if item.Eligible {
+			ids = append(ids, item.ID)
+		}
+	}
+	results, err := actions.ExecuteCleanup(context.Background(), preview.ID, ids, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range results {
+		if r.State != Succeeded {
+			t.Fatalf("result %+v", r)
+		}
+	}
+	if out := actionGit(t, group, "branch", "--list", "merged", "done"); len(strings.TrimSpace(string(out))) != 0 {
+		t.Fatalf("branches remain: %s", out)
+	}
+	if _, err := os.Stat(merged); !os.IsNotExist(err) {
+		t.Fatal("worktree not removed before its branch")
+	}
+	hinted := false
+	for _, r := range results {
+		if strings.Contains(r.Item, "done") {
+			hinted = true
+			if !strings.Contains(r.Message, "restore: git branch done ") {
+				t.Fatalf("no recovery hint: %+v", r)
+			}
+		}
+	}
+	if !hinted {
+		t.Fatal("no result for done")
+	}
+}
+
+func TestCleanupSkipsBranchStillCheckedOut(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var branchID string
+	for _, item := range preview.Items {
+		if item.Kind == DeleteBranch && item.Branch == "merged" {
+			branchID = item.ID
+		}
+	}
+	if branchID == "" {
+		t.Fatal("no branch item for merged")
+	}
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{branchID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "checked out") {
+		t.Fatalf("branch under a kept worktree: %+v", results)
+	}
+	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/merged")
+}
+
+func TestCleanupNeverDeletesDefaultBranch(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actionGit(t, repo, "checkout", "--detach")
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := false
+	for _, item := range preview.Items {
+		if item.Kind == DeleteBranch && item.Branch == "main" {
+			t.Fatalf("default branch offered: %+v", item)
+		}
+		listed = listed || item.Kind == DeleteBranch
+	}
+	if !listed {
+		t.Fatal("expected other branch items")
+	}
+}
+
+func TestCleanupSkipsBranchThatMoved(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actionGit(t, repo, "branch", "done")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id string
+	for _, item := range preview.Items {
+		if item.Kind == DeleteBranch && item.Branch == "done" {
+			id = item.ID
+		}
+	}
+	actionGit(t, repo, "branch", "-f", "done", "ahead")
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{id}, nil)
+	if len(results) != 1 || results[0].State != Skipped {
+		t.Fatalf("moved branch: %+v", results)
+	}
+	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/done")
+}
+
+func TestCleanupNeverDeletesLocalDefaultWithoutRemote(t *testing.T) {
+	repo := actionTestRepo(t)
+	actionTestWrite(t, filepath.Join(repo, "f"), "x\n")
+	actionTestCommit(t, repo, "init")
+	actionGit(t, repo, "branch", "done")
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var done bool
+	for _, item := range preview.Items {
+		if item.Kind == DeleteBranch && item.Branch == "main" {
+			t.Fatalf("local default offered: %+v", item)
+		}
+		done = done || (item.Kind == DeleteBranch && item.Branch == "done" && item.Eligible)
+	}
+	if !done {
+		t.Fatalf("done not offered: %+v", preview.Items)
+	}
+}
+
+func TestCleanupDeletesBranchOfStaleWorktreeAfterPrune(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	stale := filepath.Join(t.TempDir(), "stale")
+	actionGit(t, repo, "worktree", "add", "-b", "stale-br", stale)
+	os.RemoveAll(stale)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, item := range preview.Items {
+		if item.Kind == PruneStale || (item.Kind == DeleteBranch && item.Branch == "stale-br") {
+			if !item.Eligible {
+				t.Fatalf("not eligible: %+v", item)
+			}
+			ids = append(ids, item.ID)
+		}
+	}
+	if len(ids) != 2 {
+		t.Fatalf("ids %v in %+v", ids, preview.Items)
+	}
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, ids, nil)
+	if len(results) != 2 || results[0].State != Succeeded || results[1].State != Succeeded {
+		t.Fatalf("results %+v", results)
+	}
+	if out := actionGit(t, repo, "branch", "--list", "stale-br"); strings.TrimSpace(string(out)) != "" {
+		t.Fatalf("branch remains: %s", out)
+	}
+}
+
+func TestCleanupDefaultBranchSkippedForRemoteNameWithSlash(t *testing.T) {
+	repo := actionTestRepo(t)
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	actionBareRemote(t, remote)
+	actionTestWrite(t, filepath.Join(repo, "tracked"), "initial\n")
+	actionTestCommit(t, repo, "initial")
+	actionGit(t, repo, "remote", "add", "up/stream", remote)
+	actionGit(t, repo, "push", "up/stream", "main")
+	actionGit(t, repo, "config", "remote.up/stream.followRemoteHEAD", "never")
+	actionGit(t, repo, "remote", "set-head", "up/stream", "main")
+	actionGit(t, repo, "checkout", "--detach")
+	actionGit(t, repo, "branch", "done")
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var done bool
+	for _, item := range preview.Items {
+		if item.Kind == DeleteBranch && item.Branch == "main" {
+			t.Fatalf("default branch offered: %+v", item)
+		}
+		done = done || (item.Kind == DeleteBranch && item.Branch == "done" && item.Eligible)
+	}
+	if !done {
+		t.Fatalf("done not offered: %+v", preview.Items)
+	}
+}
