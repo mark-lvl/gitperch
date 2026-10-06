@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scrolling a large diff in the Changes section stays responsive: the patch is
   wrapped once per terminal width instead of on every frame and keypress
   (about 12 ms to under 1 ms per step for a 20,000-line patch).
+- Push and pull fetch their targets concurrently before the confirmation
+  popup, up to `action_workers` at a time and still one at a time per shared
+  Git directory, instead of one repository after another.
 
 ### Fixed
 

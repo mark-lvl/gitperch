@@ -155,8 +155,9 @@ comparisons deliberately start stale for some rows; fetch reveals current state.
 ## Push and fast-forward pull
 
 Select repositories with Space or `a`, then press `p` to push or `l` to
-fast-forward pull. Gitperch first fetches the targets, compares the refreshed
-state, then opens one small popup listing each eligible repository with its
+fast-forward pull. Gitperch first fetches the targets (concurrently, within
+the same `action_workers` and shared-Git-directory limits as other actions),
+compares the refreshed state, then opens one small popup listing each eligible repository with its
 route (`main → origin/main`) and short commit, plus any skips and their reasons.
 Enter executes; Esc cancels. When nothing is eligible, no popup opens and the
 status line says why. Repositories skipped during fetch remain skipped. `d`

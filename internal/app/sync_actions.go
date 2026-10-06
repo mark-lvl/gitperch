@@ -7,6 +7,7 @@ import (
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
 	"github.com/mark-lvl/gitperch/internal/repository"
 	"strings"
+	"sync"
 )
 
 type SyncGit interface {
@@ -178,18 +179,41 @@ func (a *Actions) PrepareSync(ctx context.Context, id uint64, action Action) (Pr
 			a.mu.Unlock()
 		}
 	}()
-	planned := make([]plannedTarget, 0, len(items))
-	for _, item := range items {
-		if err := ctx.Err(); err != nil {
-			return Preview{}, err
-		}
-		if !item.display.Eligible {
-			item.display.Action = action
-			planned = append(planned, item)
-			continue
-		}
-		planned = append(planned, a.planOne(ctx, action, item.display.Path, &item.metadata))
+	// Each plan runs a preflight fetch, so plans share Execute's limits: at
+	// most a.workers at once, one at a time per common Git directory.
+	planned := make([]plannedTarget, len(items))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for range min(a.workers, len(items)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				item := items[i]
+				if !item.display.Eligible {
+					item.display.Action = action
+					planned[i] = item
+					continue
+				}
+				lock := a.lockFor(item.metadata.CommonDir)
+				select {
+				case <-ctx.Done():
+					continue // the cancelled preview is discarded below
+				case <-lock:
+				}
+				planned[i] = a.planOne(ctx, action, item.display.Path, &item.metadata)
+				lock <- struct{}{}
+			}
+		}()
 	}
+	for i := range items {
+		if ctx.Err() != nil {
+			break
+		}
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
 	if err := ctx.Err(); err != nil {
 		return Preview{}, err
 	}
