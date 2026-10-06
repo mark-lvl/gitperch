@@ -42,7 +42,7 @@ func (m *Model) cancelPatch() {
 }
 func (m *Model) ensurePatch() tea.Cmd {
 	row := m.highlightedRow()
-	if m.closing || m.running || m.preparing || !m.details || m.detailTab != 1 || row == nil {
+	if m.closing || m.running || m.preparing || !m.details || m.detailTab != 1 || row == nil || !row.Selectable() {
 		if m.patchCancel != nil {
 			m.cancelPatch()
 		}

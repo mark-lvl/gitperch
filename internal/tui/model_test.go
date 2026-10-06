@@ -13,7 +13,15 @@ import (
 	"time"
 )
 
-func key(text string) tea.KeyPressMsg { return tea.KeyPressMsg{Code: []rune(text)[0], Text: text} }
+func key(text string) tea.KeyPressMsg {
+	switch text {
+	case "right":
+		return tea.KeyPressMsg{Code: tea.KeyRight}
+	case "left":
+		return tea.KeyPressMsg{Code: tea.KeyLeft}
+	}
+	return tea.KeyPressMsg{Code: []rune(text)[0], Text: text}
+}
 func testRows() []app.Row {
 	return []app.Row{
 		{Repository: repository.Repository{Name: "same", Path: "/one/same"}, Status: repository.Status{Branch: "main"}},

@@ -16,6 +16,14 @@ var scopes = []string{"All", "Attention", "Changed", "Ahead", "Behind", "Issues"
 // Attention is deliberately broader than dirty: unknown tracking state and
 // interrupted operations need review even when the worktree is clean.
 func attentionRank(row app.Row) int {
+	if w := row.Worktree; w != nil {
+		if w.Bare {
+			return 0
+		}
+		if w.Prunable {
+			return 2
+		}
+	}
 	s := row.Status
 	switch {
 	case s.Error != "":
@@ -261,7 +269,7 @@ func (m *Model) repositoryList(l dashboardLayout) []string {
 		lines = append(lines, message...)
 	}
 	for pos := m.scroll; pos < min(len(indices), m.scroll+l.slots); pos++ {
-		lines = append(lines, m.tableRow(m.rows[indices[pos]], pos, pos == m.highlight, l.listWidth))
+		lines = append(lines, m.tableRow(m.rows[indices[pos]], pos, pos == m.highlight, m.treePrefix(pos, indices), m.isContext(indices[pos]), l.listWidth))
 	}
 	return fitLines(lines, l.body)
 }
@@ -340,6 +348,12 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 			return "! cancelled", amber
 		}
 	}
+	if w := row.Worktree; w != nil && w.Bare {
+		return "bare repository", muted
+	}
+	if w := row.Worktree; w != nil && w.Prunable {
+		return "◌ stale · directory missing", amber
+	}
 	switch {
 	case s.Error != "":
 		return icons.failed + " failed", danger
@@ -351,6 +365,8 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 		return icons.changed + " changed", amber
 	case s.ComparisonKnown && s.Ahead > 0 && s.Behind > 0:
 		return "! diverged", danger
+	case row.Worktree != nil && row.Worktree.Locked:
+		return "⊘ locked", muted
 	case s.Detached:
 		return "! detached", amber
 	case s.Unborn:
@@ -371,7 +387,7 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 		return icons.clean + " clean", success
 	}
 }
-func (m *Model) tableRow(row app.Row, position int, highlighted bool, w int) string {
+func (m *Model) tableRow(row app.Row, position int, highlighted bool, tree string, context bool, w int) string {
 	icons := m.symbols()
 	pointer, mark := " ", " "
 	if highlighted {
@@ -393,7 +409,7 @@ func (m *Model) tableRow(row app.Row, position int, highlighted bool, w int) str
 		}
 		line += m.style(cell(number, c.index), muted, false) + " "
 	}
-	line += m.style(icons.repo, color, false) + " " + m.style(cell(gitcli.SafeText(row.Name), c.name), ink, highlighted) + " "
+	line += m.style(icons.repo, color, false) + " " + m.nameCell(row, tree, context, highlighted, c.name) + " "
 	if c.branch > 0 {
 		line += m.branchCell(row, c.branch) + " "
 	}
@@ -406,6 +422,27 @@ func (m *Model) tableRow(row app.Row, position int, highlighted bool, w int) str
 		return backgroundText(line, selection)
 	}
 	return line
+}
+
+// nameCell shows the tree prefix and name, followed by a collapsed group's
+// badge. The name is truncated before the badge. Context parents are muted.
+func (m *Model) nameCell(row app.Row, tree string, context, highlighted bool, w int) string {
+	nameColor := ink
+	if context {
+		nameColor = muted
+	}
+	name := tree + gitcli.SafeText(row.Name)
+	badge := m.groupBadge(row)
+	if badge == "" {
+		return m.style(cell(name, w), nameColor, highlighted)
+	}
+	room := w - ansi.StringWidth(badge) - 1
+	if room < 1 {
+		return m.style(cell(name, w), nameColor, highlighted)
+	}
+	name = ansi.Truncate(name, room, "…")
+	text := m.style(name, nameColor, highlighted) + " " + m.style(badge, muted, false)
+	return text + strings.Repeat(" ", max(0, w-ansi.StringWidth(name)-1-ansi.StringWidth(badge)))
 }
 func (m *Model) trackingCounts(row app.Row) string {
 	s := row.Status

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 	"time"
 
@@ -52,6 +51,7 @@ type Model struct {
 	filtering        bool
 	scope            int
 	attentionFirst   bool
+	expanded         map[string]bool // parent path to expanded worktree group
 	help             bool
 	helpOffset       int
 	details          bool
@@ -166,6 +166,7 @@ func New(ctx context.Context, load func(context.Context) (app.Snapshot, error), 
 		load:             load,
 		noColor:          noColor,
 		selected:         make(map[string]bool),
+		expanded:         make(map[string]bool),
 		width:            80,
 		height:           24,
 	}
@@ -353,7 +354,7 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	}
 	m.selected = make(map[string]bool)
 	for _, row := range m.rows {
-		if oldSelection[row.Path] && matches(row, m.filter) && m.inScope(row) {
+		if oldSelection[row.Path] && m.matchesView(row) && row.Selectable() {
 			m.selected[row.Path] = true
 		}
 	}
@@ -615,26 +616,53 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.highlight--
 			m.keepHighlightVisible()
 		}
+	case "right":
+		if row := m.highlightedRow(); row != nil {
+			m.expanded[groupKey(*row)] = true
+		}
+	case "left":
+		if row := m.highlightedRow(); row != nil {
+			parent := groupKey(*row)
+			if !isParent(*row) {
+				for i, index := range m.visibleRows() {
+					if m.rows[index].Path == parent {
+						m.highlight = i
+					}
+				}
+			} else {
+				delete(m.expanded, parent)
+			}
+			m.keepHighlightVisible()
+		}
 	case " ", "space":
 		if row := m.highlightedRow(); row != nil {
+			if !row.Selectable() {
+				m.message = staleNotice
+				return nil
+			}
 			m.selected[row.Path] = !m.selected[row.Path]
 			if !m.selected[row.Path] {
 				delete(m.selected, row.Path)
 			}
 		}
 	case "a":
-		allSelected := len(indices) > 0
+		// Context parents and rows without a directory are never selected.
+		var targets []int
 		for _, index := range indices {
+			if !m.isContext(index) && m.rows[index].Selectable() {
+				targets = append(targets, index)
+			}
+		}
+		allSelected := len(targets) > 0
+		for _, index := range targets {
 			if !m.selected[m.rows[index].Path] {
 				allSelected = false
 				break
 			}
 		}
-		if allSelected {
-			m.clearSelection()
-		} else {
-			m.clearSelection()
-			for _, index := range indices {
+		m.clearSelection()
+		if !allSelected {
+			for _, index := range targets {
 				m.selected[m.rows[index].Path] = true
 			}
 		}
@@ -689,10 +717,16 @@ func (m *Model) ExitCode() int {
 	return 0
 }
 
+const staleNotice = "Stale worktrees and bare repositories are handled by Clean up (c)"
+
 func (m *Model) launchShell() tea.Cmd {
 	row := m.highlightedRow()
 	if row == nil {
 		m.message = "Select a repository first"
+		return nil
+	}
+	if !row.Selectable() {
+		m.message = "This worktree has no directory to open"
 		return nil
 	}
 	shell := os.Getenv("SHELL")
@@ -709,6 +743,10 @@ func (m *Model) launchLazyGit() tea.Cmd {
 	row := m.highlightedRow()
 	if row == nil {
 		m.message = "Select a repository first"
+		return nil
+	}
+	if !row.Selectable() {
+		m.message = "This worktree has no directory to open"
 		return nil
 	}
 	path, err := exec.LookPath("lazygit")
@@ -744,26 +782,6 @@ func (m *Model) highlightedRow() *app.Row {
 		return nil
 	}
 	return &m.rows[indices[m.highlight]]
-}
-
-func (m *Model) visibleRows() []int {
-	indices := make([]int, 0, len(m.rows))
-	for i, row := range m.rows {
-		if matches(row, m.filter) && m.inScope(row) {
-			indices = append(indices, i)
-		}
-	}
-	sort.SliceStable(indices, func(i, j int) bool {
-		a, b := m.rows[indices[i]], m.rows[indices[j]]
-		if m.attentionFirst && m.attentionRank(a) != m.attentionRank(b) {
-			return m.attentionRank(a) > m.attentionRank(b)
-		}
-		if a.Name != b.Name {
-			return a.Name < b.Name
-		}
-		return a.Path < b.Path
-	})
-	return indices
 }
 
 func matches(row app.Row, filter string) bool {

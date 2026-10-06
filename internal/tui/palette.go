@@ -175,6 +175,10 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 		paths := m.selectedPaths()
 		if len(paths) == 0 {
 			if row := m.highlightedRow(); row != nil {
+				if !row.Selectable() {
+					m.message = staleNotice
+					return nil
+				}
 				paths = []string{row.Path}
 			}
 		}

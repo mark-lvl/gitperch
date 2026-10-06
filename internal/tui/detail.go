@@ -27,7 +27,7 @@ func (m *Model) ensureDetail() tea.Cmd {
 		return nil
 	}
 	row := m.highlightedRow()
-	if row == nil {
+	if row == nil || !row.Selectable() {
 		return nil
 	}
 	if _, ok := m.detailCache[row.Path]; ok && !m.detailStale[row.Path] {
