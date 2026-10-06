@@ -178,7 +178,6 @@ rule.
 - [Releasing](docs/releasing.md): versioning, changelog and the release workflow
 - [Changelog](CHANGELOG.md): changes in each version
 - [Design plan](docs/plan.md) and [mission control notes](docs/mission-control.md)
-- [Changelog](CHANGELOG.md)
 
 ## Roadmap
 
@@ -190,7 +189,8 @@ heuristics:
 - Group worktrees created by agents under their parent repository.
 - Surface "waiting for review" and "agent finished" states next to Git status.
 - Run project checks (tests, linters) from the dashboard.
-- Validated macOS and Windows support and published release binaries.
+- Validated macOS and Windows support, with release binaries for both
+  (Linux binaries are already published).
 
 Ideas and use cases are welcome in
 [GitHub Discussions](https://github.com/mark-lvl/gitperch/discussions)
