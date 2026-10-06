@@ -75,26 +75,11 @@ func (r Runner) Metadata(ctx context.Context, path string) (Metadata, error) {
 // the workspace can show recent activity without another Git process.
 func (r Runner) localMetadata(ctx context.Context, path string) (string, string, time.Time, error) {
 	var activity time.Time
-	gitPath := func(arg string) (string, error) {
-		out, err := r.Run(ctx, path, "rev-parse", "--path-format=absolute", arg)
-		if err != nil {
-			return "", err
-		}
-		p := strings.TrimSuffix(string(out.Stdout), "\n")
-		if p == "" || !filepath.IsAbs(p) {
-			return "", fmt.Errorf("Git returned an invalid metadata path")
-		}
-		return filepath.Clean(p), nil
-	}
-	common, err := gitPath("--git-common-dir")
+	common, gitDir, err := r.gitDirectories(ctx, path)
 	if err != nil {
 		return "", "", activity, err
 	}
 	common, err = filepath.EvalSymlinks(common)
-	if err != nil {
-		return "", "", activity, err
-	}
-	gitDir, err := gitPath("--git-dir")
 	if err != nil {
 		return "", "", activity, err
 	}
@@ -109,6 +94,37 @@ func (r Runner) localMetadata(ctx context.Context, path string) (string, string,
 		}
 	}
 	return common, "", activity, nil
+}
+
+// gitDirectories returns the absolute common and per-worktree Git
+// directories. One rev-parse prints both, a line each; a path containing a
+// newline cannot be split that way and is asked for separately.
+func (r Runner) gitDirectories(ctx context.Context, path string) (common, gitDir string, err error) {
+	out, err := r.Run(ctx, path, "rev-parse", "--path-format=absolute", "--git-common-dir", "--git-dir")
+	if err != nil {
+		return "", "", err
+	}
+	if lines := strings.Split(strings.TrimSuffix(string(out.Stdout), "\n"), "\n"); len(lines) == 2 && filepath.IsAbs(lines[0]) && filepath.IsAbs(lines[1]) {
+		return filepath.Clean(lines[0]), filepath.Clean(lines[1]), nil
+	}
+	gitPath := func(arg string) (string, error) {
+		out, err := r.Run(ctx, path, "rev-parse", "--path-format=absolute", arg)
+		if err != nil {
+			return "", err
+		}
+		p := strings.TrimSuffix(string(out.Stdout), "\n")
+		if p == "" || !filepath.IsAbs(p) {
+			return "", fmt.Errorf("Git returned an invalid metadata path")
+		}
+		return filepath.Clean(p), nil
+	}
+	if common, err = gitPath("--git-common-dir"); err != nil {
+		return "", "", err
+	}
+	if gitDir, err = gitPath("--git-dir"); err != nil {
+		return "", "", err
+	}
+	return common, gitDir, nil
 }
 
 type FetchTarget struct {

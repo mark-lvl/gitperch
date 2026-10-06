@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Push and pull fetch their targets concurrently before the confirmation
   popup, up to `action_workers` at a time and still one at a time per shared
   Git directory, instead of one repository after another.
+- Each status inspection starts one fewer Git process: a single `rev-parse`
+  now resolves both the common and per-worktree Git directories.
 
 ### Fixed
 
