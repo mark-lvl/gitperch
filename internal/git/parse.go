@@ -132,8 +132,13 @@ func ParseStatus(data []byte) (repository.Status, error) {
 			s.Conflicts++
 		}
 	}
-	if !head || !oid || (s.ComparisonKnown && (s.Upstream == "" || s.Unborn || s.Detached)) {
+	if !head || !oid || (s.ComparisonKnown && (s.Upstream == "" || s.Unborn)) {
 		return bad("inconsistent or missing branch headers")
+	}
+	if s.Detached {
+		// Detached at a tag or remote branch named like a local branch, Git
+		// reports that branch's upstream; HEAD itself tracks nothing.
+		s.Upstream, s.Ahead, s.Behind, s.ComparisonKnown = "", 0, 0, false
 	}
 	return s, nil
 }

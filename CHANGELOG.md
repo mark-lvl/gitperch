@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `[rejected] (fetch first) for refs/heads/main`, so the result and the
   "remote history needs review" guidance appear even when Git's advice hints
   are turned off.
+- A repository whose detached HEAD sits on a tag named like a local branch
+  with an upstream is no longer shown as failed ("malformed porcelain-v2
+  record"); it shows as detached with no upstream.
 
 ## [0.1.0] - 2026-10-06
 

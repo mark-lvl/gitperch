@@ -45,7 +45,7 @@ func commit(t *testing.T, path string) {
 }
 
 func TestRealStatusFixtures(t *testing.T) {
-	for _, name := range []string{"unborn", "normal", "staged-unstaged", "renamed", "conflicted", "untracked", "detached", "dirty-submodule", "unusual-filenames"} {
+	for _, name := range []string{"unborn", "normal", "staged-unstaged", "renamed", "conflicted", "untracked", "detached", "detached-upstream", "dirty-submodule", "unusual-filenames"} {
 		t.Run(name, func(t *testing.T) {
 			d := disposable(t)
 			if name != "unborn" {
@@ -67,6 +67,13 @@ func TestRealStatusFixtures(t *testing.T) {
 				untracked = 1
 			case "detached":
 				gitCmd(t, d, "checkout", "--detach")
+			case "detached-upstream":
+				// Detached at a tag named like a local branch: Git reports that
+				// branch's upstream although HEAD is on no branch.
+				gitCmd(t, d, "tag", "v1")
+				gitCmd(t, d, "branch", "v1")
+				gitCmd(t, d, "branch", "--set-upstream-to=main", "v1")
+				gitCmd(t, d, "checkout", "tags/v1")
 			case "conflicted":
 				gitCmd(t, d, "checkout", "-b", "other")
 				write(t, filepath.Join(d, "file"), "other\n")
@@ -97,7 +104,7 @@ func TestRealStatusFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s.Changes != changes || s.Untracked != untracked || s.Conflicts != conflicts || s.Detached != (name == "detached") || s.Unborn != (name == "unborn") || s.Synchronized() {
+			if s.Changes != changes || s.Untracked != untracked || s.Conflicts != conflicts || s.Detached != strings.HasPrefix(name, "detached") || (s.Detached && (s.Upstream != "" || s.ComparisonKnown)) || s.Unborn != (name == "unborn") || s.Synchronized() {
 				t.Fatalf("unexpected status: %+v", s)
 			}
 			actual := (Runner{}).Inspect(context.Background(), d)
@@ -152,7 +159,7 @@ func TestLocallyKnownComparisonAndDeletedUpstream(t *testing.T) {
 
 func TestMalformedRecords(t *testing.T) {
 	head := "# branch.oid " + strings.Repeat("a", 40) + "\x00# branch.head main\x00"
-	for _, data := range []string{"", head + "? \x00", head + "1 M. N...\x00", head + "# branch.ab +x -0\x00", head + "# branch.ab +1 -0\x00", head + "# branch.head main\x00", head + "bad\x00", strings.TrimSuffix(head, "\x00"), head + "2 R. N... 100644 100644 100644 " + strings.Repeat("a", 40) + " " + strings.Repeat("a", 40) + " R100 name\x00"} {
+	for _, data := range []string{"", head + "? \x00", head + "1 M. N...\x00", head + "# branch.ab +x -0\x00", head + "# branch.ab +1 -0\x00", "# branch.oid " + strings.Repeat("a", 40) + "\x00# branch.head (detached)\x00# branch.ab +1 -0\x00", head + "# branch.head main\x00", head + "bad\x00", strings.TrimSuffix(head, "\x00"), head + "2 R. N... 100644 100644 100644 " + strings.Repeat("a", 40) + " " + strings.Repeat("a", 40) + " R100 name\x00"} {
 		if _, err := ParseStatus([]byte(data)); err == nil {
 			t.Fatalf("accepted malformed %q", data)
 		}
