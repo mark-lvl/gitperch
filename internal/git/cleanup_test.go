@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -139,5 +140,49 @@ func TestRemoveWorktreeRefusesDirtyAndForceIsNeverUsed(t *testing.T) {
 	}
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Fatalf("worktree still present: %v", err)
+	}
+}
+
+func TestLocalBranches(t *testing.T) {
+	repo, _ := repoWithRemote(t)
+	gitCmd(t, repo, "branch", "plain")
+	gitCmd(t, repo, "branch", "tracked")
+	gitCmd(t, repo, "push", "-u", "origin", "tracked")
+	gitCmd(t, repo, "update-ref", "-d", "refs/remotes/origin/tracked")
+	got, err := (Runner{}).LocalBranches(context.Background(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]Branch{}
+	for _, b := range got {
+		byName[b.Name] = b
+	}
+	if len(got) != 3 || !objectID(byName["plain"].OID) || byName["plain"].Upstream != "" || !byName["tracked"].Gone || byName["main"].Gone {
+		t.Fatalf("branches: %+v", got)
+	}
+}
+
+func TestDeleteBranchComparesAndCleansConfig(t *testing.T) {
+	repo, _ := repoWithRemote(t)
+	gitCmd(t, repo, "branch", "done")
+	gitCmd(t, repo, "config", "branch.done.description", "agent work")
+	oid := strings.TrimSpace(string(gitCmd(t, repo, "rev-parse", "done")))
+	r := Runner{}
+	if err := r.DeleteBranch(context.Background(), repo, "done", strings.Repeat("1", 40)); err == nil {
+		t.Fatal("deleted with a stale expected OID")
+	}
+	if err := r.DeleteBranch(context.Background(), repo, "done", oid); err != nil {
+		t.Fatal(err)
+	}
+	if out, _ := exec.Command("git", "-C", repo, "rev-parse", "--verify", "--quiet", "refs/heads/done").Output(); len(out) != 0 {
+		t.Fatal("branch still exists")
+	}
+	if out, _ := exec.Command("git", "-C", repo, "config", "--get", "branch.done.description").Output(); len(out) != 0 {
+		t.Fatal("branch config left behind")
+	}
+	gitCmd(t, repo, "branch", "noconfig")
+	oid = strings.TrimSpace(string(gitCmd(t, repo, "rev-parse", "noconfig")))
+	if err := r.DeleteBranch(context.Background(), repo, "noconfig", oid); err != nil {
+		t.Fatalf("missing config section is not an error: %v", err)
 	}
 }

@@ -63,3 +63,9 @@ func (s Service) PruneWorktrees(ctx context.Context, path string) error {
 func (s Service) RemoveWorktree(ctx context.Context, path, worktree string) error {
 	return s.Write.RemoveWorktree(ctx, path, worktree)
 }
+func (s Service) LocalBranches(ctx context.Context, path string) ([]Branch, error) {
+	return s.Read.LocalBranches(ctx, path)
+}
+func (s Service) DeleteBranch(ctx context.Context, path, name, oid string) error {
+	return s.Write.DeleteBranch(ctx, path, name, oid)
+}

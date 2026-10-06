@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -94,4 +95,55 @@ func (r Runner) RemoveWorktree(ctx context.Context, path, worktree string) error
 	}
 	_, err := r.Run(ctx, path, "worktree", "remove", worktree)
 	return err
+}
+
+type Branch struct {
+	Name     string // short name
+	OID      string
+	Upstream string // e.g. refs/remotes/origin/x; "" when none
+	Gone     bool   // upstream configured but its tracking ref is missing
+}
+
+func (r Runner) LocalBranches(ctx context.Context, path string) ([]Branch, error) {
+	out, err := r.Run(ctx, path, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(upstream)%00%(upstream:track)", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	var branches []Branch
+	for _, line := range strings.Split(strings.TrimSuffix(string(out.Stdout), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "\x00")
+		name, ok := strings.CutPrefix(fields[0], "refs/heads/")
+		if len(fields) != 4 || !ok || name == "" || !objectID(fields[1]) {
+			return nil, fmt.Errorf("malformed branch list")
+		}
+		branches = append(branches, Branch{Name: name, OID: fields[1], Upstream: fields[2], Gone: fields[3] == "[gone]"})
+	}
+	return branches, nil
+}
+
+// DeleteBranch removes refs/heads/<name> only while it still points at oid
+// (Git compares and deletes atomically), then drops its config section.
+func (r Runner) DeleteBranch(ctx context.Context, path, name, oid string) error {
+	if name == "" || !objectID(oid) {
+		return fmt.Errorf("invalid reviewed branch")
+	}
+	if _, err := r.Run(ctx, path, "update-ref", "-d", "refs/heads/"+name, oid); err != nil {
+		return err
+	}
+	section := "branch." + name
+	_, err := r.Run(ctx, path, "config", "--local", "--name-only", "--get-regexp", "^"+regexp.QuoteMeta(section)+`\.`)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return nil // no configuration for this branch
+	}
+	if err != nil {
+		return fmt.Errorf("branch deleted; configuration not checked: %w", err)
+	}
+	if _, err := r.Run(ctx, path, "config", "--local", "--remove-section", section); err != nil {
+		return fmt.Errorf("branch deleted; configuration left behind: %w", err)
+	}
+	return nil
 }
