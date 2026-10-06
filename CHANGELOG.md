@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-06
+
 ### Changed
 
 - Renamed the project from `repodash` to **gitperch** and positioned it as a Git
@@ -42,4 +44,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instructions (`AGENTS.md`), issue and pull request templates, and Dependabot
   configuration.
 
-[Unreleased]: https://github.com/mark-lvl/gitperch/commits/main
+[Unreleased]: https://github.com/mark-lvl/gitperch/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mark-lvl/gitperch/releases/tag/v0.1.0
