@@ -233,7 +233,12 @@ func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, 
 	if err != nil {
 		return cleanupBase{reason: "default branch unknown: " + gitcli.SafeText(err.Error())}
 	}
-	return cleanupBase{ref: ref, name: gitcli.SafeText(strings.TrimPrefix(ref, "refs/remotes/")), branch: strings.TrimPrefix(ref, "refs/remotes/"+remote+"/")}
+	branch, ok := strings.CutPrefix(ref, "refs/remotes/"+remote+"/")
+	if !ok || branch == "" {
+		// Without the branch name the default branch could not be protected.
+		return cleanupBase{reason: "default branch unknown: " + gitcli.SafeText(ref) + " is outside refs/remotes/" + gitcli.SafeText(remote) + "/"}
+	}
+	return cleanupBase{ref: ref, name: gitcli.SafeText(strings.TrimPrefix(ref, "refs/remotes/")), branch: branch}
 }
 
 func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path string, m gitcli.Metadata) []plannedCleanup {
@@ -283,20 +288,22 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 	if base.ref == "" {
 		return out
 	}
-	// A branch whose worktree is planned for removal counts as free; a branch
-	// checked out only in a stale record is too, because prune runs first.
+	// A worktree planned for removal frees its branch, per worktree: the same
+	// branch can be checked out in several. A stale record frees it too, because
+	// prune runs first, unless it is locked (prune never removes those).
 	removed := map[string]bool{}
 	for _, p := range out {
-		if p.item.Kind == RemoveWorktree && p.item.Eligible && p.item.Branch != "" {
-			removed[p.item.Branch] = true
+		if p.item.Kind == RemoveWorktree && p.item.Eligible {
+			removed[p.item.Path] = true
 		}
 	}
 	checkedOut := map[string]string{}
 	for _, wt := range worktrees {
-		if wt.Branch != "" && !isStale(wt) && !removed[wt.Branch] {
+		if wt.Branch != "" && holdsBranch(wt) && !removed[wt.Path] {
 			checkedOut[wt.Branch] = wt.Path
 		}
 	}
+	busy := operationBlocker(ctx, git, worktrees)
 	branches, err := git.LocalBranches(ctx, path)
 	if err != nil {
 		add(CleanupItem{Kind: CleanupGroup, Path: group, Reason: "branch list failed: " + gitcli.SafeText(err.Error()), Failed: true})
@@ -311,6 +318,8 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		switch {
 		case err != nil:
 			item.Reason = "merge check failed: " + gitcli.SafeText(err.Error())
+		case merged && busy != "":
+			item.Reason = busy
 		case merged && checkedOut[b.Name] != "":
 			item.Reason = "merged but checked out in " + gitcli.SafeText(filepath.Base(checkedOut[b.Name]))
 		case merged:
@@ -328,6 +337,32 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 // isStale reports a linked worktree whose record outlived its directory.
 // Planning and revalidation share it so the reviewed set compares equal.
 func isStale(wt gitcli.Worktree) bool { return wt.Prunable || missingDir(wt.Path) }
+
+// holdsBranch reports whether a worktree keeps its branch checked out. Only a
+// prunable record frees it; a locked one stays (its directory may be on a
+// drive that is not mounted) and prune never removes it.
+func holdsBranch(wt gitcli.Worktree) bool { return !isStale(wt) || wt.Locked }
+
+// operationBlocker returns why no branch may be deleted while a worktree is
+// mid rebase, bisect, merge or similar: Git then lists that worktree as
+// detached, so its branch looks free although it is in use. An unreadable
+// worktree blocks too. "" means every inspectable worktree is idle.
+func operationBlocker(ctx context.Context, git CleanupGit, worktrees []gitcli.Worktree) string {
+	for _, wt := range worktrees {
+		if wt.Bare || isStale(wt) {
+			continue
+		}
+		name := gitcli.SafeText(filepath.Base(wt.Path))
+		s := git.Inspect(ctx, wt.Path)
+		switch {
+		case s.Error != "":
+			return "inspection failed in " + name + ": " + gitcli.SafeText(s.Error)
+		case s.Operation != "":
+			return "operation in progress in " + name
+		}
+	}
+	return ""
+}
 
 func lockReason(wt gitcli.Worktree) string {
 	if wt.LockReason != "" {
@@ -547,9 +582,12 @@ func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item Cl
 	case DeleteBranch:
 		// update-ref does not look at worktrees, so check them here.
 		for _, wt := range worktrees {
-			if wt.Branch == item.Branch && !isStale(wt) {
+			if wt.Branch == item.Branch && holdsBranch(wt) {
 				return fmt.Errorf("checked out in %s", filepath.Base(wt.Path))
 			}
+		}
+		if busy := operationBlocker(ctx, git, worktrees); busy != "" {
+			return errors.New(busy)
 		}
 		branches, err := git.LocalBranches(ctx, item.Group)
 		if err != nil {

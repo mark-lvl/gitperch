@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -472,5 +473,164 @@ func TestCleanupDefaultBranchSkippedForRemoteNameWithSlash(t *testing.T) {
 	}
 	if !done {
 		t.Fatalf("done not offered: %+v", preview.Items)
+	}
+}
+
+func branchItem(p CleanupPreview, name string) *CleanupItem {
+	for i, item := range p.Items {
+		if item.Kind == DeleteBranch && item.Branch == name {
+			return &p.Items[i]
+		}
+	}
+	return nil
+}
+
+func TestCleanupKeepsBranchOfLockedWorktreeWithMissingDirectory(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	usb := filepath.Join(t.TempDir(), "usb")
+	actionGit(t, repo, "worktree", "add", "--lock", "-b", "onusb", usb)
+	os.RemoveAll(usb)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := branchItem(preview, "onusb"); b == nil || b.Eligible || !strings.Contains(b.Reason, "checked out") {
+		t.Fatalf("branch of locked worktree: %+v", b)
+	}
+	actions.Discard(preview.ID)
+}
+
+func TestCleanupSkipsBranchWhoseStaleWorktreeGotLockedAfterReview(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	usb := filepath.Join(t.TempDir(), "usb")
+	actionGit(t, repo, "worktree", "add", "-b", "onusb", usb)
+	os.RemoveAll(usb)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := branchItem(preview, "onusb")
+	if b == nil || !b.Eligible {
+		t.Fatalf("branch of stale worktree should be eligible: %+v", b)
+	}
+	actionGit(t, repo, "worktree", "lock", usb)
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{b.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "checked out") {
+		t.Fatalf("results %+v", results)
+	}
+	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/onusb")
+}
+
+// conflictRebaseSetup returns a linked worktree on branch "rb" (merged into
+// origin/main) whose rebase onto "target" will conflict.
+func conflictRebaseSetup(t *testing.T, repo string) string {
+	t.Helper()
+	actionGit(t, repo, "checkout", "-b", "target")
+	actionTestWrite(t, filepath.Join(repo, "conflict.txt"), "target\n")
+	actionTestCommit(t, repo, "target change")
+	actionGit(t, repo, "checkout", "main")
+	actionTestWrite(t, filepath.Join(repo, "conflict.txt"), "main\n")
+	actionTestCommit(t, repo, "main change")
+	actionGit(t, repo, "push", "origin", "main")
+	wt := filepath.Join(t.TempDir(), "rb")
+	actionGit(t, repo, "worktree", "add", "-b", "rb", wt, "main")
+	return wt
+}
+
+func startConflictRebase(t *testing.T, wt string) {
+	t.Helper()
+	cmd := exec.Command("git", "-C", wt, "rebase", "target")
+	cmd.Env = actionTestGitEnv(t)
+	if out, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("rebase should conflict: %s", out)
+	}
+	gitDir := strings.TrimSpace(string(actionGit(t, wt, "rev-parse", "--absolute-git-dir")))
+	if _, err := os.Stat(filepath.Join(gitDir, "rebase-merge")); err != nil {
+		t.Fatalf("no rebase in progress: %v", err)
+	}
+}
+
+func TestCleanupKeepsMergedBranchesWhileAWorktreeIsRebasing(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actionGit(t, repo, "branch", "done")
+	wt := conflictRebaseSetup(t, repo)
+	startConflictRebase(t, wt)
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"rb", "done", "merged"} {
+		if b := branchItem(preview, name); b == nil || b.Eligible || !strings.Contains(b.Reason, "operation in progress in rb") {
+			t.Fatalf("%s: %+v", name, b)
+		}
+	}
+}
+
+func TestCleanupSkipsBranchWhenAWorktreeStartsRebasingAfterReview(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actionGit(t, repo, "branch", "done")
+	wt := conflictRebaseSetup(t, repo)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := branchItem(preview, "done")
+	if b == nil || !b.Eligible {
+		t.Fatalf("done: %+v", b)
+	}
+	startConflictRebase(t, wt)
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{b.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "operation in progress") {
+		t.Fatalf("results %+v", results)
+	}
+	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/done")
+}
+
+func TestCleanupKeepsBranchCheckedOutInASecondWorktree(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	first := filepath.Join(t.TempDir(), "dup1")
+	second := filepath.Join(t.TempDir(), "dup2")
+	actionGit(t, repo, "worktree", "add", "-b", "dup", first)
+	actionGit(t, repo, "worktree", "add", "--force", second, "dup")
+	actionTestWrite(t, filepath.Join(second, "scratch"), "x")
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item := itemFor(t, preview, RemoveWorktree, first); !item.Eligible {
+		t.Fatalf("first worktree should be removable: %+v", item)
+	}
+	if b := branchItem(preview, "dup"); b == nil || b.Eligible || !strings.Contains(b.Reason, "dup2") {
+		t.Fatalf("dup: %+v", b)
+	}
+}
+
+// outsideHeadGit reports a default ref outside refs/remotes/<remote>/.
+type outsideHeadGit struct{ gitcli.Service }
+
+func (outsideHeadGit) RemoteDefaultRef(context.Context, string, string) (string, error) {
+	return "refs/heads/main", nil
+}
+
+func TestCleanupTreatsDefaultRefOutsideRemoteAsUnknown(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	actionGit(t, repo, "branch", "done")
+	preview, err := NewActions(outsideHeadGit{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible || !strings.Contains(item.Reason, "default branch unknown") {
+		t.Fatalf("worktree: %+v", item)
+	}
+	for _, item := range preview.Items {
+		if item.Eligible {
+			t.Fatalf("eligible item without a known default: %+v", item)
+		}
+		if item.Kind == DeleteBranch {
+			t.Fatalf("branch item without a known default: %+v", item)
+		}
 	}
 }
