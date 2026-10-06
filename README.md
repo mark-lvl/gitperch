@@ -4,8 +4,8 @@
 
 **A terminal Git dashboard for keeping watch over the many repositories your AI coding agents work in.**
 
-[![CI](https://github.com/markkaghazgarian/gitperch/actions/workflows/ci.yml/badge.svg)](https://github.com/markkaghazgarian/gitperch/actions/workflows/ci.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/markkaghazgarian/gitperch.svg)](https://pkg.go.dev/github.com/markkaghazgarian/gitperch)
+[![CI](https://github.com/mark-lvl/gitperch/actions/workflows/ci.yml/badge.svg)](https://github.com/mark-lvl/gitperch/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mark-lvl/gitperch.svg)](https://pkg.go.dev/github.com/mark-lvl/gitperch)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ![gitperch workspace view](docs/captures/workspace-110x35.png)
@@ -63,13 +63,13 @@ platforms today; macOS and Windows are not yet validated.
 With Go 1.27.1 or newer:
 
 ```sh
-go install github.com/markkaghazgarian/gitperch/cmd/gitperch@latest
+go install github.com/mark-lvl/gitperch/cmd/gitperch@latest
 ```
 
 From source:
 
 ```sh
-git clone https://github.com/markkaghazgarian/gitperch.git
+git clone https://github.com/mark-lvl/gitperch.git
 cd gitperch
 make build          # writes bin/gitperch
 ```
@@ -157,8 +157,8 @@ heuristics:
 - Validated macOS and Windows support and published release binaries.
 
 Ideas and use cases are welcome in
-[GitHub Discussions](https://github.com/markkaghazgarian/gitperch/discussions)
-or as a [feature request](https://github.com/markkaghazgarian/gitperch/issues/new/choose).
+[GitHub Discussions](https://github.com/mark-lvl/gitperch/discussions)
+or as a [feature request](https://github.com/mark-lvl/gitperch/issues/new/choose).
 
 ## Contributing
 

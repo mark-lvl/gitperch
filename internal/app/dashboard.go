@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"github.com/markkaghazgarian/gitperch/internal/discovery"
+	"github.com/mark-lvl/gitperch/internal/discovery"
 )
 
 type Snapshot struct {

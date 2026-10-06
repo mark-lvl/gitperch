@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Renamed the project from `repodash` to **gitperch** and positioned it as a Git
   dashboard for overseeing repositories used in AI agentic development.
-- The Go module path is now `github.com/markkaghazgarian/gitperch`, the binary
+- The Go module path is now `github.com/mark-lvl/gitperch`, the binary
   is `gitperch`, and the config file moved to `~/.config/gitperch/config.toml`
   (previously `~/.config/repodash/config.toml`).
 - Detailed usage documentation moved from the README to `docs/usage.md`, and
@@ -37,5 +37,5 @@ the [draft release notes](docs/release-notes-v0.1.0.md).
 - Fetch, push of reviewed commits and fast-forward-only pull with plans,
   confirmation and revalidation.
 
-[Unreleased]: https://github.com/markkaghazgarian/gitperch/commits/main
+[Unreleased]: https://github.com/mark-lvl/gitperch/commits/main
 [0.1.0]: docs/release-notes-v0.1.0.md

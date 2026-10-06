@@ -12,7 +12,7 @@ and code are all welcome.
 
 ## Reporting bugs and requesting features
 
-Use the [issue templates](https://github.com/markkaghazgarian/gitperch/issues/new/choose).
+Use the [issue templates](https://github.com/mark-lvl/gitperch/issues/new/choose).
 For bugs include your OS (and whether it is WSL2), terminal, `git --version`,
 `gitperch --version`, what you did, what you expected and what happened.
 `gitperch status --json` output for the affected repository is very helpful;
@@ -23,7 +23,7 @@ redact paths or remote URLs you do not want to share.
 You need Go 1.27.1+ and Git. Then:
 
 ```sh
-git clone https://github.com/markkaghazgarian/gitperch.git
+git clone https://github.com/mark-lvl/gitperch.git
 cd gitperch
 make check      # fmt-check, test, race, vet, build: the same as CI
 ```

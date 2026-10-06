@@ -2,7 +2,7 @@ package tui
 
 import (
 	"github.com/charmbracelet/x/ansi"
-	"github.com/markkaghazgarian/gitperch/internal/app"
+	"github.com/mark-lvl/gitperch/internal/app"
 	"strings"
 	"testing"
 	"time"

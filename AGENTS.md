@@ -7,7 +7,7 @@ this repository. Human contributors should read [CONTRIBUTING.md](CONTRIBUTING.m
 
 gitperch is a Go terminal dashboard (Bubble Tea v2, Lip Gloss v2) that gives an
 overview of many local Git repositories and safely fetches, pushes and
-fast-forward pulls them. Module path: `github.com/markkaghazgarian/gitperch`.
+fast-forward pulls them. Module path: `github.com/mark-lvl/gitperch`.
 
 ## Commands
 

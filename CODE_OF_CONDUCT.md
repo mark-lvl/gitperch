@@ -60,9 +60,9 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the project maintainer,
-[@markkaghazgarian](https://github.com/markkaghazgarian), through a private
+[@mark-lvl](https://github.com/mark-lvl), through a private
 message on GitHub or a private
-[security advisory](https://github.com/markkaghazgarian/gitperch/security/advisories/new)
+[security advisory](https://github.com/mark-lvl/gitperch/security/advisories/new)
 marked as a conduct report. All complaints will be reviewed and investigated
 promptly and fairly.
 

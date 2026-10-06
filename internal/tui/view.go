@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/markkaghazgarian/gitperch/internal/app"
-	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	"github.com/mark-lvl/gitperch/internal/app"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 )
 
 var scopes = []string{"All", "Attention", "Changed", "Ahead", "Behind", "Issues"}

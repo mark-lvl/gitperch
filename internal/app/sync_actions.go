@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
-	"github.com/markkaghazgarian/gitperch/internal/repository"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
+	"github.com/mark-lvl/gitperch/internal/repository"
 	"strings"
 )
 

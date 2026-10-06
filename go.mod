@@ -1,4 +1,4 @@
-module github.com/markkaghazgarian/gitperch
+module github.com/mark-lvl/gitperch
 
 go 1.27.1
 

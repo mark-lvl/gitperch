@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/markkaghazgarian/gitperch/internal/repository"
+	"github.com/mark-lvl/gitperch/internal/repository"
 )
 
 const maxInspectionWorkers = 64

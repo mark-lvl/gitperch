@@ -11,8 +11,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/markkaghazgarian/gitperch/internal/app"
-	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	"github.com/mark-lvl/gitperch/internal/app"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 )
 
 type loader func(context.Context) (app.Snapshot, error)

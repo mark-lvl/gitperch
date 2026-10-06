@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/markkaghazgarian/gitperch/internal/repository"
+	"github.com/mark-lvl/gitperch/internal/repository"
 )
 
 // Options controls filesystem traversal. Each root starts at depth zero;

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 )
 
 func TestPushSuccessExcludesUncommittedChanges(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/markkaghazgarian/gitperch/internal/repository"
+	"github.com/mark-lvl/gitperch/internal/repository"
 	"os"
 	"path/filepath"
 	"sort"

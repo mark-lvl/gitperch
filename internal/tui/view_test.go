@@ -8,8 +8,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/markkaghazgarian/gitperch/internal/app"
-	"github.com/markkaghazgarian/gitperch/internal/repository"
+	"github.com/mark-lvl/gitperch/internal/app"
+	"github.com/mark-lvl/gitperch/internal/repository"
 )
 
 func dashboardRows() []app.Row {

@@ -3,8 +3,8 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/markkaghazgarian/gitperch/internal/discovery"
-	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	"github.com/mark-lvl/gitperch/internal/discovery"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 	"io"
 	"strings"
 	"text/tabwriter"

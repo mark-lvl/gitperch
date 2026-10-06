@@ -3,7 +3,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 	"context"
-	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 	"strings"
 )
 

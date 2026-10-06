@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	gitcli "github.com/markkaghazgarian/gitperch/internal/git"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 )
 
 func TestPushExcludesImplicitTagsAndUnrelatedBranches(t *testing.T) {

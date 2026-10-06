@@ -10,7 +10,7 @@ next release; older versions are not patched.
 Please **do not** open a public issue for security problems.
 
 Report vulnerabilities privately through GitHub's
-[private vulnerability reporting](https://github.com/markkaghazgarian/gitperch/security/advisories/new).
+[private vulnerability reporting](https://github.com/mark-lvl/gitperch/security/advisories/new).
 Include a description, the affected version or commit, reproduction steps and
 the impact you expect. You should receive an acknowledgement within a week.
 We will keep you informed while a fix is prepared and credit you in the

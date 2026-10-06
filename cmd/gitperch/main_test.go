@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/markkaghazgarian/gitperch/internal/app"
+	"github.com/mark-lvl/gitperch/internal/app"
 	"os"
 	"os/exec"
 	"path/filepath"

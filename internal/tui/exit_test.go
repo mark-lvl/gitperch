@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/markkaghazgarian/gitperch/internal/app"
-	"github.com/markkaghazgarian/gitperch/internal/repository"
+	"github.com/mark-lvl/gitperch/internal/app"
+	"github.com/mark-lvl/gitperch/internal/repository"
 )
 
 func TestDashboardExitCodes(t *testing.T) {
