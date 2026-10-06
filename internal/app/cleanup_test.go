@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
+	"github.com/mark-lvl/gitperch/internal/repository"
 )
 
 // cleanupRepo returns a repository with origin/HEAD set and a merged, clean
@@ -201,5 +202,64 @@ func TestCleanupSharesTheActivePreview(t *testing.T) {
 	actions.Discard(preview.ID)
 	if _, err := actions.Plan(context.Background(), Fetch, []string{repo}); err != nil {
 		t.Fatalf("discard did not release the cleanup preview: %v", err)
+	}
+}
+
+func TestCleanupPreflightFetchFailureIsReported(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	actionGit(t, repo, "remote", "set-url", "origin", filepath.Join(t.TempDir(), "missing.git"))
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var failed int
+	for _, item := range preview.Items {
+		if item.Kind == CleanupGroup && item.Failed && strings.Contains(item.Reason, "preflight fetch failed") {
+			failed++
+		}
+		if item.Kind == RemoveWorktree && item.Eligible {
+			t.Fatalf("removal eligible after a failed fetch: %+v", item)
+		}
+	}
+	if failed != 1 {
+		t.Fatalf("want one failed group item, got %d in %+v", failed, preview.Items)
+	}
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible {
+		t.Fatalf("merged: %+v", item)
+	}
+}
+
+type movedHead struct {
+	gitcli.Service
+	oid string
+}
+
+func (m *movedHead) Inspect(ctx context.Context, path string) repository.Status {
+	s := m.Service.Inspect(ctx, path)
+	if m.oid != "" {
+		s.HeadOID = m.oid
+	}
+	return s
+}
+
+func TestCleanupSkipsWhenInspectedHeadDiffersFromReviewed(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	svc := &movedHead{}
+	actions := NewActions(svc, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := itemFor(t, preview, RemoveWorktree, merged)
+	if !item.Eligible {
+		t.Fatalf("not eligible: %+v", item)
+	}
+	svc.oid = strings.Repeat("a", len(item.OID))
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{item.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "HEAD moved") {
+		t.Fatalf("moved HEAD not skipped: %+v", results)
+	}
+	if _, err := os.Stat(merged); err != nil {
+		t.Fatal("worktree removed")
 	}
 }

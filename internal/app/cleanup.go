@@ -221,7 +221,7 @@ func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, 
 	}
 	ref, err := git.RemoteDefaultRef(ctx, path, remote)
 	if errors.Is(err, gitcli.ErrNoDefaultRef) {
-		return cleanupBase{reason: fmt.Sprintf("default branch unknown — run git remote set-head %s -a", remote)}
+		return cleanupBase{reason: fmt.Sprintf("default branch unknown — run git remote set-head %s -a", gitcli.SafeText(remote))}
 	}
 	if err == nil {
 		_, err = git.ResolveCommit(ctx, path, ref)
@@ -229,7 +229,7 @@ func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, 
 	if err != nil {
 		return cleanupBase{reason: "default branch unknown: " + gitcli.SafeText(err.Error())}
 	}
-	return cleanupBase{ref: ref, name: strings.TrimPrefix(ref, "refs/remotes/")}
+	return cleanupBase{ref: ref, name: gitcli.SafeText(strings.TrimPrefix(ref, "refs/remotes/"))}
 }
 
 func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path string, m gitcli.Metadata) []plannedCleanup {
@@ -248,6 +248,9 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		item.ID = string(item.Kind) + "\x00" + group + "\x00" + item.Path + "\x00" + item.Branch
 		out = append(out, plannedCleanup{item: item, common: m.CommonDir})
 	}
+	if base.failed { // eligible prune items below do not depend on the base
+		add(CleanupItem{Kind: CleanupGroup, Path: group, Reason: base.reason, Failed: true})
+	}
 	var stale []string
 	for _, wt := range worktrees {
 		if wt.Main {
@@ -262,7 +265,7 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 			continue
 		}
 		item := CleanupItem{Kind: RemoveWorktree, Path: wt.Path, Branch: wt.Branch, OID: wt.HeadOID}
-		item.Reason = a.worktreeBlocker(ctx, git, wt, base)
+		item.Reason = a.worktreeBlocker(ctx, git, wt, base, "")
 		item.Eligible = item.Reason == ""
 		if item.Eligible {
 			item.Reason = "merged into " + base.name
@@ -288,8 +291,10 @@ func lockReason(wt gitcli.Worktree) string {
 }
 
 // worktreeBlocker returns why a linked worktree must stay, or "" when it is
-// clean, unlocked, free of ignored files and merged into the base.
-func (a *Actions) worktreeBlocker(ctx context.Context, git CleanupGit, wt gitcli.Worktree, base cleanupBase) string {
+// clean, unlocked, free of ignored files and merged into the base. A non-empty
+// wantOID also requires the inspected HEAD to be that commit, so the commit
+// that is merge-checked is the reviewed one.
+func (a *Actions) worktreeBlocker(ctx context.Context, git CleanupGit, wt gitcli.Worktree, base cleanupBase, wantOID string) string {
 	if wt.Locked {
 		return lockReason(wt)
 	}
@@ -305,6 +310,8 @@ func (a *Actions) worktreeBlocker(ctx context.Context, git CleanupGit, wt gitcli
 		return fmt.Sprintf("dirty (%d files)", s.Changes+s.Untracked)
 	case s.Unborn:
 		return "no commits"
+	case wantOID != "" && s.HeadOID != wantOID:
+		return "worktree HEAD moved since review"
 	}
 	ignored, err := git.IgnoredFiles(ctx, wt.Path)
 	switch {
@@ -470,7 +477,7 @@ func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item Cl
 			if wt.HeadOID != item.OID {
 				return errors.New("worktree HEAD moved since review")
 			}
-			if blocker := a.worktreeBlocker(ctx, git, wt, cleanupBase{ref: item.Base, name: item.BaseName}); blocker != "" {
+			if blocker := a.worktreeBlocker(ctx, git, wt, cleanupBase{ref: item.Base, name: item.BaseName}, item.OID); blocker != "" {
 				return errors.New(blocker)
 			}
 			return nil
