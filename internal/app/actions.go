@@ -14,9 +14,10 @@ import (
 type Action string
 
 const (
-	Fetch Action = "fetch"
-	Push  Action = "push"
-	Pull  Action = "fast-forward pull"
+	Fetch   Action = "fetch"
+	Push    Action = "push"
+	Pull    Action = "fast-forward pull"
+	Cleanup Action = "clean up"
 )
 
 type State string
@@ -57,6 +58,7 @@ type Preview struct {
 }
 type Event struct {
 	Path    string
+	Item    string // cleanup item ID; empty for fetch, push and pull
 	State   State
 	Message string
 	Status  repository.Status
@@ -73,15 +75,16 @@ type plannedTarget struct {
 // Actions owns one pending preview or batch at a time. Returned previews are
 // detached copies; callers cannot change executable targets after review.
 type Actions struct {
-	service   ActionGit
-	workers   int
-	mu        sync.Mutex
-	active    bool
-	nextID    uint64
-	pendingID uint64
-	pending   []plannedTarget
-	locks     map[string]chan struct{}
-	lastFetch map[string]time.Time
+	service        ActionGit
+	workers        int
+	mu             sync.Mutex
+	active         bool
+	nextID         uint64
+	pendingID      uint64
+	pending        []plannedTarget
+	pendingCleanup []plannedCleanup
+	locks          map[string]chan struct{}
+	lastFetch      map[string]time.Time
 }
 
 func NewActions(service ActionGit, workers int) *Actions {
@@ -145,8 +148,8 @@ func (a *Actions) Plan(ctx context.Context, action Action, paths []string) (Prev
 func (a *Actions) Discard(id uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if id != 0 && a.pendingID == id && len(a.pending) > 0 {
-		a.pending = nil
+	if id != 0 && a.pendingID == id && (len(a.pending) > 0 || a.pendingCleanup != nil) {
+		a.pending, a.pendingCleanup = nil, nil
 		a.pendingID = 0
 		a.active = false
 	}
