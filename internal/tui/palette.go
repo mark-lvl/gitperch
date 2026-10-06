@@ -119,8 +119,9 @@ func (m *Model) paletteKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		m.paletteCursor = 0
 	default:
-		if msg.Key().Mod == 0 {
-			m.paletteQuery += msg.Key().Text
+		// Text is empty for Ctrl/Alt combinations and non-printing keys.
+		if text := msg.Key().Text; text != "" {
+			m.paletteQuery += text
 			m.paletteCursor = 0
 		}
 	}

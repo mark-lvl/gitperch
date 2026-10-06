@@ -507,8 +507,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				m.highlight, m.scroll = 0, 0
 			}
 		default:
-			text := msg.Key().Text
-			if text != "" && msg.Key().Mod == 0 {
+			// Text is set only for printable input, including shifted keys;
+			// Ctrl and Alt combinations arrive without it.
+			if text := msg.Key().Text; text != "" {
 				m.filter += text
 				m.clearSelection()
 				m.highlight, m.scroll = 0, 0

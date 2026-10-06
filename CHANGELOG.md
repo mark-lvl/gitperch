@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The search filter and command palette accept capital letters and other
+  shifted characters instead of silently dropping them.
+
 ## [0.1.0] - 2026-10-06
 
 ### Changed

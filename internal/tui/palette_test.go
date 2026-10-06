@@ -122,6 +122,55 @@ func TestSearchNavigationEscapeAndFocusIdentity(t *testing.T) {
 	}
 }
 
+// Terminals report a typed capital as a shifted key, and the Kitty protocol
+// also reports Caps Lock; both still carry printable text.
+func TestSearchAndPaletteAcceptShiftedText(t *testing.T) {
+	shifted := []tea.KeyPressMsg{
+		{Code: 'd', ShiftedCode: 'D', Text: "D", Mod: tea.ModShift},
+		{Code: '-', ShiftedCode: '_', Text: "_", Mod: tea.ModShift},
+		{Code: 'o', Text: "O", Mod: tea.ModCapsLock},
+	}
+	m := New(nil, nil, true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.Update(key("/"))
+	for _, msg := range shifted {
+		m.Update(msg)
+	}
+	if m.filter != "D_O" {
+		t.Fatalf("search filter = %q, want %q", m.filter, "D_O")
+	}
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m.Update(key(":"))
+	for _, msg := range shifted {
+		m.Update(msg)
+	}
+	if m.paletteQuery != "D_O" {
+		t.Fatalf("palette query = %q, want %q", m.paletteQuery, "D_O")
+	}
+}
+
+func TestSearchAndPaletteIgnoreModifiedKeys(t *testing.T) {
+	// Ctrl and Alt combinations arrive without text and must not be typed.
+	modified := []tea.KeyPressMsg{{Code: 'x', Mod: tea.ModAlt}, {Code: 'x', Mod: tea.ModCtrl}}
+	m := New(nil, nil, true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.Update(key("/"))
+	for _, msg := range modified {
+		m.Update(msg)
+	}
+	if m.filter != "" {
+		t.Fatalf("modified keys typed into search: %q", m.filter)
+	}
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m.Update(key(":"))
+	for _, msg := range modified {
+		m.Update(msg)
+	}
+	if m.paletteQuery != "" {
+		t.Fatalf("modified keys typed into palette: %q", m.paletteQuery)
+	}
+}
+
 func TestPaletteAndHelpOverRepositoryDetails(t *testing.T) {
 	m := New(nil, nil, true)
 	m.applySnapshot(app.Snapshot{Rows: testRows()})
