@@ -1,5 +1,10 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+  <img src="docs/assets/logo-light.svg" alt="gitperch logo: a bird perched on a line of commits" width="160">
+</picture>
+
 # gitperch
 
 **A terminal Git dashboard for keeping watch over the many repositories your AI coding agents work in.**

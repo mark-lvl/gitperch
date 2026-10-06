@@ -33,6 +33,14 @@ Remaining spare rows sit between the list and the card. Key hints are filled key
 first on narrow terminals, and only keys that work for the highlighted
 repository appear.
 
+While the first scan runs, and when no repositories are found, the empty list
+shows the gitperch mark centered above its message: the logo's songbird in half
+blocks, perched on a heavy rule between two commits, with the bird in the
+accent color and the branch in the branch color. Mark and message need seven
+rows below the column headings; shorter lists and ASCII icons show the message
+alone. Once repositories exist, an empty search or scope shows only its
+message. The vector logo lives in [assets](assets/).
+
 Columns follow three terminal tiers:
 
 | Width | Columns | Preview |
@@ -120,7 +128,8 @@ automatic refresh timer, or unsafe confirmation bypass is introduced.
 ## Render captures and validation
 
 The deterministic captures use test fixtures, rendered by the production view.
-PNG captures are rasterized from its actual ANSI output:
+PNG captures are rasterized from its actual ANSI output. Like terminals, the
+rasterizer draws block elements and braille as shapes rather than font glyphs:
 
 - [Wide, 160×45](captures/workspace-160x45.png) · [text](captures/workspace-160x45.txt)
 - [Medium, 110×35](captures/workspace-110x35.png) · [text](captures/workspace-110x35.txt)
@@ -128,6 +137,7 @@ PNG captures are rasterized from its actual ANSI output:
 - [Minimum width, 60×20](captures/workspace-60x20.png) · [text](captures/workspace-60x20.txt)
 - [Command palette](captures/palette-110x35.png)
 - [Repository overview](captures/details-110x35.png)
+- [First scan, 80×24](captures/scanning-80x24.png) · [text](captures/scanning-80x24.txt)
 
 Run `go test ./...`, `go vet ./...`, `go test -race ./...`, and
 `go build -o bin/gitperch ./cmd/gitperch`. Launch `bin/gitperch /path/to/workspace`.
@@ -136,7 +146,7 @@ needs optional development packages `pillow` and `pyte`):
 
 ```sh
 ansi=$(mktemp -d)
-UPDATE_RENDERS=1 GITPERCH_ANSI_DIR="$ansi" go test ./internal/tui -run 'TestWorkspaceRenderCaptures|TestOverlayRenderCaptures'
+UPDATE_RENDERS=1 GITPERCH_ANSI_DIR="$ansi" go test ./internal/tui -run 'TestWorkspaceRenderCaptures|TestOverlayRenderCaptures|TestScanningRenderCapture'
 python scripts/render-captures.py "$ansi"
 ```
 

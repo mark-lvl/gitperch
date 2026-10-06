@@ -90,6 +90,36 @@ func TestWorkspaceRenderCaptures(t *testing.T) {
 	}
 }
 
+// The first scan shows the terminal mark in the empty list.
+func TestScanningRenderCapture(t *testing.T) {
+	m := New(nil, nil, true)
+	m.Configure("~/dev/platform", "unicode", false)
+	m.clock = func() time.Time { return captureNow }
+	m.loading = true
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	content := m.View().Content
+	lines := strings.Split(content, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	content = strings.Join(lines, "\n") + "\n"
+	path := filepath.Join("..", "..", "docs", "captures", "scanning-80x24.txt")
+	if os.Getenv("UPDATE_RENDERS") == "1" {
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+		m.noColor = false
+		writeANSICapture(t, "scanning-80x24", m.View().Content)
+	}
+	expected, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(expected) != content {
+		t.Fatal("scanning view changed; review with UPDATE_RENDERS=1 go test ./internal/tui -run TestScanningRenderCapture")
+	}
+}
+
 func TestOverlayRenderCaptures(t *testing.T) {
 	for _, mode := range []string{"palette", "details"} {
 		t.Run(mode, func(t *testing.T) {

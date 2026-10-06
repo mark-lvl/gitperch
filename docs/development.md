@@ -96,7 +96,7 @@ internal/repository/ repository identity and status model
 internal/tui/        Bubble Tea v2 interface
 scripts/             demo, dev launcher and capture rendering
 testdata/            recorded Git output used by tests
-docs/                user guides, design notes and render captures
+docs/                user guides, design notes, render captures and logo files
 ```
 
 Domain logic stays independent of the TUI, and Git is always invoked through

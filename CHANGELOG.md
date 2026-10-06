@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A logo: a songbird perched on a line of commits, in `docs/assets/` and at
+  the top of the README. The dashboard draws it with text characters above the
+  message while the first scan runs and when no repositories are found.
 - The dashboard refreshes local status automatically while idle, every 30
   seconds by default (`[ui] refresh_seconds`, `0` disables). The footer now
   shows the `r` manual refresh key.

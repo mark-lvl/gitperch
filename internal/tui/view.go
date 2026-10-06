@@ -106,6 +106,9 @@ func (m *Model) layout() dashboardLayout {
 	}
 	capacity := max(1, h-6-preview-notice)
 	l.body = min(max(4, len(m.visibleRows())+1), capacity)
+	if m.showsMark() {
+		l.body = capacity // the mark centers in the rows above the preview
+	}
 	l.slots = max(1, l.body-1)
 	l.bottom += preview + notice
 	l.split = w >= 120 && preview > 0
@@ -248,7 +251,14 @@ func (m *Model) repositoryList(l dashboardLayout) []string {
 		} else if m.scope != 0 {
 			title, hint = "Nothing needs attention in this view", "Tab returns to all repositories."
 		}
-		lines = append(lines, "", m.style(title, ink, true), m.style(hint, muted, false))
+		message := []string{m.style(title, ink, true), m.style(hint, muted, false)}
+		if m.showsMark() {
+			if block := m.markBlock(message, l.listWidth, l.body-1); block != nil {
+				return fitLines(append(lines, block...), l.body)
+			}
+		}
+		lines = append(lines, "")
+		lines = append(lines, message...)
 	}
 	for pos := m.scroll; pos < min(len(indices), m.scroll+l.slots); pos++ {
 		lines = append(lines, m.tableRow(m.rows[indices[pos]], pos, pos == m.highlight, l.listWidth))

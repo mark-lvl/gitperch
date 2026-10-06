@@ -30,7 +30,8 @@ and performs no network access.
 5. Show help with `?` and scroll to the end; return with Esc. Use `d` and
    arrows or PgUp/PgDn to inspect full diagnostics and root warnings,
    including long errors. Inspect the highlighted repository's error details when
-   using an invalid `.git` candidate. Try an empty directory and a missing root.
+   using an invalid `.git` candidate. Try an empty directory (the gitperch mark
+   sits above the message) and a missing root.
 6. Press Enter and confirm repository details open; Esc returns. Press `o` to
    start a child shell. Check `pwd`, type `exit`, and confirm the
    dashboard restores and refreshes. The parent shell stays in its original
