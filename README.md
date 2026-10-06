@@ -60,6 +60,28 @@ or resets, and re-validates every action right before it runs.
   deadlines, no interactive credential prompts, control characters escaped and
   credentials in URLs redacted.
 
+## How it compares
+
+gitperch sits between single-repository Git clients and multi-repository
+command runners: it gives you a live overview of many repositories and a small,
+guarded set of sync actions, and leaves everything else to the tools below.
+
+| Tool | Interface | What it is for |
+| --- | --- | --- |
+| **gitperch** | TUI + plain/JSON status | Overseeing many repositories and worktrees; fetch, push and fast-forward-only pull after review |
+| [lazygit](https://github.com/jesseduffield/lazygit) | TUI | Working inside one repository: staging, committing, rebasing |
+| [gita](https://github.com/nosarthur/gita) | CLI | Side-by-side status of registered repositories and running commands across them |
+| [myrepos](https://myrepos.branchable.com/) (`mr`) | CLI | Running commands across repositories listed in a config file, for several VCSs |
+| [multi-git-status](https://github.com/fboender/multi-git-status) | CLI | One-shot report of uncommitted, unpushed and unpulled changes under a directory |
+
+Choose gitperch when you want to see at a glance which of many repositories
+need attention, especially ones that AI agents have been working in, without
+registering each repository by hand or risking a command that rewrites history.
+It discovers repositories and linked worktrees by scanning your roots, ranks
+them by what needs you first, and deliberately cannot commit, stash, reset,
+rebase or force-push. When you need to do real work in a repository, it opens
+lazygit or a shell there and refreshes when you return.
+
 ## Installation
 
 gitperch requires the `git` CLI at runtime. Linux and WSL2 are the supported
