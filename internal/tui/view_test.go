@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
+	gitcli "github.com/mark-lvl/gitperch/internal/git"
 	"github.com/mark-lvl/gitperch/internal/repository"
 )
 
@@ -212,4 +213,66 @@ func highlightedLine(content, repository string) bool {
 		}
 	}
 	return false
+}
+
+func TestDocumentBodyWrapsOnlyOverlongLines(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.width, m.height = 20, 10
+	long := strings.Repeat("abcd ", 6)
+	_, body, _, _ := m.documentParts([]string{"title", "rule", "fits", long, "  spaced  "}, "foot")
+	want := append(append([]string{"fits"}, strings.Split(ansi.Wrap(long, 20, "/"), "\n")...), "  spaced  ")
+	if strings.Join(body, "|") != strings.Join(want, "|") {
+		t.Fatalf("body = %q, want %q", body, want)
+	}
+}
+
+// largePatchModel shows the Changes section of a repository whose tracked
+// patch has the given number of lines, styled as ensurePatch styles them.
+func largePatchModel(lines int) *Model {
+	m := New(context.Background(), nil, false)
+	m.applySnapshot(app.Snapshot{Rows: []app.Row{{Repository: repository.Repository{Name: "big", Path: "/big"}, Status: repository.Status{Branch: "main", Changes: 1}}}})
+	m.Update(tea.WindowSizeMsg{Width: 160, Height: 45})
+	m.detailCache["/big"] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Code: " M", Path: "big.txt", Added: lines}}}}
+	styled := make([]string, lines)
+	for i := range styled {
+		styled[i] = m.style(fmt.Sprintf("+line %d of a moderately long generated change", i), success, false)
+	}
+	m.details, m.detailTab = true, 1
+	m.patch = &patchResult{path: "/big", lines: styled}
+	return m
+}
+
+func BenchmarkLargePatchView(b *testing.B) {
+	m := largePatchModel(20000)
+	b.ResetTimer()
+	for range b.N {
+		_ = m.View()
+	}
+}
+
+func BenchmarkLargePatchScroll(b *testing.B) {
+	m := largePatchModel(20000)
+	b.ResetTimer()
+	for range b.N {
+		m.Update(key("j"))
+	}
+}
+
+func TestPatchFollowsDetailWidthAcrossResizes(t *testing.T) {
+	m := largePatchModel(3)
+	m.patch.lines = append(m.patch.lines, strings.Repeat("x", 150)+"END")
+	for _, width := range []int{160, 90, 60, 160} {
+		m.Update(tea.WindowSizeMsg{Width: width, Height: 45})
+		m.detailOffset = 1 << 20 // scroll to the end of the patch
+		m.Update(key("j"))
+		content := m.View().Content
+		if !strings.Contains(content, "END") {
+			t.Fatalf("width %d: end of the long patch line is missing:\n%s", width, content)
+		}
+		for _, line := range strings.Split(content, "\n") {
+			if w := ansi.StringWidth(line); w > width {
+				t.Fatalf("width %d: line is %d cells wide", width, w)
+			}
+		}
+	}
 }

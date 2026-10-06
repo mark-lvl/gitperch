@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository details load much faster for large change sets: matching line
   statistics to 20,000 changed files dropped from about 650 ms to 2 ms.
+- Scrolling a large diff in the Changes section stays responsive: the patch is
+  wrapped once per terminal width instead of on every frame and keypress
+  (about 12 ms to under 1 ms per step for a 20,000-line patch).
 
 ### Fixed
 

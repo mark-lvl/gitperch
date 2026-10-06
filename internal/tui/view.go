@@ -732,15 +732,28 @@ func (m *Model) documentPartsAt(content []string, footer string, bodyWidth int) 
 	w, h := max(1, m.width), max(1, m.height)
 	headerCount := min(len(content), 2, max(0, h-1))
 	header = content[:headerCount]
-	for _, line := range content[headerCount:] {
-		body = append(body, strings.Split(ansi.Wrap(line, max(1, bodyWidth), "/"), "\n")...)
-	}
+	body = wrapBody(content[headerCount:], bodyWidth)
 	for _, line := range strings.Split(footer, "\n") {
 		foot = append(foot, strings.Split(ansi.Wrap(line, w, " "), "\n")...)
 	}
 	foot = foot[:min(len(foot), max(1, h/3))]
 	page = max(0, h-len(header)-len(foot))
 	return
+}
+
+// wrapBody wraps document lines to width. Lines that already fit skip the
+// wrapper, which returns them unchanged.
+func wrapBody(lines []string, width int) []string {
+	width = max(1, width)
+	body := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if ansi.StringWidth(line) <= width {
+			body = append(body, line)
+			continue
+		}
+		body = append(body, strings.Split(ansi.Wrap(line, width, "/"), "\n")...)
+	}
+	return body
 }
 
 func (m *Model) documentMaxOffset(content []string, footer string) int {

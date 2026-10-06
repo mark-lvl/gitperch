@@ -830,21 +830,38 @@ func (m *Model) detailsContent() []string {
 	return content
 }
 
-func (m *Model) detailParts() (header, body, foot []string, page int) {
-	return m.documentPartsAt(m.repositoryDetails(), detailsFooter, max(1, m.width-m.detailNavWidth()-1))
+// detailBodyWidth leaves room for the section column when it is shown.
+func (m *Model) detailBodyWidth() int {
+	if inset := m.detailNavWidth(); inset > 0 {
+		return max(1, m.width-inset-1)
+	}
+	return max(1, m.width)
 }
 
-// detailsView scrolls the section content beside a fixed section column.
-func (m *Model) detailsView() tea.View {
-	inset := m.detailNavWidth()
-	if inset == 0 {
-		return m.documentView(m.repositoryDetails(), detailsFooter, m.detailOffset)
+// detailParts splices the tracked patch, wrapped once per width, into the
+// wrapped details document.
+func (m *Model) detailParts() (header, body, foot []string, page int) {
+	content, patchAt := m.repositoryDetails()
+	width := m.detailBodyWidth()
+	if patchAt < 0 {
+		return m.documentPartsAt(content, detailsFooter, width)
 	}
+	header, body, foot, page = m.documentPartsAt(content[:patchAt], detailsFooter, width)
+	body = append(body, m.patch.wrappedLines(width)...)
+	return header, append(body, wrapBody(content[patchAt:], width)...), foot, page
+}
+
+// detailsView scrolls the section content beside a fixed section column, or
+// below inline tabs on narrow terminals.
+func (m *Model) detailsView() tea.View {
 	header, body, foot, page := m.detailParts()
 	offset := min(max(0, m.detailOffset), max(0, len(body)-max(1, page)))
 	body = fitLines(body[offset:min(len(body), offset+page)], page)
-	nav := m.detailNav(page)
 	lines := append([]string(nil), header...)
+	if m.detailNavWidth() == 0 {
+		return m.screen(append(append(lines, body...), foot...))
+	}
+	nav := m.detailNav(page)
 	for i := range body {
 		lines = append(lines, nav[i]+" "+body[i])
 	}

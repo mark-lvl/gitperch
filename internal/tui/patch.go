@@ -12,7 +12,20 @@ type patchResult struct {
 	path  string
 	lines []string
 	err   error
+	// The wrapped patch for wrapWidth. A loaded patch never changes, and
+	// measuring every line again on each frame made large patches sluggish.
+	wrapWidth int
+	wrapped   []string
 }
+
+// wrappedLines wraps the patch for a details body width, once per width.
+func (p *patchResult) wrappedLines(width int) []string {
+	if p.wrapped == nil || p.wrapWidth != width {
+		p.wrapped, p.wrapWidth = wrapBody(p.lines, width), width
+	}
+	return p.wrapped
+}
+
 type patchMsg struct {
 	generation uint64
 	result     patchResult

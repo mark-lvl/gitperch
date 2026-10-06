@@ -50,14 +50,18 @@ func (m *Model) ensureDetail() tea.Cmd {
 		return detailMsg{path, generation, detailResult{data, err}}
 	}
 }
-func (m *Model) repositoryDetails() []string {
+
+// repositoryDetails returns the details document without the tracked patch,
+// and where the patch belongs (-1 when it is not shown); see detailParts.
+func (m *Model) repositoryDetails() (lines []string, patchAt int) {
+	patchAt = -1
 	row := m.highlightedRow()
 	if row == nil {
-		return m.detailsContent()
+		return m.detailsContent(), patchAt
 	}
 	w := max(1, m.width)
 	title := m.between(m.style(" Repository: ", ink, true)+m.style(gitcli.SafeText(row.Name), accent, true), m.style("Esc to back ", muted, false), w)
-	lines := []string{title, m.rule(w)}
+	lines = []string{title, m.rule(w)}
 	// Wide terminals list sections in a side column; narrow ones keep tabs inline.
 	if m.detailNavWidth() == 0 {
 		tabs := append([]string(nil), detailTabs...)
@@ -116,7 +120,7 @@ func (m *Model) repositoryDetails() []string {
 			if m.patch.err != nil {
 				lines = append(lines, m.style(" "+gitcli.SafeText(m.patch.err.Error()), danger, false))
 			}
-			lines = append(lines, m.patch.lines...)
+			patchAt = len(lines)
 			if len(m.patch.lines) == 0 && m.patch.err == nil {
 				lines = append(lines, m.style(" No tracked patch · untracked file contents are not included", muted, false))
 			}
@@ -155,7 +159,7 @@ func (m *Model) repositoryDetails() []string {
 	if m.loadErr != "" {
 		lines = append(lines, "Load error: "+gitcli.SafeText(m.loadErr))
 	}
-	return lines
+	return lines, patchAt
 }
 
 var detailTabs = []string{"Overview", "Changes", "Commits", "Worktree"}
