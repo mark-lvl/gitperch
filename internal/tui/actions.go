@@ -111,6 +111,14 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 		if skipped+failed > 0 {
 			m.message += " · d details"
 		}
+		if m.runningAction == app.Cleanup {
+			for _, result := range msg.results {
+				if result.State == app.Succeeded && strings.Contains(result.Message, "restore: git branch") {
+					m.message += " · d restore commands"
+					break
+				}
+			}
+		}
 		if msg.err != nil {
 			m.actionFailed = true
 			m.message += " · " + msg.err.Error()

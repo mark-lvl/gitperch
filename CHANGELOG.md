@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   worktrees already merged into the remote default branch. Dirty, locked,
   unmerged worktrees and worktrees with ignored files are kept with the reason
   shown; nothing is forced.
+- Clean up also deletes local branches fully merged into the remote default
+  branch, only at the commit you reviewed; Diagnostics (`d`) lists a
+  `git branch <name> <commit>` command to restore each one. Worktree and branch
+  cleanup need Git 2.36 or newer.
 - `gitperch status --json` reports a `worktree` object per repository (schema
   version 1, additive).
 

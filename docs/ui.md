@@ -95,7 +95,7 @@ expanded group.
 | a | Select/deselect all visible repositories (existing binding) |
 | p / l | Push / fast-forward pull selection or highlighted repository; one confirmation popup |
 | f | Fetch explicitly selected repositories (no confirmation) |
-| c | Clean up: review stale worktree records and merged clean worktrees (Git 2.36+); Space toggles, Enter runs, Esc cancels |
+| c | Clean up: review stale worktree records, merged clean worktrees and merged branches (Git 2.36+); Space toggles, Enter runs, Esc cancels |
 | o | Open an interactive shell in the selected worktree |
 | g | Open LazyGit; palette lists it only when installed |
 | r | Refresh workspace and invalidate cached details |

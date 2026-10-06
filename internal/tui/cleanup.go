@@ -223,7 +223,11 @@ func (m *Model) runCleanup(chosen []string) tea.Cmd {
 	return tea.Batch(run, m.nextEvent())
 }
 
-func (m *Model) cleanupLabel(item app.CleanupItem) string {
+func (m *Model) cleanupLabel(item app.CleanupItem) string { return m.cleanupItemLabel(item, true) }
+
+// cleanupItemLabel names an item; withOID adds a branch's short commit, which
+// the kept list leaves out so the reason keeps its room.
+func (m *Model) cleanupItemLabel(item app.CleanupItem, withOID bool) string {
 	switch item.Kind {
 	case app.PruneStale:
 		return fmt.Sprintf("prune %s", plural(len(item.Stale), "stale worktree record", "stale worktree records"))
@@ -234,7 +238,11 @@ func (m *Model) cleanupLabel(item app.CleanupItem) string {
 		}
 		return label
 	case app.DeleteBranch:
-		return "delete branch " + gitcli.SafeText(item.Branch)
+		label := "delete branch " + gitcli.SafeText(item.Branch)
+		if withOID {
+			label += "  " + m.style(shortCommit(item.OID), muted, false)
+		}
+		return label
 	}
 	return gitcli.SafeText(m.targetName(item.Path))
 }
@@ -301,7 +309,7 @@ func (m *Model) cleanupView() tea.View {
 		if item.Failed {
 			color = danger
 		}
-		lines = append(lines, m.style("  "+m.cleanupLabel(item)+": "+gitcli.SafeText(item.Reason), color, false))
+		lines = append(lines, m.style("  "+m.cleanupItemLabel(item, false)+": "+gitcli.SafeText(item.Reason), color, false))
 	}
 	footer := "Space toggle · ↑↓ move · " + m.symbols().enter + " clean up · Esc cancel"
 	if len(eligible) == 0 {

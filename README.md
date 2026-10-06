@@ -37,8 +37,8 @@ directory.
 It is deliberately conservative. Agents generate a lot of change; the
 dashboard you use to review that change should never add surprises.
 gitperch is read-only by default, never force-pushes or force-removes, never
-commits, stashes or resets, only deletes worktrees that are clean and merged, and
-re-validates every action right before it runs.
+commits, stashes or resets, only deletes worktrees and branches that are clean
+and merged, and re-validates every action right before it runs.
 
 ## Features
 
@@ -50,7 +50,8 @@ re-validates every action right before it runs.
 - **Worktree inventory**: every linked worktree, including nested, outside-root
   and stale ones, grouped under its repository.
 - **Reviewed cleanup**: prune stale worktree records and remove clean
-  worktrees already merged into the default branch.
+  worktrees already merged into the default branch, and local branches fully
+  merged into it.
 - **Repository details**: overview, changed files, recent commits and worktree
   state, plus a diff view.
 - **Safe synchronization**: fetch, push and fast-forward-only pull across a

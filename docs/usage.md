@@ -135,7 +135,8 @@ prunable) and is listed but cannot be selected or acted on; a `locked`
 worktree shows its lock reason when Git has one; a bare repository is shown as
 `bare` and is not selectable. These are read-only views; the only changes
 gitperch makes to worktrees are the reviewed ones under
-[Cleaning up worktrees](#cleaning-up-worktrees). It never creates or locks them.
+[Cleaning up worktrees and branches](#cleaning-up-worktrees-and-branches). It
+never creates or locks them.
 
 The inventory needs Git 2.36 or newer. With older Git, or when the Git version
 cannot be read, the feature is silently off: no grouping, no stale worktrees, no
@@ -154,10 +155,10 @@ inventory is available (schema version still 1; the field is additive):
 | `main_path` | Path of the main worktree that owns this group |
 | `outside_roots` | Listed by Git but outside the scanned roots (omitted when false) |
 
-## Cleaning up worktrees
+## Cleaning up worktrees and branches
 
-Press `c` (or choose Clean up from the palette) to review leftover worktrees,
-typically after agents finish. It targets the selected repositories, or the
+Press `c` (or choose Clean up from the palette) to review leftover worktrees
+and merged local branches, typically after agents finish. It targets the selected repositories, or the
 highlighted one; a selected or highlighted linked worktree targets its whole
 group. Clean up is hidden below Git 2.36, where `c` explains the requirement.
 
@@ -174,6 +175,7 @@ a reason. Results appear in the status line and in details under Batch results.
 | --- | --- | --- |
 | Stale worktree records (one item per repository) | At least one record is stale (directory missing) and not locked | `git worktree prune` |
 | Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
+| Local branch | Its tip is reachable from the default ref, it is not the default branch, and no remaining worktree has it checked out | `git update-ref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
 
 Reasons a worktree is kept include `dirty (3 files)`, `locked: agent session`,
 `4 ignored file(s) (.env, node_modules/, …)`, and `not merged into origin/main`.
@@ -191,6 +193,32 @@ removal (stale records can still be pruned); run
 `git remote set-head <remote> -a` yourself, because gitperch never sets it. A
 failed fetch likewise makes no worktree eligible for removal, and the error is
 shown among the kept items; stale records can still be pruned.
+
+### Branches
+
+Local branches are reviewed in the same list, one item per branch with its
+short commit. A branch is eligible when its tip is reachable from the default
+ref (`refs/remotes/<remote>/HEAD` after the fetch, or local `main`/`master`
+without a remote), it is not the default branch itself, and no remaining
+worktree has it checked out.
+
+- A worktree holds its branch unless its record is stale (directory missing).
+  A locked worktree holds its branch even when its directory is missing.
+- A branch whose worktree removal you unticked, or whose removal fails, is
+  skipped at run time ("checked out in ...").
+- While any worktree in the repository has an operation in progress (rebase,
+  merge, cherry-pick, revert, bisect) or cannot be inspected, merged branches
+  are still listed but none is eligible.
+- An unmerged branch whose upstream is gone is kept with
+  "upstream gone but not merged into ... — squash merge?", since a squash or
+  rebase merge cannot be detected. Other unmerged branches are not listed.
+
+Deletion is a compare-and-delete at the commit you reviewed: if the branch has
+moved since, it is skipped and nothing is lost. Afterwards the branch's
+`branch.<name>` config section (its upstream settings) is removed. Each deleted
+branch leaves a restore command in Diagnostics (`d`) under Batch results, for
+example `git branch feat/old-login 9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2`;
+the status line points to it with "d restore commands".
 
 ## Fetch
 
@@ -276,7 +304,7 @@ normal user permissions; gitperch is not a sandbox for untrusted repositories.
 
 The dashboard does not stage, commit, stash, reset, clean, rebase, resolve
 conflicts, create branches, configure upstreams, or force push. It does not
-force-remove worktrees or delete unmerged work. It does not
-support triangular push workflows, multiple push URLs, arbitrary push
+force-remove worktrees or delete unmerged work; the only branches it deletes
+are fully merged ones, after review. It does not support triangular push workflows, multiple push URLs, arbitrary push
 refspecs, or headless bulk mutation. See [plan.md](plan.md) for the full v0.1
 scope and action policy.

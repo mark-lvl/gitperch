@@ -356,3 +356,46 @@ func TestCleanupLateResultAfterCancelDoesNotOpenReview(t *testing.T) {
 		t.Fatalf("review opened after cancel: %v %q", m.cleanup, m.message)
 	}
 }
+
+func TestCleanupSummaryPointsToRestoreCommands(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.running, m.runningAction, m.results = true, app.Cleanup, map[string]app.Event{}
+	m.Update(batchDoneMsg{generation: m.actionGeneration, results: []app.Event{{Path: "/r", Item: "delete branch\x00/r\x00/r\x00done", State: app.Succeeded, Message: "deleted done · restore: git branch done 0123456789abcdef0123456789abcdef01234567"}}})
+	if !strings.Contains(m.message, "d restore commands") {
+		t.Fatalf("summary: %q", m.message)
+	}
+	m.details, m.detailTab = true, 0
+	if !strings.Contains(strings.Join(m.detailsContent(), "\n"), "restore: git branch done 0123456789abcdef") {
+		t.Fatal("restore command missing from diagnostics")
+	}
+}
+
+func TestCleanupSummaryOmitsRestoreHintWithoutDeletedBranch(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.running, m.runningAction, m.results = true, app.Cleanup, map[string]app.Event{}
+	m.Update(batchDoneMsg{generation: m.actionGeneration, results: []app.Event{{Path: "/r", Item: "remove worktree\x00/r\x00/w", State: app.Succeeded, Message: "removed"}}})
+	if strings.Contains(m.message, "restore") {
+		t.Fatalf("summary: %q", m.message)
+	}
+}
+
+func TestCleanupLabelShowsShortBranchCommit(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	label := m.cleanupLabel(app.CleanupItem{Kind: app.DeleteBranch, Branch: "feat/x", OID: "0123456789abcdef0123456789abcdef01234567"})
+	if !strings.Contains(label, "delete branch feat/x") || !strings.Contains(label, "0123456") || strings.Contains(label, "01234567") {
+		t.Fatalf("label: %q", label)
+	}
+}
+
+func TestCleanupKeptBranchOmitsCommitSoReasonFits(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.width, m.height = 110, 35
+	m.cleanup = &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{{ID: "b", Group: "/r", Kind: app.DeleteBranch, Path: "/r", Branch: "feat/squashed", OID: "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", Reason: "upstream gone but not merged into origin/main — squash merge?"}}}
+	content := m.View().Content
+	if !strings.Contains(content, "delete branch feat/squashed: upstream gone") || !strings.Contains(content, "squash merge?") || strings.Contains(content, "4be81d0") {
+		t.Fatalf("kept branch: %s", content)
+	}
+}

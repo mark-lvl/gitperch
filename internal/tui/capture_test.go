@@ -50,8 +50,9 @@ func writeANSICapture(t *testing.T, name, content string) {
 	}
 }
 
-// captureCleanup is a fixed review: one prune, two eligible removals and two
-// kept worktrees. It never touches Git.
+// captureCleanup is a fixed review: one prune, two eligible removals, one
+// eligible merged branch, two kept worktrees and one kept branch whose
+// upstream is gone. It never touches Git.
 func captureCleanup(main string) *app.CleanupPreview {
 	base := "origin/main"
 	remove := func(id, name, branch string, eligible bool, reason string) app.CleanupItem {
@@ -61,8 +62,10 @@ func captureCleanup(main string) *app.CleanupPreview {
 		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Eligible: true, Reason: "1 stale worktree record(s)"},
 		remove("fix-tokens", "fix-tokens", "fix/tokens", true, "merged into "+base),
 		remove("add-icons", "add-icons", "feat/icons", true, "merged into "+base),
+		{ID: "branch-old-login", Group: main, Kind: app.DeleteBranch, Path: main, Branch: "feat/old-login", OID: "9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2", BaseName: base, Eligible: true, Reason: "merged into " + base},
 		remove("wip-dark", "wip-dark", "wip/dark-mode", false, "dirty (3 files)"),
 		remove("agent-run", "agent-run", "agent/run-42", false, "locked: agent session"),
+		{ID: "branch-squashed", Group: main, Kind: app.DeleteBranch, Path: main, Branch: "feat/squashed", OID: "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", BaseName: base, Reason: "upstream gone but not merged into " + base + " — squash merge?"},
 	}}
 }
 
