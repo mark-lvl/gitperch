@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A repository whose detached HEAD sits on a tag named like a local branch
   with an upstream is no longer shown as failed ("malformed porcelain-v2
   record"); it shows as detached with no upstream.
+- While an action is being prepared, the footer shows "Preparing…" instead of
+  "Batch running" with the previous batch's counts (for example "2/1
+  finished").
 
 ## [0.1.0] - 2026-10-06
 

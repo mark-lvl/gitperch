@@ -600,7 +600,12 @@ func (m *Model) footer() string {
 	w := max(1, m.width-4)
 	enter := m.symbols().enter
 	if m.preparing || m.running {
-		return m.hintBar("", []hint{{"Esc", "Cancel", 0}}, w) + "  " + m.style(m.spinner()+" "+m.progressLabel(), working, false)
+		// Results held while preparing belong to the previous batch.
+		activity := "Preparing…"
+		if m.running {
+			activity = m.progressLabel()
+		}
+		return m.hintBar("", []hint{{"Esc", "Cancel", 0}}, w) + "  " + m.style(m.spinner()+" "+activity, working, false)
 	}
 	if m.filtering {
 		return m.hintBar("", []hint{{"↑↓", "Choose", 1}, {enter, "Open", 0}, {"Esc", "Clear", 0}}, w)

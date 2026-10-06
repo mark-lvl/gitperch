@@ -76,3 +76,25 @@ func TestSpinnerShowsWhereWorkIsRunning(t *testing.T) {
 		t.Fatalf("refresh spinner missing: %q", content)
 	}
 }
+
+// Preparing a plan or preflight fetch is not a running batch: the footer must
+// not report batch progress, least of all the previous batch's results.
+func TestPreparingFooterDoesNotReportBatchProgress(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.width, m.height = 120, 30
+	m.applySnapshot(app.Snapshot{Rows: []app.Row{
+		{Repository: repository.Repository{Name: "first", Path: "/repos/first"}},
+		{Repository: repository.Repository{Name: "second", Path: "/repos/second"}},
+	}})
+	m.results = map[string]app.Event{
+		"/repos/first":  {Path: "/repos/first", State: app.Succeeded},
+		"/repos/second": {Path: "/repos/second", State: app.Succeeded},
+	}
+	m.preparing = true
+	m.actionTotal = 1
+	m.spinnerFrame = 1
+	footer := m.footer()
+	if strings.Contains(footer, "Batch running") || !strings.Contains(footer, "⠙ Preparing") {
+		t.Fatalf("preparing footer = %q", footer)
+	}
+}
