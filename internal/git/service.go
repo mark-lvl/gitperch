@@ -39,3 +39,21 @@ func (s Service) FastForward(ctx context.Context, path, commit string) error {
 func (s Service) SupportsWorktreeInventory(ctx context.Context) bool {
 	return s.Read.SupportsWorktreeInventory(ctx)
 }
+func (s Service) Worktrees(ctx context.Context, path string) ([]Worktree, error) {
+	return s.Read.Worktrees(ctx, path)
+}
+func (s Service) ResolveRemote(ctx context.Context, path string, m Metadata, remote string) (FetchTarget, error) {
+	return s.Read.ResolveRemote(ctx, path, m, remote)
+}
+func (s Service) RemoteDefaultRef(ctx context.Context, path, remote string) (string, error) {
+	return s.Read.RemoteDefaultRef(ctx, path, remote)
+}
+func (s Service) ResolveCommit(ctx context.Context, path, ref string) (string, error) {
+	return s.Read.ResolveCommit(ctx, path, ref)
+}
+func (s Service) IsAncestor(ctx context.Context, path, oid, ref string) (bool, error) {
+	return s.Read.IsAncestor(ctx, path, oid, ref)
+}
+func (s Service) IgnoredFiles(ctx context.Context, path string) ([]string, error) {
+	return s.Read.IgnoredFiles(ctx, path)
+}

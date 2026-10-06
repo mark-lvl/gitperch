@@ -140,6 +140,12 @@ func (r Runner) ResolveFetch(ctx context.Context, path string, m Metadata) (Fetc
 		}
 		remote = m.Remotes[0]
 	}
+	return r.ResolveRemote(ctx, path, m, remote)
+}
+
+// ResolveRemote validates a named remote for a safe fetch: configured,
+// external, not a mirror, and with conventional tracking refspecs only.
+func (r Runner) ResolveRemote(ctx context.Context, path string, m Metadata, remote string) (FetchTarget, error) {
 	valid := false
 	for _, name := range m.Remotes {
 		if remote == name {
