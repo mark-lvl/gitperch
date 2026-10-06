@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - While an action is being prepared, the footer shows "Preparing…" instead of
   "Batch running" with the previous batch's counts (for example "2/1
   finished").
+- Cancelling an action while it is being prepared reports "Preview preparation
+  cancelled" instead of the raw "context canceled".
 
 ## [0.1.0] - 2026-10-06
 

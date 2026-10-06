@@ -3,6 +3,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
@@ -40,9 +41,14 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 			return true, nil
 		}
 		m.preparing = false
-		if msg.err == nil && m.actionCtx != nil && m.actionCtx.Err() != nil {
+		cancelled := m.actionCtx != nil && m.actionCtx.Err() != nil
+		if cancelled && (msg.err == nil || errors.Is(msg.err, context.Canceled)) {
 			m.actions.Discard(msg.preview.ID)
 			m.message = "Preview preparation cancelled"
+			if m.actionCancel != nil {
+				m.actionCancel()
+				m.actionCancel = nil
+			}
 			return true, m.resumeInterruptedRefresh()
 		}
 		if msg.err != nil {

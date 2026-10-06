@@ -240,6 +240,9 @@ func TestEscCancelsSyncPreparationAndReleasesPlan(t *testing.T) {
 	if m.preparing || m.preview != nil || fake.pushCalls.Load() != 0 || fake.ffCalls.Load() != 0 {
 		t.Fatalf("cancelled prep state: preparing=%v preview=%#v", m.preparing, m.preview)
 	}
+	if m.message != "Preview preparation cancelled" {
+		t.Fatalf("cancelled preflight message = %q", m.message)
+	}
 	// Actions must be available again after the cancelled preflight releases its reservation.
 	preview, err := m.actions.Plan(context.Background(), app.Fetch, []string{"/repos/first"})
 	if err != nil {
@@ -294,5 +297,15 @@ func TestActionWithoutBatchDoesNotRefreshWhenIdle(t *testing.T) {
 	startSyncPreview(t, m, "p")
 	if cmd := pressAction(m, "esc"); cmd != nil || m.loading {
 		t.Fatal("dismissing a confirmation started an unrequested refresh")
+	}
+}
+
+func TestEscDuringPlanningReportsCancellation(t *testing.T) {
+	m := syncActionModel(newSyncActionFake(app.Push, false))
+	plan := pressAction(m, "f")
+	pressAction(m, "esc")
+	m.Update(plan())
+	if m.preparing || m.message != "Preview preparation cancelled" {
+		t.Fatalf("cancelled planning: preparing=%v message=%q", m.preparing, m.message)
 	}
 }
