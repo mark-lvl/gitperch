@@ -981,3 +981,43 @@ func TestCleanupBranchChecksDoNotInspectEveryWorktree(t *testing.T) {
 		}
 	}
 }
+
+// hideEdit marks a tracked file assume-unchanged and edits it, so git status
+// reports the worktree clean although removing it would lose the edit.
+func hideEdit(t *testing.T, worktree string) string {
+	t.Helper()
+	actionGit(t, worktree, "update-index", "--assume-unchanged", "tracked")
+	path := filepath.Join(worktree, "tracked")
+	actionTestWrite(t, path, "local edit hidden from status\n")
+	return path
+}
+
+func TestCleanupKeepsWorktreeWithHiddenLocalChanges(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	hideEdit(t, merged)
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible || !strings.Contains(item.Reason, "1 file(s) marked assume-unchanged or skip-worktree (tracked)") {
+		t.Fatalf("hidden edit: %+v", item)
+	}
+}
+
+func TestCleanupSkipsWorktreeThatGainedHiddenChangesAfterReview(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := itemFor(t, preview, RemoveWorktree, merged)
+	path := hideEdit(t, merged)
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{item.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "assume-unchanged or skip-worktree") {
+		t.Fatalf("results: %+v", results)
+	}
+	if data, err := os.ReadFile(path); err != nil || string(data) != "local edit hidden from status\n" {
+		t.Fatalf("hidden edit lost: %q, %v", data, err)
+	}
+}

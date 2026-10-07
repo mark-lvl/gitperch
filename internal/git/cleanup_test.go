@@ -300,3 +300,29 @@ func TestOperationReadsMarkersWithoutStatus(t *testing.T) {
 		t.Fatal("a missing worktree reported no error")
 	}
 }
+
+func TestHiddenChangesListsAssumeUnchangedAndPresentSkipWorktreeFiles(t *testing.T) {
+	repo := disposable(t)
+	for _, name := range []string{"assumed", "skipped", "sparse", "plain"} {
+		write(t, filepath.Join(repo, name), name+"\n")
+	}
+	commit(t, repo)
+	r := Runner{}
+	if got, err := r.HiddenChanges(context.Background(), repo); err != nil || len(got) != 0 {
+		t.Fatalf("no flags: %v, %v", got, err)
+	}
+	gitCmd(t, repo, "update-index", "--assume-unchanged", "assumed")
+	gitCmd(t, repo, "update-index", "--skip-worktree", "skipped", "sparse")
+	// A sparse checkout leaves skip-worktree files absent; nothing local to lose.
+	if err := os.Remove(filepath.Join(repo, "sparse")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(repo, "assumed"), "local edit git status cannot see\n")
+	got, err := r.HiddenChanges(context.Background(), repo)
+	if err != nil || strings.Join(got, ",") != "assumed,skipped" {
+		t.Fatalf("hidden: %v, %v", got, err)
+	}
+	if out := gitCmd(t, repo, "status", "--porcelain"); len(out) != 0 {
+		t.Fatalf("status was expected to hide these edits: %s", out)
+	}
+}

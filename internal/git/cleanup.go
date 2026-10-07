@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -75,6 +77,42 @@ func (r Runner) IgnoredFiles(ctx context.Context, path string) ([]string, error)
 	for _, f := range bytes.Split(out.Stdout, []byte{0}) {
 		if len(f) > 0 {
 			files = append(files, string(f))
+		}
+	}
+	return files, nil
+}
+
+// hiddenChangesOutputLimit bounds `ls-files -v`, which lists every tracked
+// file: large repositories outgrow the default capture limit.
+const hiddenChangesOutputLimit = 64 << 20
+
+// HiddenChanges lists tracked files whose local edits git status hides: files
+// marked assume-unchanged, and skip-worktree files present on disk. Removing
+// the worktree would delete such edits. Skip-worktree files a sparse checkout
+// left absent hold nothing and are not listed.
+func (r Runner) HiddenChanges(ctx context.Context, path string) ([]string, error) {
+	if r.OutputLimit < hiddenChangesOutputLimit {
+		r.OutputLimit = hiddenChangesOutputLimit
+	}
+	out, err := r.Run(ctx, path, "ls-files", "-v", "-z")
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, record := range bytes.Split(out.Stdout, []byte{0}) {
+		tag, name, ok := strings.Cut(string(record), " ")
+		if !ok || len(tag) != 1 || name == "" {
+			continue
+		}
+		switch {
+		case tag[0] >= 'a' && tag[0] <= 'z': // lowercase: assume-unchanged
+			files = append(files, name)
+		case tag == "S":
+			if _, err := os.Lstat(filepath.Join(path, name)); err == nil {
+				files = append(files, name)
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
 		}
 	}
 	return files, nil

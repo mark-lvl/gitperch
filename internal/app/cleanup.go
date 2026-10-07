@@ -57,6 +57,7 @@ type CleanupGit interface {
 	IsAncestor(context.Context, string, string, string) (bool, error)
 	ReachableFromRefs(context.Context, string, string) (bool, error)
 	IgnoredFiles(context.Context, string) ([]string, error)
+	HiddenChanges(context.Context, string) ([]string, error)
 	PruneWorktrees(context.Context, string) error
 	RemoveWorktree(context.Context, string, string) error
 	LocalBranches(context.Context, string) ([]gitcli.Branch, error)
@@ -413,6 +414,16 @@ func operationBlocker(ctx context.Context, git CleanupGit, worktrees []gitcli.Wo
 	return ""
 }
 
+// fileList summarizes files that keep a worktree, naming up to three.
+func fileList(count int, what string, files []string) string {
+	shown := files[:min(3, len(files))]
+	text := fmt.Sprintf("%d %s (%s", count, what, gitcli.SafeText(strings.Join(shown, ", ")))
+	if len(files) > 3 {
+		text += ", …"
+	}
+	return text + ")"
+}
+
 func lockReason(wt gitcli.Worktree) string {
 	if wt.LockReason != "" {
 		return "locked: " + gitcli.SafeText(wt.LockReason)
@@ -450,12 +461,18 @@ func (a *Actions) worktreeBlocker(ctx context.Context, git CleanupGit, wt gitcli
 	case err != nil:
 		return "could not list ignored files: " + gitcli.SafeText(err.Error())
 	case len(ignored) > 0:
-		shown := ignored[:min(3, len(ignored))]
-		text := fmt.Sprintf("%d ignored file(s) (%s", len(ignored), gitcli.SafeText(strings.Join(shown, ", ")))
-		if len(ignored) > 3 {
-			text += ", …"
-		}
-		return text + ")"
+		return fileList(len(ignored), "ignored file(s)", ignored)
+	}
+	// git status and git worktree remove both overlook edits to files marked
+	// assume-unchanged or skip-worktree, so removal would silently drop them.
+	hidden, err := git.HiddenChanges(ctx, wt.Path)
+	switch {
+	case errors.Is(err, gitcli.ErrOutputLimit):
+		return "too many tracked files to check for hidden changes"
+	case err != nil:
+		return "could not check for hidden changes: " + gitcli.SafeText(err.Error())
+	case len(hidden) > 0:
+		return fileList(len(hidden), "file(s) marked assume-unchanged or skip-worktree", hidden)
 	}
 	if base.ref == "" {
 		return base.reason

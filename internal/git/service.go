@@ -45,6 +45,9 @@ func (s Service) Worktrees(ctx context.Context, path string) ([]Worktree, error)
 func (s Service) Operation(ctx context.Context, path string) (string, error) {
 	return s.Read.Operation(ctx, path)
 }
+func (s Service) HiddenChanges(ctx context.Context, path string) ([]string, error) {
+	return s.Read.HiddenChanges(ctx, path)
+}
 func (s Service) ResolveRemote(ctx context.Context, path string, m Metadata, remote string) (FetchTarget, error) {
 	return s.Read.ResolveRemote(ctx, path, m, remote)
 }

@@ -141,7 +141,7 @@ ID, so several results per repository stay distinct.
 | Item | Eligible when | Command |
 | --- | --- | --- |
 | Stale worktree records (one item per group) | at least one prunable record that is not locked, and every such record's HEAD commit is reachable from some branch, remote-tracking branch or tag (otherwise the item is kept, naming the commit and a `git branch` command that saves it) | `worktree prune` |
-| Linked worktree | exists; not main; not locked; no changes, untracked files or conflicts; no operation in progress; no ignored files; HEAD reachable from the default ref | `worktree remove <path>` |
+| Linked worktree | exists; not main; not locked; no changes, untracked files or conflicts; no operation in progress; no ignored files; no assume-unchanged files or present skip-worktree files (`ls-files -v`); HEAD reachable from the default ref | `worktree remove <path>` |
 | Local branch | not the default branch; not a symbolic ref (such as `master -> main`, skipped silently); tip reachable from the default ref; not checked out in any worktree that remains after this plan | `update-ref --no-deref -d refs/heads/<b> <oid>`, then `config --remove-section branch.<b>` |
 
 - Reachability of a stale record's HEAD uses

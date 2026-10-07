@@ -168,17 +168,21 @@ toggles the highlighted item, `a` toggles all, Enter runs the ticked items and
 Esc discards the review without changing anything. Items that are kept stay
 listed below with the reason. Only the ticked items you reviewed run, each
 revalidated right before it runs; if anything changed in the meantime
-(HEAD, status, lock state, ignored files, reachability) the item is skipped with
+(HEAD, status, lock state, ignored files, hidden changes, reachability) the item is skipped with
 a reason. Results appear in the status line and in details under Batch results.
 
 | Item | Removed when | Command |
 | --- | --- | --- |
 | Stale worktree records (one item per repository) | At least one record is stale (directory missing) and not locked, and every such record's HEAD commit is reachable from a branch, remote-tracking branch or tag | `git worktree prune` |
-| Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
+| Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, has no files marked assume-unchanged or (present) skip-worktree, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
 | Local branch | Its tip is reachable from the default ref, it is not the default branch, and no remaining worktree has it checked out | `git update-ref --no-deref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
 
 Reasons a worktree is kept include `dirty (3 files)`, `locked: agent session`,
-`4 ignored file(s) (.env, node_modules/, …)`, and `not merged into origin/main`.
+`4 ignored file(s) (.env, node_modules/, …)`,
+`1 file(s) marked assume-unchanged or skip-worktree (config/dev.env)`, and
+`not merged into origin/main`. Edits to assume-unchanged and skip-worktree
+files are invisible to `git status` and `git worktree remove` would delete
+them; skip-worktree files a sparse checkout left absent do not count.
 A stale record whose HEAD is a commit no ref reaches (for example work done on
 a detached HEAD) is kept: pruning would leave that commit unreferenced. The
 review names each such commit and the command that saves it, such as
