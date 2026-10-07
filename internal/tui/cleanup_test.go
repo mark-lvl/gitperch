@@ -389,13 +389,51 @@ func TestCleanupLabelShowsShortBranchCommit(t *testing.T) {
 	}
 }
 
+// A kept prune item's reason carries the command that saves a stranded commit,
+// so it must reach the screen whole instead of being cut at the overlay edge.
+func TestCleanupKeptReasonWrapsToShowRescueCommand(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.width, m.height = 110, 35
+	oid := "890ae7e5c1d2b3a4f5e6d7c8b9a0f1e2d3c4b5a6"
+	reason := "stale worktree feature-experiment-2026 holds unreferenced commit 890ae7e — create a branch first: git branch rescue/feature-experiment-2026 " + oid
+	m.cleanup = &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{{ID: "p", Group: "/r", Kind: app.PruneStale, Path: "/r", Stale: []string{"/w/feature-experiment-2026"}, Reason: reason}}}
+	content := m.View().Content
+	text := overlayText(content)
+	for _, want := range []string{"feature-experiment-2026 holds unreferenced commit 890ae7e", "git branch rescue/feature-experiment-2026 " + oid, "Esc close"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q:\n%s", want, content)
+		}
+	}
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "…") {
+			t.Fatalf("kept reason truncated: %q", line)
+		}
+	}
+}
+
 func TestCleanupKeptBranchOmitsCommitSoReasonFits(t *testing.T) {
 	m := New(context.Background(), nil, true)
 	m.EnableActions(app.NewActions(newActionFake(false), 1))
 	m.width, m.height = 110, 35
 	m.cleanup = &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{{ID: "b", Group: "/r", Kind: app.DeleteBranch, Path: "/r", Branch: "feat/squashed", OID: "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", Reason: "upstream gone but not merged into origin/main — squash merge?"}}}
 	content := m.View().Content
-	if !strings.Contains(content, "delete branch feat/squashed: upstream gone") || !strings.Contains(content, "squash merge?") || strings.Contains(content, "4be81d0") {
+	if text := overlayText(content); !strings.Contains(text, "delete branch feat/squashed: upstream gone but not merged into origin/main — squash merge?") || strings.Contains(text, "4be81d0") {
 		t.Fatalf("kept branch: %s", content)
 	}
+}
+
+// overlayText joins the screen's lines without box borders and padding, so a
+// sentence wrapped across popup lines can be matched as one string.
+func overlayText(content string) string {
+	var words []string
+	for _, line := range strings.Split(content, "\n") {
+		words = append(words, strings.Fields(strings.Map(func(r rune) rune {
+			if strings.ContainsRune("│╭╮╰╯─", r) {
+				return ' '
+			}
+			return r
+		}, line))...)
+	}
+	return strings.Join(words, " ")
 }

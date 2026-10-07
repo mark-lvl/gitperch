@@ -378,13 +378,8 @@ func unreferencedStale(ctx context.Context, git CleanupGit, path string, worktre
 				name, wt.HeadOID[:min(7, len(wt.HeadOID))], shellQuote("rescue/"+name), wt.HeadOID))
 		}
 	}
-	if len(problems) == 0 {
-		return ""
-	}
-	if len(problems) > 1 {
-		return fmt.Sprintf("%s (and %d more)", problems[0], len(problems)-1)
-	}
-	return problems[0]
+	// Every record is named: each one needs its own command before pruning.
+	return strings.Join(problems, "; ")
 }
 
 // isStale reports a linked worktree whose record outlived its directory.

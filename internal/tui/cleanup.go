@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
 )
@@ -309,7 +311,17 @@ func (m *Model) cleanupView() tea.View {
 		if item.Failed {
 			color = danger
 		}
-		lines = append(lines, m.style("  "+m.cleanupItemLabel(item, false)+": "+gitcli.SafeText(item.Reason), color, false))
+		// Reasons wrap instead of truncating: a kept prune item ends with the
+		// command that saves a stranded commit, which must stay readable.
+		// The first line keeps the full width; continuations indent further.
+		text := m.cleanupItemLabel(item, false) + ": " + gitcli.SafeText(item.Reason)
+		first, rest, _ := strings.Cut(ansi.Wrap(text, max(1, inner-2), " "), "\n")
+		lines = append(lines, m.style("  "+first, color, false))
+		if rest != "" {
+			for _, line := range strings.Split(ansi.Wrap(strings.ReplaceAll(rest, "\n", " "), max(1, inner-4), " "), "\n") {
+				lines = append(lines, m.style("    "+line, color, false))
+			}
+		}
 	}
 	footer := "Space toggle · ↑↓ move · " + m.symbols().enter + " clean up · Esc cancel"
 	if len(eligible) == 0 {

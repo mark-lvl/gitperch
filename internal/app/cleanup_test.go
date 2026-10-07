@@ -747,6 +747,22 @@ func pruneItem(t *testing.T, p CleanupPreview) CleanupItem {
 	return CleanupItem{}
 }
 
+func TestCleanupNamesEveryStrandedCommitsRescueCommand(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	_, first := staleDetached(t, repo, "spike-a")
+	_, second := staleDetached(t, repo, "spike-b")
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prune := pruneItem(t, preview)
+	for _, want := range []string{"git branch rescue/spike-a " + first, "git branch rescue/spike-b " + second} {
+		if prune.Eligible || !strings.Contains(prune.Reason, want) {
+			t.Fatalf("missing %q in %+v", want, prune)
+		}
+	}
+}
+
 func TestCleanupKeepsStaleRecordHoldingUnreferencedCommit(t *testing.T) {
 	repo, _, _ := cleanupRepo(t)
 	_, oid := staleDetached(t, repo, "spike")

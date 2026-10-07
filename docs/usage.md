@@ -181,8 +181,9 @@ Reasons a worktree is kept include `dirty (3 files)`, `locked: agent session`,
 `4 ignored file(s) (.env, node_modules/, …)`, and `not merged into origin/main`.
 A stale record whose HEAD is a commit no ref reaches (for example work done on
 a detached HEAD) is kept: pruning would leave that commit unreferenced. The
-review names the commit and the command that saves it, such as
-`git branch rescue/spike <commit>`; run it, and the record becomes prunable.
+review names each such commit and the command that saves it, such as
+`git branch rescue/spike <commit>`, wrapping long reasons instead of cutting
+them off; run the commands, and the records become prunable.
 Nothing is forced: gitperch never passes `--force` and never removes the main
 worktree. gitperch checks for ignored files immediately before removal, but
 files another program writes in the instant between that check and
