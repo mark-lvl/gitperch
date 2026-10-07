@@ -294,3 +294,13 @@ func TestBadgeShortensBeforeTheNameDoes(t *testing.T) {
 		t.Fatalf("minimal badge: %q", got)
 	}
 }
+
+func TestASCIIBadgeUsesASCIISymbols(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.Configure("", "ascii", false)
+	rows := groupedRows()
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	if got := strings.TrimRight(ansi.Strip(m.nameCell(rows[0], "", false, false, 15)), " "); got != "api wt2 ~1 !1" {
+		t.Fatalf("ascii compact badge: %q", got)
+	}
+}

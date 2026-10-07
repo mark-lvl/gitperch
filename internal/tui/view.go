@@ -428,11 +428,11 @@ func (m *Model) tableRow(row app.Row, position int, highlighted bool, tree strin
 	return line
 }
 
-// nameCell shows the tree prefix and name, followed by a collapsed group's
-// badge. The name is truncated before the badge. Context parents are muted.
 // badgeNameMin is how much of a repository name a wider group badge must leave.
 const badgeNameMin = 12
 
+// nameCell shows the tree prefix and name, followed by a collapsed group's
+// badge. The name is truncated before the badge. Context parents are muted.
 func (m *Model) nameCell(row app.Row, tree string, context, highlighted bool, w int) string {
 	nameColor := ink
 	if context {
@@ -696,7 +696,7 @@ func (m *Model) helpContent() []string {
 		" NAVIGATION", " ↑↓ / j k      Move between repositories", " [ / ]         Scroll the selected preview's changed files", " PgUp / PgDn   Move one page · Home / End jump to first / last", " 1–9           Jump to that row (numbered in narrow layouts)",
 		" Tab / Shift+Tab  Toggle All / Focus; more filters live in Actions",
 		" → / ←         Expand / collapse a repository's worktrees · ← on a worktree selects its repository",
-		fmt.Sprintf(" %-14sCollapsed group: 2 worktrees, 1 stale, 1 needs attention", m.symbols().worktree+"2 ◌1 !1"),
+		fmt.Sprintf(" %-14sCollapsed group: 2 worktrees, 1 stale, 1 needs attention", m.symbols().worktree+"2 "+m.symbols().stale+"1 !1"),
 		" /             Search name, path or branch · arrows move · Enter opens", " s             Toggle name / attention order · r refresh local status",
 		m.autoRefreshHelp(),
 		"", " REPOSITORY ACTIONS", " Enter / d     Open repository overview / changes · Tab switches section", " o             Open a shell in the highlighted worktree", " g             Open LazyGit in the highlighted worktree",

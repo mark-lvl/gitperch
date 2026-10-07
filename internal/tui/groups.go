@@ -142,7 +142,7 @@ func (m *Model) groupBadges(row app.Row) []string {
 	full, compact := count, count
 	if stale > 0 {
 		full += fmt.Sprintf(" · %d stale", stale)
-		compact += fmt.Sprintf(" ◌%d", stale)
+		compact += fmt.Sprintf(" %s%d", m.symbols().stale, stale)
 	}
 	if attention == 1 {
 		full += " · 1 needs attention"
