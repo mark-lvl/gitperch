@@ -32,7 +32,7 @@ gitperch status ~/projects            # plain table, no TUI
 gitperch status --json ~/projects     # JSON for scripts and agents
 ```
 
-[Install](#installation) · [Keys](#using-the-dashboard) · [Configuration](#configuration) · [Docs](#documentation)
+[Install](#installation) · [Usage](#usage) · [Configuration](#configuration) · [Docs](#documentation)
 
 ## Why gitperch exists
 
@@ -50,16 +50,35 @@ keeping the whole picture in your head. gitperch answers questions like:
 - Which worktrees are still useful, and which can go?
 - Can this repository be updated safely, and did anything change since I reviewed it?
 
-It discovers every repository and linked worktree under your project roots,
-inspects them concurrently and ranks them so conflicts and unfinished work rise
-above what is already clean. The dashboard is less a directory browser and more
-an **attention list**.
+It finds every repository and linked worktree under your project roots,
+inspects them concurrently and flags the ones that need you, so the dashboard
+works less like a directory browser and more like an **attention list**.
+
+## Features
+
+- **Workspace discovery**: recursive scan of one or more roots with depth
+  limits, ignored directories, symlink safety and linked-worktree support.
+- **Attention overview**: changes, untracked files, conflicts, branch, upstream
+  and ahead/behind counts for every repository. The header counts what needs
+  you; Focus shows only those repositories and attention order puts them first.
+- **First-class worktrees**: every linked worktree, including nested,
+  outside-root and stale ones, grouped under its repository.
+- **Repository details**: overview, changed files, recent commits and worktree
+  state, plus a diff view.
+- **Safe synchronization**: fetch, push and fast-forward-only pull across a
+  selection.
+- **Reviewed cleanup**: prune stale worktree records and remove clean, merged
+  worktrees and local branches.
+- **Fast navigation**: fuzzy command palette, filtering, Focus mode and
+  multi-select.
+- **Scriptable status**: `gitperch status` prints a plain table or versioned
+  JSON for scripts, CI and agent tooling.
 
 ## Conservative by design
 
 Repositories can change between the moment you look and the moment you act,
 especially with several terminals, editors and agents touching the same
-project. Every operation that changes state follows the same path:
+project. Push, pull and cleanup all follow the same path:
 
 ```text
 inspect → plan → review → revalidate → execute → refresh
@@ -72,32 +91,12 @@ inspect → plan → review → revalidate → execute → refresh
   default branch. Local changes, ignored files (such as `.env`), files hidden
   from `git status`, operations in progress, locks and anything that changed
   since your review all keep a worktree in place.
-- gitperch never commits, stashes, resets, rebases, force-pushes or
-  force-removes. When it cannot be confident an action is safe, it stops and
-  tells you why.
+- **Git runs hardened**: no shell, deadlines, bounded output, no credential
+  prompts; control characters are escaped and URL credentials redacted.
 
-## Features
-
-- **Workspace discovery**: recursive scan of one or more roots with depth
-  limits, ignored directories, symlink safety and linked-worktree support.
-- **Attention-first overview**: changes, untracked files, conflicts, branch,
-  upstream and ahead/behind counts for every repository, sorted by what needs
-  you first.
-- **First-class worktrees**: every linked worktree, including nested,
-  outside-root and stale ones, grouped under its repository.
-- **Reviewed cleanup**: prune stale worktree records and remove clean, merged
-  worktrees and local branches.
-- **Repository details**: overview, changed files, recent commits and worktree
-  state, plus a diff view.
-- **Safe synchronization**: fetch, push and fast-forward-only pull across a
-  selection, with per-repository results.
-- **Fast navigation**: fuzzy command palette (`:` / `Ctrl+K`), filtering,
-  focus mode and multi-select.
-- **Scriptable status**: `gitperch status` prints a plain table or versioned
-  JSON for scripts, CI and agent tooling.
-- **Hardened Git execution**: no shell interpolation, bounded output and
-  deadlines, no interactive credential prompts, control characters escaped and
-  credentials in URLs redacted.
+gitperch never commits, stashes, resets, rebases, force-pushes or
+force-removes. When it cannot be confident an action is safe, it stops and
+tells you why.
 
 ## Where gitperch fits
 
@@ -119,8 +118,9 @@ registration and understands linked worktrees.
 
 ## Installation
 
-gitperch requires the `git` CLI at runtime. Linux and WSL2 are the supported
-platforms today; macOS and Windows are not yet validated.
+gitperch needs the `git` CLI at runtime; worktree grouping and cleanup need
+Git 2.36 or newer. Linux and WSL2 are the supported platforms today; macOS and
+Windows are not yet validated.
 
 Prebuilt Linux binaries (amd64 and arm64) are attached to each
 [GitHub release](https://github.com/mark-lvl/gitperch/releases). Download the
@@ -146,30 +146,33 @@ cd gitperch
 make build          # writes bin/gitperch
 ```
 
-## Using the dashboard
+## Usage
 
-| Key | Action |
-| --- | --- |
-| `↑`/`↓`, `j`/`k` | Move |
-| `Enter` | Repository details |
-| `d` | Changes / diff |
-| `Space`, `a` | Select one / all visible |
-| `f` | Fetch selected |
-| `p` / `l` | Push / fast-forward pull (after one confirmation) |
-| `c` | Review worktree and branch cleanup |
-| `/` | Filter by name, path or branch |
-| `:` or `Ctrl+K` | Command palette |
-| `o` | Open a shell in the repository |
-| `r` | Refresh |
-| `?` | Help |
-| `q` | Quit |
-
-Try it without touching your own repositories:
+From a source checkout, try it on disposable demo repositories first:
 
 ```sh
 demo_root=$(bash scripts/demo.sh)
 bin/gitperch "$demo_root/workspace"
 ```
+
+Inside the dashboard:
+
+| Key | Action |
+| --- | --- |
+| `↑`/`↓`, `j`/`k` | Move |
+| `→`/`←` | Expand / collapse a repository's worktrees |
+| `Enter` / `d` | Repository details / changes and diff |
+| `Tab` | Toggle All / Focus (only what needs attention) |
+| `s` | Toggle name / attention order |
+| `/` | Filter by name, path or branch |
+| `:` or `Ctrl+K` | Command palette |
+| `Space` / `a` | Select one / all visible |
+| `f` | Fetch selected |
+| `p` / `l` | Push / fast-forward pull (after one confirmation) |
+| `c` | Review worktree and branch cleanup |
+| `o` / `g` | Open a shell / lazygit in the repository |
+| `r` | Refresh |
+| `?` / `q` | Help / quit |
 
 ## Configuration
 
@@ -191,12 +194,8 @@ icons = "unicode"     # or "ascii", "nerd"
 refresh_seconds = 30  # automatic local status refresh; 0 turns it off
 ```
 
-```sh
-gitperch --workspace agents
-```
-
-See the [usage guide](docs/usage.md) for every option, exit code and safety
-rule.
+Pick a workspace with `gitperch --workspace agents`. The
+[usage guide](docs/usage.md) covers every option, exit code and safety rule.
 
 ## Documentation
 
