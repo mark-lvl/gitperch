@@ -353,3 +353,22 @@ func TestRepositoryIconUsesGroupColorNotStatusColor(t *testing.T) {
 		t.Fatalf("icon not in group color:\n%q\nwant %q", row, want)
 	}
 }
+
+func TestCollapseKeepsSelectionStillVisibleInNarrowedView(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: groupedRows()})
+	m.setScope(2) // Changed: the dirty child shows under its context parent
+	if got := strings.Join(visibleNames(m), ","); got != "api,fix-auth" {
+		t.Fatalf("changed scope: %s", got)
+	}
+	m.highlight = 1
+	m.key(key(" "))
+	m.highlight = 0
+	m.key(key("left"))
+	if got := strings.Join(visibleNames(m), ","); got != "api,fix-auth" {
+		t.Fatalf("collapse changed a narrowed view: %s", got)
+	}
+	if !m.selected[fixAuthPath] {
+		t.Fatalf("visible child lost its selection: %v", m.selected)
+	}
+}

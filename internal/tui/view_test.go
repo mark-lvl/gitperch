@@ -276,3 +276,25 @@ func TestPatchFollowsDetailWidthAcrossResizes(t *testing.T) {
 		}
 	}
 }
+
+func TestPreviewPopupKeepsFooterWithSkipsAndDirtyNote(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 24})
+	var targets []app.Target
+	for i := range 30 {
+		targets = append(targets, app.Target{Path: fmt.Sprintf("/repos/api%d", i), Action: app.Push, Eligible: true, Commit: "0123456789", DirtyExcluded: true})
+	}
+	for i := range 5 {
+		targets = append(targets, app.Target{Path: fmt.Sprintf("/repos/skip%d", i), Action: app.Push, Reason: "no upstream"})
+	}
+	m.preview = &app.Preview{Targets: targets}
+	content := m.View().Content
+	if n := len(strings.Split(content, "\n")); n > m.height {
+		t.Fatalf("%d lines exceed height %d", n, m.height)
+	}
+	for _, want := range []string{"more skipped", "Uncommitted changes stay local", "Esc cancel", "╰"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("popup missing %q:\n%s", want, content)
+		}
+	}
+}

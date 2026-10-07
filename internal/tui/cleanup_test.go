@@ -481,3 +481,65 @@ func TestCleanupSummaryPointsToRecreateCommands(t *testing.T) {
 		t.Fatalf("summary: %q", m.message)
 	}
 }
+
+// assertCleanupFits checks the review stays within the terminal and keeps the
+// cursor item and the footer on screen.
+func assertCleanupFits(t *testing.T, m *Model, cursorLabel string) {
+	t.Helper()
+	content := m.View().Content
+	lines := strings.Split(content, "\n")
+	if len(lines) > m.height {
+		t.Fatalf("%d lines exceed height %d", len(lines), m.height)
+	}
+	text := overlayText(content)
+	for _, want := range []string{"Esc cancel", cursorLabel} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q:\n%s", want, content)
+		}
+	}
+	if !strings.Contains(content, "╰") {
+		t.Fatalf("bottom border cut off:\n%s", content)
+	}
+}
+
+func TestCleanupReviewFitsWithKeptItems(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.width, m.height = 110, 24
+	var items []app.CleanupItem
+	ticked := map[string]bool{}
+	for i := range 20 {
+		id := fmt.Sprint("b", i)
+		items = append(items, app.CleanupItem{ID: id, Group: "/repos/a", Kind: app.DeleteBranch, Path: "/repos/a", Branch: fmt.Sprintf("feat/b%02d", i), OID: "0123456789", Assessment: app.Assess(app.CleanupReason{Code: app.CleanupMerged, Text: "merged into origin/main"})})
+		ticked[id] = true
+	}
+	for i := range 5 {
+		items = append(items, app.CleanupItem{ID: fmt.Sprint("k", i), Group: "/repos/a", Kind: app.RemoveWorktree, Path: fmt.Sprint("/w/k", i), Assessment: app.Assess(app.CleanupReason{Code: app.CleanupUncommitted, Text: "1 uncommitted file"})})
+	}
+	m.cleanup = &app.CleanupPreview{ID: 1, Items: items}
+	m.cleanupTicked = ticked
+	m.cleanupCursor = 19
+	assertCleanupFits(t, m, "feat/b19")
+	m.cleanupCursor = 0
+	assertCleanupFits(t, m, "feat/b00")
+}
+
+func TestCleanupReviewFitsWithManyGroups(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.width, m.height = 110, 24
+	var items []app.CleanupItem
+	ticked := map[string]bool{}
+	for i := range 20 {
+		id := fmt.Sprint("b", i)
+		group := fmt.Sprintf("/repos/r%02d", i)
+		items = append(items, app.CleanupItem{ID: id, Group: group, Kind: app.DeleteBranch, Path: group, Branch: fmt.Sprintf("feat/b%02d", i), OID: "0123456789", Assessment: app.Assess(app.CleanupReason{Code: app.CleanupMerged, Text: "merged into origin/main"})})
+		ticked[id] = true
+	}
+	m.cleanup = &app.CleanupPreview{ID: 1, Items: items}
+	m.cleanupTicked = ticked
+	for _, cursor := range []int{19, 10, 0} {
+		m.cleanupCursor = cursor
+		assertCleanupFits(t, m, fmt.Sprintf("feat/b%02d", cursor))
+	}
+}

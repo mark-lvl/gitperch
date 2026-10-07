@@ -314,32 +314,31 @@ func (m *Model) cleanupView() tea.View {
 	w := min(96, m.width-4)
 	inner := max(1, w-4)
 	lines := []string{m.style(title, ink, true)}
-	// One line is reserved for the highlighted item's checks.
-	room := max(3, m.height-11)
-	start := max(0, min(m.cleanupCursor-room/2, len(eligible)-room))
-	group := ""
-	for i := start; i < min(len(eligible), start+room); i++ {
-		item := eligible[i]
-		if item.Group != group {
-			group = item.Group
-			lines = append(lines, m.style(m.symbols().repo, m.cleanupGroupColor(group), false)+" "+m.style(gitcli.SafeText(m.targetName(group)), accent, true))
-		}
-		box := "[ ]"
-		if m.cleanupTicked[item.ID] {
-			box = "[x]"
-		}
-		pointer := "  "
-		if i == m.cleanupCursor {
-			pointer = m.symbols().pointer + " "
-		}
-		lines = append(lines, m.between(pointer+box+" "+m.cleanupLabel(item), m.style(item.Assessment.Summary(), muted, false), inner))
-		if i == m.cleanupCursor && len(item.Assessment.Reasons) > 1 {
-			lines = append(lines, m.style(ansi.Truncate("      "+m.cleanupChecks(item), inner, "…"), muted, false))
-		}
+	// The frame, title, blank line and footer take five lines. The kept
+	// section yields when even the highlighted item, its heading and its
+	// checks would not fit; the eligible items get the rest.
+	avail := m.height - 5
+	kept := m.cleanupKept(inner)
+	if len(eligible) > 0 {
+		kept = kept[:min(len(kept), max(0, avail-3))]
 	}
-	// Failed planning steps come first and always show. The other kept items
-	// follow from most to least restrictive and fill the remaining budget of
-	// four lines.
+	lines = append(lines, m.cleanupWindow(eligible, inner, max(1, avail-len(kept)))...)
+	lines = append(lines, kept...)
+	footer := "Space toggle · ↑↓ move · " + m.symbols().enter + " clean up · Esc cancel"
+	if len(eligible) == 0 {
+		footer = "Nothing can be cleaned up safely · Esc close"
+	}
+	lines = append(lines, "", m.style(footer, muted, false))
+	if m.width < 24 || m.height < 6 {
+		return m.screen(lines)
+	}
+	return m.overlay(lines, w)
+}
+
+// cleanupKept lists what stays and why. Failed planning steps come first and
+// always show. The other kept items follow from most to least restrictive and
+// fill the remaining budget of four entries.
+func (m *Model) cleanupKept(inner int) []string {
 	var kept []app.CleanupItem
 	failed := 0
 	for _, item := range m.cleanup.Items {
@@ -355,6 +354,7 @@ func (m *Model) cleanupView() tea.View {
 			}
 		}
 	}
+	var lines []string
 	shown := max(4, failed)
 	for i, item := range kept {
 		if i == 0 {
@@ -383,13 +383,58 @@ func (m *Model) cleanupView() tea.View {
 			lines = append(lines, m.style(indent+line, color, false))
 		}
 	}
-	footer := "Space toggle · ↑↓ move · " + m.symbols().enter + " clean up · Esc cancel"
+	return lines
+}
+
+// cleanupWindow renders as many eligible items around the cursor as fit in
+// room lines. Each repository heading takes a line, repeated when the window
+// starts inside a group, and so do the highlighted item's checks.
+func (m *Model) cleanupWindow(eligible []app.CleanupItem, inner, room int) []string {
 	if len(eligible) == 0 {
-		footer = "Nothing can be cleaned up safely · Esc close"
+		return nil
 	}
-	lines = append(lines, "", m.style(footer, muted, false))
-	if m.width < 24 || m.height < 6 {
-		return m.screen(lines)
+	cursor := min(m.cleanupCursor, len(eligible)-1)
+	height := func(from, to int) int {
+		n := 0
+		for i := from; i < to; i++ {
+			if i == from || eligible[i].Group != eligible[i-1].Group {
+				n++
+			}
+			n++
+			if i == cursor && len(eligible[i].Assessment.Reasons) > 1 {
+				n++
+			}
+		}
+		return n
 	}
-	return m.overlay(lines, w)
+	from, to := cursor, cursor+1
+	for grew := true; grew; {
+		grew = false
+		if to < len(eligible) && height(from, to+1) <= room {
+			to, grew = to+1, true
+		}
+		if from > 0 && height(from-1, to) <= room {
+			from, grew = from-1, true
+		}
+	}
+	var lines []string
+	for i := from; i < to; i++ {
+		item := eligible[i]
+		if i == from || item.Group != eligible[i-1].Group {
+			lines = append(lines, m.style(m.symbols().repo, m.cleanupGroupColor(item.Group), false)+" "+m.style(gitcli.SafeText(m.targetName(item.Group)), accent, true))
+		}
+		box := "[ ]"
+		if m.cleanupTicked[item.ID] {
+			box = "[x]"
+		}
+		pointer := "  "
+		if i == cursor {
+			pointer = m.symbols().pointer + " "
+		}
+		lines = append(lines, m.between(pointer+box+" "+m.cleanupLabel(item), m.style(item.Assessment.Summary(), muted, false), inner))
+		if i == cursor && len(item.Assessment.Reasons) > 1 {
+			lines = append(lines, m.style(ansi.Truncate("      "+m.cleanupChecks(item), inner, "…"), muted, false))
+		}
+	}
+	return lines
 }

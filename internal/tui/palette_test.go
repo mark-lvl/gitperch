@@ -205,3 +205,26 @@ func TestOperationFailureNeedsAttentionEvenWhenGitClean(t *testing.T) {
 		t.Fatal("failed operation not prioritized")
 	}
 }
+
+func TestPasteTypesIntoSearchAndPalette(t *testing.T) {
+	m := New(nil, nil, true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.Update(tea.PasteMsg{Content: "ignored"})
+	if m.filter != "" || m.paletteQuery != "" {
+		t.Fatal("paste outside a text input changed state")
+	}
+	m.Update(key("/"))
+	m.Update(tea.PasteMsg{Content: "design\x1b-sys\ntem\r"})
+	if m.filter != "design-system" {
+		t.Fatalf("search filter = %q", m.filter)
+	}
+	if got := strings.Join(visibleNames(m), ","); got != "design-system" {
+		t.Fatalf("pasted search did not filter: %s", got)
+	}
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m.Update(key(":"))
+	m.Update(tea.PasteMsg{Content: "fetch"})
+	if m.paletteQuery != "fetch" || m.filter != "" {
+		t.Fatalf("palette query = %q, filter = %q", m.paletteQuery, m.filter)
+	}
+}

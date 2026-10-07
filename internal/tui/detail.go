@@ -88,7 +88,7 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 	lines = append(lines, " "+m.detailActions(*row), m.style(" Path: "+gitcli.SafeText(row.Path), muted, false))
 	branch := branchLabel(*row)
 	if row.Status.Upstream != "" {
-		branch += " → " + gitcli.SafeText(row.Status.Upstream)
+		branch += " " + m.symbols().arrow + " " + gitcli.SafeText(row.Status.Upstream)
 	}
 	lines = append(lines, " "+m.style(branch, branchColor, false), " "+m.style(label, color, false)+"  "+m.previewHint(*row))
 	result, loaded := m.detailCache[row.Path]

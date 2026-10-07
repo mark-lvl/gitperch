@@ -20,8 +20,9 @@ func (m *Model) selectedPreview(w, h int) []string {
 	branchWidth := inner - ansi.StringWidth(name) - ansi.StringWidth(age) - 6
 	branch := branchLabel(*row)
 	// The upstream is dropped before the branch itself is truncated.
-	if upstream := gitcli.SafeText(row.Status.Upstream); upstream != "" && ansi.StringWidth(branch+" → "+upstream)+2 <= branchWidth {
-		branch += " → " + upstream
+	route := " " + m.symbols().arrow + " "
+	if upstream := gitcli.SafeText(row.Status.Upstream); upstream != "" && ansi.StringWidth(branch+route+upstream)+2 <= branchWidth {
+		branch += route + upstream
 	}
 	if glyph := m.symbols().branch; glyph != "" {
 		branchWidth -= 2

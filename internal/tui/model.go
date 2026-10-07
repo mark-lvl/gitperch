@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/mark-lvl/gitperch/internal/app"
@@ -321,8 +322,34 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		return m, m.spin()
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
+	case tea.PasteMsg:
+		m.paste(msg.Content)
 	}
 	return m, nil
+}
+
+// paste types bracketed-paste text into the command palette or the search,
+// the only text inputs, as typed characters would be. Control characters and
+// line breaks are dropped.
+func (m *Model) paste(content string) {
+	text := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, content)
+	if text == "" || m.preparing || m.running || m.preview != nil || m.cleanup != nil {
+		return
+	}
+	switch {
+	case m.palette:
+		m.paletteQuery += text
+		m.paletteCursor = 0
+	case m.filtering && !m.help && !m.details:
+		m.filter += text
+		m.clearSelection()
+		m.highlight, m.scroll = 0, 0
+	}
 }
 
 func (m *Model) applySnapshot(snapshot app.Snapshot) {
@@ -645,9 +672,14 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				}
 			} else {
 				delete(m.expanded, parent)
-				// Collapsing hides the children, so they leave the selection.
+				// Children the collapse hides leave the selection; a search or
+				// scope keeps matching children visible, so those stay.
+				visible := map[string]bool{}
+				for _, index := range m.visibleRows() {
+					visible[m.rows[index].Path] = true
+				}
 				for _, other := range m.rows {
-					if other.Path != parent && groupKey(other) == parent {
+					if other.Path != parent && groupKey(other) == parent && !visible[other.Path] {
 						delete(m.selected, other.Path)
 					}
 				}
@@ -825,6 +857,9 @@ func (m *Model) keepHighlightVisible() {
 		m.highlight = len(indices) - 1
 	}
 	page := m.pageSize()
+	// A shorter list or a taller terminal must not leave rows hidden above
+	// empty space.
+	m.scroll = min(m.scroll, max(0, len(indices)-page))
 	if m.highlight < m.scroll {
 		m.scroll = m.highlight
 	} else if m.highlight >= m.scroll+page {

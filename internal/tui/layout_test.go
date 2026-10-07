@@ -1,8 +1,12 @@
 package tui
 
 import (
+	tea "charm.land/bubbletea/v2"
+	"context"
+	"fmt"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
+	"github.com/mark-lvl/gitperch/internal/repository"
 	"strings"
 	"testing"
 	"time"
@@ -118,5 +122,52 @@ func TestNumberKeysJumpToVisibleRows(t *testing.T) {
 	m.key(key("1"))
 	if m.filter != "1" || m.highlight != 0 {
 		t.Fatal("digits must type into search while filtering")
+	}
+}
+
+func TestScrollClampsWhenListShrinksOrTerminalGrows(t *testing.T) {
+	rows := func(n int) []app.Row {
+		var out []app.Row
+		for i := range n {
+			name := fmt.Sprintf("repo-%04d", i)
+			out = append(out, app.Row{Repository: repository.Repository{Name: name, Path: "/repos/" + name}, Status: repository.Status{Branch: "main"}})
+		}
+		return out
+	}
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: rows(30)})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 20})
+	m.key(tea.KeyPressMsg{Code: tea.KeyEnd})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 80})
+	if m.scroll != 0 || !strings.Contains(m.View().Content, "repo-0000") {
+		t.Fatalf("all 30 rows fit, yet scroll is %d", m.scroll)
+	}
+	m.applySnapshot(app.Snapshot{Rows: rows(40)})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m.key(tea.KeyPressMsg{Code: tea.KeyEnd})
+	m.applySnapshot(app.Snapshot{Rows: rows(12)})
+	if want := max(0, 12-m.pageSize()); m.scroll != want {
+		t.Fatalf("after shrinking to 12 rows scroll is %d, want %d", m.scroll, want)
+	}
+}
+
+func TestASCIIArrowKeepsFrameBorders(t *testing.T) {
+	m := New(nil, nil, true)
+	m.Configure("/workspace", "ascii", true)
+	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	content := m.View().Content
+	found := false
+	for _, line := range strings.Split(content, "\n") {
+		if !strings.Contains(line, "-> origin/") {
+			continue
+		}
+		found = true
+		if !strings.HasSuffix(strings.TrimRight(line, " "), "|") {
+			t.Fatalf("frame border cut off: %q", line)
+		}
+	}
+	if !found {
+		t.Fatalf("no upstream route shown:\n%s", content)
 	}
 }

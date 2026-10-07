@@ -313,19 +313,24 @@ func (m *Model) previewView() tea.View {
 	w := min(64, m.width-4)
 	inner := max(1, w-4)
 	lines := []string{m.style(title, ink, true)}
-	room := max(1, m.height-7)
-	nameWidth := 0
+	nameWidth, dirty := 0, false
 	for _, target := range ready {
 		nameWidth = max(nameWidth, min(24, ansi.StringWidth(m.targetName(target.Path))))
+		dirty = dirty || target.DirtyExcluded
 	}
-	dirty := false
+	// The skip lines (at most three) and the dirty note keep their place, so
+	// the ready list shortens to leave the footer on screen.
+	room := m.height - 7 - min(3, len(skipped))
+	if dirty {
+		room--
+	}
+	room = max(1, room)
 	for i, target := range ready {
 		if i == room-1 && len(ready) > room {
 			lines = append(lines, m.style(fmt.Sprintf("+%d more", len(ready)-i), muted, false))
 			break
 		}
-		dirty = dirty || target.DirtyExcluded
-		lines = append(lines, m.between(cell(m.targetName(target.Path), nameWidth)+"  "+m.style(syncRoute(target), muted, false), m.style(shortCommit(target.Commit), muted, false), inner))
+		lines = append(lines, m.between(cell(m.targetName(target.Path), nameWidth)+"  "+m.style(m.syncRoute(target), muted, false), m.style(shortCommit(target.Commit), muted, false), inner))
 	}
 	for i, target := range skipped {
 		if i == 2 && len(skipped) > 3 {
@@ -355,7 +360,7 @@ func (m *Model) targetName(path string) string {
 }
 
 // syncRoute renders a reviewed scope such as "main → origin/main".
-func syncRoute(target app.Target) string {
+func (m *Model) syncRoute(target app.Target) string {
 	from, to, ok := strings.Cut(target.Scope, " -> ")
 	if !ok {
 		return gitcli.SafeText(target.Branch)
@@ -366,7 +371,7 @@ func syncRoute(target app.Target) string {
 	} else {
 		to = target.Remote + "/" + to
 	}
-	return gitcli.SafeText(from + " → " + to)
+	return gitcli.SafeText(from + " " + m.symbols().arrow + " " + to)
 }
 
 func shortCommit(oid string) string { return gitcli.SafeText(oid[:min(7, len(oid))]) }

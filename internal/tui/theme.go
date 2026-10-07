@@ -49,8 +49,8 @@ var identityPalette = [...]string{
 // branch is empty outside nerd mode: no fork glyph is common to terminal fonts.
 // spinner frames are each one cell wide so the busy labels never shift.
 type icons struct {
-	clean, changed, ahead, behind, failed, pointer, rule, repo, brand, branch, enter, worktree, stale string
-	spinner                                                                                           []string
+	clean, changed, ahead, behind, failed, pointer, rule, repo, brand, branch, enter, arrow, worktree, stale string
+	spinner                                                                                                  []string
 }
 
 var (
@@ -59,10 +59,10 @@ var (
 )
 
 func iconSet(mode string) icons {
-	i := icons{clean: "✓", changed: "●", ahead: "↑", behind: "↓", failed: "×", pointer: "▌", rule: "─", repo: "▰", brand: "◇", enter: "↵", worktree: "⑂", stale: "◌", spinner: brailleSpinner}
+	i := icons{clean: "✓", changed: "●", ahead: "↑", behind: "↓", failed: "×", pointer: "▌", rule: "─", repo: "▰", brand: "◇", enter: "↵", arrow: "→", worktree: "⑂", stale: "◌", spinner: brailleSpinner}
 	switch mode {
 	case "ascii":
-		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*", enter: "Enter", worktree: "wt", stale: "~", spinner: asciiSpinner}
+		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*", enter: "Enter", arrow: "->", worktree: "wt", stale: "~", spinner: asciiSpinner}
 	case "nerd":
 		i.clean = "\uf00c"
 		i.changed = "\uf044"
