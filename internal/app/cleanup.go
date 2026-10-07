@@ -655,9 +655,18 @@ func restoreCommand(item CleanupItem) string {
 }
 
 // restoreAnywhere is restoreCommand with the repository named, so it works
-// from any directory once the dashboard has closed.
+// from any directory once the dashboard has closed. When SafeText must escape
+// the repository path or branch name (invisible or control characters, such
+// as the ZWNJ common in Persian names), the escaped command would name a path
+// that does not exist, so it says so and gives the form to run in place; the
+// restore log keeps the exact names.
 func restoreAnywhere(item CleanupItem) string {
-	return fmt.Sprintf("git -C %s branch %s %s", shellQuote(gitcli.SafeText(item.Group)), shellQuote(gitcli.SafeText(item.Branch)), item.OID)
+	repo, branch := gitcli.SafeText(item.Group), gitcli.SafeText(item.Branch)
+	command := fmt.Sprintf("git -C %s branch %s %s", shellQuote(repo), shellQuote(branch), item.OID)
+	if repo != item.Group || branch != item.Branch {
+		command += "  # names shown escaped; inside the repository run: git branch <name> " + item.OID
+	}
+	return command
 }
 
 func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) error {

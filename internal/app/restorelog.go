@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
-
-	gitcli "github.com/mark-lvl/gitperch/internal/git"
 )
 
 // DefaultRestoreLogPath is $XDG_STATE_HOME/gitperch/cleanup.log, falling back
@@ -34,8 +33,9 @@ func (a *Actions) SetRestoreLog(path string) {
 }
 
 // recordRestore appends one tab-separated line: time, repository, branch,
-// commit and the command that recreates the branch. Repository and branch
-// pass through SafeText, so no name can start a forged line.
+// commit and the command that recreates the branch. Repository and branch are
+// Go-quoted (strconv.Quote), which keeps them exact and recoverable while no
+// tab or newline in a name can forge a column or line.
 // It reports whether the line was written; no log configured is not an error.
 func (a *Actions) recordRestore(item CleanupItem, command string) (bool, error) {
 	a.mu.Lock()
@@ -53,7 +53,12 @@ func (a *Actions) recordRestore(item CleanupItem, command string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	_, err = fmt.Fprintf(file, "%s\t%s\t%s\t%s\t%s\n", time.Now().UTC().Format(time.RFC3339), gitcli.SafeText(item.Group), gitcli.SafeText(item.Branch), item.OID, command)
+	// The log names repositories and commits; keep it private even if an
+	// earlier file was created with looser permissions.
+	err = file.Chmod(0o600)
+	if err == nil {
+		_, err = fmt.Fprintf(file, "%s\t%s\t%s\t%s\t%s\n", time.Now().UTC().Format(time.RFC3339), strconv.Quote(item.Group), strconv.Quote(item.Branch), item.OID, command)
+	}
 	err = errors.Join(err, file.Close())
 	return err == nil, err
 }

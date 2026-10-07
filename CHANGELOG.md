@@ -16,14 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the details Worktree section lists the group.
 - Clean up (`c`) reviews and removes stale worktree records and clean linked
   worktrees already merged into the remote default branch. Dirty, locked,
-  unmerged worktrees, worktrees with ignored files and worktrees with files
-  marked assume-unchanged or skip-worktree are kept with the reason
+  unmerged worktrees, worktrees with ignored files and worktrees with
+  assume-unchanged or present skip-worktree files are kept with the reason
   shown; a stale record whose commit no branch or tag reaches is kept too, with
   the `git branch` command that saves it; nothing is forced.
 - Clean up also deletes local branches fully merged into the remote default
   branch, only at the commit you reviewed; Diagnostics (`d`) lists a
   `git branch <name> <commit>` command to restore each one. The commands are also
-  appended to `~/.local/state/gitperch/cleanup.log` (or `$XDG_STATE_HOME`) and
+  appended to `$XDG_STATE_HOME/gitperch/cleanup.log` (by default
+  `~/.local/state/gitperch/cleanup.log`) and
   printed when the dashboard closes. Worktree and branch cleanup need Git 2.36
   or newer.
 - `gitperch status --json` reports a `worktree` object per repository (schema

@@ -185,7 +185,7 @@ func TestPrintRestoreCommands(t *testing.T) {
 	}
 	out.Reset()
 	printRestoreCommands(&out, cmds, false, "/state/gitperch/cleanup.log", nil)
-	if text := out.String(); !strings.Contains(text, "could not be recorded in /state/gitperch/cleanup.log") {
+	if text := out.String(); !strings.Contains(text, "Not every command was recorded in /state/gitperch/cleanup.log") {
 		t.Fatalf("printed %q", text)
 	}
 	out.Reset()

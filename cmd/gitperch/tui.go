@@ -74,7 +74,7 @@ func printRestoreCommands(w io.Writer, commands []string, logged bool, logPath s
 	case logErr != nil:
 		fmt.Fprintln(w, "These commands were not recorded: "+gitcli.SafeText(logErr.Error()))
 	case !logged:
-		fmt.Fprintln(w, "Some of these commands could not be recorded in "+gitcli.SafeText(logPath))
+		fmt.Fprintln(w, "Not every command was recorded in "+gitcli.SafeText(logPath))
 	default:
 		fmt.Fprintln(w, "They are also recorded in "+gitcli.SafeText(logPath))
 	}

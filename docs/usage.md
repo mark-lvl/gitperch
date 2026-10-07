@@ -170,9 +170,10 @@ against fresh data, then opens a review. Eligible items start ticked: Space
 toggles the highlighted item, `a` toggles all, Enter runs the ticked items and
 Esc discards the review without changing anything. Items that are kept stay
 listed below with the reason. Only the ticked items you reviewed run, each
-revalidated right before it runs; if anything changed in the meantime
-(HEAD, status, lock state, ignored files, hidden changes, reachability) the item is skipped with
-a reason. Results appear in the status line and in details under Batch results.
+revalidated right before it runs; if anything changed in the meantime (HEAD,
+status, lock state, ignored files, hidden changes, reachability) the item is
+skipped with a reason. Results appear in the status line and in details under
+Batch results.
 
 | Item | Removed when | Command |
 | --- | --- | --- |
@@ -236,9 +237,14 @@ The same commands, naming the repository (`git -C <repository> branch …`) so
 they work from any directory, are appended to
 `$XDG_STATE_HOME/gitperch/cleanup.log` (by default
 `~/.local/state/gitperch/cleanup.log`; one tab-separated line per deletion with
-time, repository, branch, commit and command; the file is private to you) and
-printed again when the dashboard closes. If the log cannot be written the
-deletion still stands and its result says so.
+time, repository and branch as Go-quoted strings so they stay exact, commit and
+command; the file is kept readable only by you) and printed again when the
+dashboard closes. If the log cannot be written the deletion still stands, and
+the result or the exit message says what was not recorded. When a repository
+path or branch name has to be shown escaped (for example one containing a
+zero-width non-joiner), the printed command says so and gives the
+`git branch <name> <commit>` form to run inside the repository; the log's
+quoted columns keep the exact names.
 Names with shell-significant characters are single-quoted in that command, so it is
 safe to paste. If a name contains unprintable characters, the command shows the
 escaped name, says so, and the commit stays recoverable through its hash.
