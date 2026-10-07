@@ -326,3 +326,24 @@ func TestHiddenChangesListsAssumeUnchangedAndPresentSkipWorktreeFiles(t *testing
 		t.Fatalf("status was expected to hide these edits: %s", out)
 	}
 }
+
+// Annotated tags count once peeled, and a tag on a tree neither counts nor
+// breaks the check.
+func TestReachableFromRefsPeelsTags(t *testing.T) {
+	repo, _ := repoWithRemote(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitCmd(t, repo, "worktree", "add", "--detach", wt)
+	write(t, filepath.Join(wt, "new"), "unreferenced\n")
+	commit(t, wt)
+	oid := strings.TrimSpace(string(gitCmd(t, wt, "rev-parse", "HEAD")))
+	gitCmd(t, repo, "tag", "tree", "HEAD^{tree}")
+	r := Runner{}
+	ctx := context.Background()
+	if ok, err := r.ReachableFromRefs(ctx, repo, oid); err != nil || ok {
+		t.Fatalf("detached-only commit beside a tree tag: %v %v", ok, err)
+	}
+	gitCmd(t, repo, "tag", "-a", "-m", "keep", "annotated", oid)
+	if ok, err := r.ReachableFromRefs(ctx, repo, oid); err != nil || !ok {
+		t.Fatalf("commit under an annotated tag: %v %v", ok, err)
+	}
+}

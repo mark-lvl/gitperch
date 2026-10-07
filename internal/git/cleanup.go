@@ -82,19 +82,12 @@ func (r Runner) IgnoredFiles(ctx context.Context, path string) ([]string, error)
 	return files, nil
 }
 
-// hiddenChangesOutputLimit bounds `ls-files -v`, which lists every tracked
-// file: large repositories outgrow the default capture limit.
-const hiddenChangesOutputLimit = 64 << 20
-
 // HiddenChanges lists tracked files whose local edits git status hides: files
 // marked assume-unchanged, and skip-worktree files present on disk. Removing
 // the worktree would delete such edits. Skip-worktree files a sparse checkout
 // left absent hold nothing and are not listed.
 func (r Runner) HiddenChanges(ctx context.Context, path string) ([]string, error) {
-	if r.OutputLimit < hiddenChangesOutputLimit {
-		r.OutputLimit = hiddenChangesOutputLimit
-	}
-	out, err := r.Run(ctx, path, "ls-files", "-v", "-z")
+	out, err := r.forFileLists().Run(ctx, path, "ls-files", "-v", "-z")
 	if err != nil {
 		return nil, err
 	}
@@ -195,9 +188,11 @@ func (r Runner) ReachableFromRefs(ctx context.Context, path, oid string) (bool, 
 	if !objectID(oid) {
 		return false, fmt.Errorf("invalid reachability check")
 	}
-	out, err := r.Run(ctx, path, "for-each-ref", "--count=1", "--contains", oid, "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags")
+	// Listing the commits oid reaches but no ref does is one walk; asking
+	// every ref whether it contains oid costs a walk per ref.
+	out, err := r.Run(ctx, path, "rev-list", "-n1", oid, "--not", "--branches", "--remotes", "--tags")
 	if err != nil {
 		return false, err
 	}
-	return len(bytes.TrimSpace(out.Stdout)) > 0, nil
+	return len(bytes.TrimSpace(out.Stdout)) == 0, nil
 }

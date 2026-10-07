@@ -28,7 +28,7 @@ type RepoDetails struct {
 
 func (r Runner) Details(ctx context.Context, path string) (RepoDetails, error) {
 	var d RepoDetails
-	out, err := r.Run(ctx, path, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+	out, err := r.forFileLists().Run(ctx, path, "status", "--porcelain=v1", "-z", "--untracked-files=all")
 	if err != nil {
 		return d, err
 	}
@@ -46,7 +46,7 @@ func (r Runner) Details(ctx context.Context, path string) (RepoDetails, error) {
 	}
 	var passes []string
 	for _, args := range [][]string{{"diff", "--no-ext-diff", "--no-textconv", "--numstat", "-z"}, {"diff", "--cached", "--no-ext-diff", "--no-textconv", "--numstat", "-z"}} {
-		out, err = r.Run(ctx, path, args...)
+		out, err = r.forFileLists().Run(ctx, path, args...)
 		if err != nil {
 			return d, err
 		}

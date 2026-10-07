@@ -13,6 +13,16 @@ import (
 
 const DefaultOutputLimit = 4 << 20
 
+// fileListOutputLimit bounds commands that list every changed, untracked or
+// tracked file: large working trees outgrow the default capture limit.
+const fileListOutputLimit = 64 << 20
+
+// forFileLists raises the capture limit for a command that lists files.
+func (r Runner) forFileLists() Runner {
+	r.OutputLimit = max(r.OutputLimit, fileListOutputLimit)
+	return r
+}
+
 var ErrOutputLimit = errors.New("Git output exceeded capture limit")
 
 type Runner struct {

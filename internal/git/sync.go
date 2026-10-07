@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -41,7 +42,8 @@ func (r Runner) ResolveUpstream(ctx context.Context, path string, m Metadata) (U
 			tracking = append(tracking, strings.Replace(dst, "*", middle, 1))
 		}
 	}
-	if len(tracking) != 1 {
+	slices.Sort(tracking)
+	if tracking = slices.Compact(tracking); len(tracking) != 1 { // refspecs may repeat a mapping
 		return UpstreamTarget{}, fmt.Errorf("upstream has no unambiguous tracking mapping")
 	}
 	if _, err := r.Run(ctx, path, "check-ref-format", merges[0]); err != nil {
@@ -88,6 +90,9 @@ func (r Runner) ResolvePush(ctx context.Context, path string, m Metadata, upstre
 				return PushTarget{}, fmt.Errorf("unsupported push refspec")
 			}
 			if src == "HEAD" {
+				if !colon { // a bare HEAD pushes the current branch to its own name
+					dst = source
+				}
 				src = source
 			} else if !strings.HasPrefix(src, "refs/") {
 				src = "refs/heads/" + src

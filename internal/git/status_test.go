@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -212,5 +213,25 @@ func TestFixtureNULs(t *testing.T) {
 	b, err := os.ReadFile("../../testdata/git-status/renamed.nul")
 	if err != nil || !bytes.Contains(b, []byte{0}) {
 		t.Fatalf("not a real NUL fixture: %v", err)
+	}
+}
+
+// Status lists every changed and untracked file, so a large working tree must
+// not trip the capture limit meant for small outputs and look like an error.
+func TestStatusListingsIgnoreTheDefaultCaptureLimit(t *testing.T) {
+	d := disposable(t)
+	write(t, filepath.Join(d, "tracked"), "base\n")
+	commit(t, d)
+	write(t, filepath.Join(d, "tracked"), "edit\n")
+	for i := range 200 {
+		write(t, filepath.Join(d, "untracked-"+strconv.Itoa(i)), "")
+	}
+	r := Runner{OutputLimit: 1024} // far below the status output
+	if s := r.Inspect(context.Background(), d); s.Error != "" || s.Untracked != 200 || s.Changes != 1 {
+		t.Fatalf("inspect: error %q, %d untracked, %d changes", s.Error, s.Untracked, s.Changes)
+	}
+	details, err := r.Details(context.Background(), d)
+	if err != nil || len(details.Files) != 201 {
+		t.Fatalf("details: %v, %d files", err, len(details.Files))
 	}
 }
