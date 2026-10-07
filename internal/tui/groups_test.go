@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -302,5 +303,53 @@ func TestASCIIBadgeUsesASCIISymbols(t *testing.T) {
 	m.applySnapshot(app.Snapshot{Rows: rows})
 	if got := strings.TrimRight(ansi.Strip(m.nameCell(rows[0], "", false, false, 15)), " "); got != "api wt2 ~1 !1" {
 		t.Fatalf("ascii compact badge: %q", got)
+	}
+}
+
+func TestIdentityPaletteIsDistinct(t *testing.T) {
+	seen := map[string]bool{}
+	for _, color := range identityPalette {
+		if seen[color] {
+			t.Fatalf("repeated palette color %s", color)
+		}
+		seen[color] = true
+	}
+	if len(identityPalette) != 7 {
+		t.Fatalf("palette has %d colors", len(identityPalette))
+	}
+}
+
+func TestGroupColorIsSharedByAGroupAndStable(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	rows := groupedRows()
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	parent := m.groupColor(rows[0])
+	for _, child := range rows[1:3] {
+		if got := m.groupColor(child); got != parent {
+			t.Fatalf("%s colored %s, its repository %s", child.Name, got, parent)
+		}
+	}
+	if got := m.groupColor(rows[0]); got != parent || got != identityColor("/home/mark/projects/api") {
+		t.Fatalf("color not derived from the repository path: %s", got)
+	}
+	// Different repositories land on palette slots spread by their paths.
+	slots := map[string]bool{}
+	for i := range 50 {
+		slots[identityColor(fmt.Sprintf("/home/mark/projects/repo-%d", i))] = true
+	}
+	if len(slots) != len(identityPalette) {
+		t.Fatalf("50 repositories used %d of %d colors", len(slots), len(identityPalette))
+	}
+}
+
+func TestRepositoryIconUsesGroupColorNotStatusColor(t *testing.T) {
+	m := New(context.Background(), nil, false)
+	rows := groupedRows()
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	row := m.tableRow(rows[0], 0, false, "", false, 110)
+	want := m.style(m.symbols().repo, m.groupColor(rows[0]), false)
+	if !strings.Contains(row, want) {
+		t.Fatalf("icon not in group color:\n%q\nwant %q", row, want)
 	}
 }

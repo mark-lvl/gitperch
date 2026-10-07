@@ -15,8 +15,7 @@ func (m *Model) selectedPreview(w, h int) []string {
 	if row == nil {
 		return m.card([]string{m.style("Select a repository to inspect its changes.", muted, false)}, "", w, h)
 	}
-	_, color := m.primaryStatus(*row)
-	name := m.style(m.symbols().repo, color, false) + " " + m.style(gitcli.SafeText(row.Name), accent, true)
+	name := m.style(m.symbols().repo, m.groupColor(*row), false) + " " + m.style(gitcli.SafeText(row.Name), accent, true)
 	age := m.style(relativeTime(m.now(), row.Status.LastActivity), muted, false)
 	branchWidth := inner - ansi.StringWidth(name) - ansi.StringWidth(age) - 6
 	branch := branchLabel(*row)

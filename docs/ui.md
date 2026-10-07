@@ -18,7 +18,13 @@ branch metadata, and one thin outer frame. A single header line carries the
 workspace, repository and attention badges, and a clock. The second line is a
 quiet rule that names an active search or scope and the scroll range only when
 they apply. The highlighted row has an accent bar; selected repositories carry
-a small filled marker. Folder icons and status labels share the status color.
+a small filled marker. Each repository's folder icon has an identity color,
+picked from its path, that its linked worktrees, its preview card and its Clean
+up heading share, so a group reads as one at a glance; status lives in the
+status column's own color. The seven identity colors (aqua, violet, olive, teal,
+indigo, brown, plum) are validated against the background for color-vision
+deficiency and kept clear of the success, warning, danger and accent colors.
+With more than seven repositories colors repeat; the name stays the label.
 Tracking counts follow the status (`● changed ↑3`) unless the status already is
 the tracking state (`↑ 3 commits`, `↓ 4 behind`). Zero tracking counts stay hidden.
 

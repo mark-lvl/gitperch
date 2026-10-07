@@ -225,6 +225,18 @@ func (m *Model) runCleanup(chosen []string) tea.Cmd {
 	return tea.Batch(run, m.nextEvent())
 }
 
+// cleanupGroupColor matches a review heading to its repository's icon in the
+// list. Cleanup names the group by the path Git reports, which is the parent
+// row's path unless symlinks differ; then the path itself picks the color.
+func (m *Model) cleanupGroupColor(group string) string {
+	for _, row := range m.rows {
+		if row.Path == group {
+			return m.groupColor(row)
+		}
+	}
+	return identityColor(group)
+}
+
 func (m *Model) cleanupLabel(item app.CleanupItem) string { return m.cleanupItemLabel(item, true) }
 
 // cleanupItemLabel names an item; withOID adds a branch's short commit, which
@@ -271,7 +283,7 @@ func (m *Model) cleanupView() tea.View {
 		item := eligible[i]
 		if item.Group != group {
 			group = item.Group
-			lines = append(lines, m.style(gitcli.SafeText(m.targetName(group)), accent, true))
+			lines = append(lines, m.style(m.symbols().repo, m.cleanupGroupColor(group), false)+" "+m.style(gitcli.SafeText(m.targetName(group)), accent, true))
 		}
 		box := "[ ]"
 		if m.cleanupTicked[item.ID] {

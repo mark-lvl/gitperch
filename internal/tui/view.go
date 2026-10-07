@@ -404,7 +404,6 @@ func (m *Model) tableRow(row app.Row, position int, highlighted bool, tree strin
 		}
 	}
 	c := columns(w)
-	_, color := m.primaryStatus(row)
 	line := m.style(pointer+mark, accent, true) + " "
 	if c.index > 0 {
 		number := ""
@@ -413,7 +412,8 @@ func (m *Model) tableRow(row app.Row, position int, highlighted bool, tree strin
 		}
 		line += m.style(cell(number, c.index), muted, false) + " "
 	}
-	line += m.style(icons.repo, color, false) + " " + m.nameCell(row, tree, context, highlighted, c.name) + " "
+	// The icon names the row's repository group; status keeps its own column.
+	line += m.style(icons.repo, m.groupColor(row), false) + " " + m.nameCell(row, tree, context, highlighted, c.name) + " "
 	if c.branch > 0 {
 		line += m.branchCell(row, c.branch) + " "
 	}

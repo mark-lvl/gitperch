@@ -28,6 +28,24 @@ const (
 	chipSurface = "#15283a" // keycaps, header badges and file-status chips
 )
 
+// identityPalette colors each repository's icon so a repository and its
+// worktrees read as one group. The order is part of the design: validated on
+// the background above as a cycle (the last color wraps to the first), every
+// neighboring pair stays apart under color-vision deficiency (OKLab ΔE ≥ 13.7)
+// and normal vision (ΔE ≥ 17.4), each color keeps ≥ 3:1 contrast, and none
+// sits within ΔE 15 of the success, amber, danger or accent colors, so an
+// identity icon never reads as a status. Red, orange, yellow, magenta and
+// green are left out for that reason.
+var identityPalette = [...]string{
+	"#199e70", // aqua
+	"#9085e9", // violet
+	"#8f9a2e", // olive
+	"#2aa6b8", // teal
+	"#6a6fe0", // indigo
+	"#b0703a", // brown
+	"#b56ad0", // plum
+}
+
 // branch is empty outside nerd mode: no fork glyph is common to terminal fonts.
 // spinner frames are each one cell wide so the busy labels never shift.
 type icons struct {

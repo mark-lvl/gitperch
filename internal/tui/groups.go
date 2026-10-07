@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"hash/fnv"
 	"sort"
 
 	"github.com/mark-lvl/gitperch/internal/app"
@@ -17,6 +18,17 @@ func groupKey(row app.Row) string {
 }
 
 func isParent(row app.Row) bool { return groupKey(row) == row.Path }
+
+// identityColor gives a repository path a stable palette color across
+// sessions and workspaces: an FNV-1a hash of the path picks the slot.
+func identityColor(path string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(path))
+	return identityPalette[h.Sum32()%uint32(len(identityPalette))]
+}
+
+// groupColor is the identity color a row shares with its whole group.
+func (m *Model) groupColor(row app.Row) string { return identityColor(groupKey(row)) }
 
 func (m *Model) matchesView(row app.Row) bool { return matches(row, m.filter) && m.inScope(row) }
 

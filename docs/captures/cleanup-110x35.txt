@@ -11,7 +11,7 @@
 │                                                                                                            │
 │      ╭──────────────────────────────────────────────────────────────────────────────────────────────╮      │
 │      │ Clean up 4 items?                                                                            │      │
-│      │ design-system                                                                                │      │
+│      │ ▱ design-system                                                                              │      │
 │      │   [x] prune 1 stale worktree record                             directory missing: old-spike │      │
 │      │ ▌ [x] remove worktree fix-tokens  fix-tokens                         merged into origin/main │      │
 │      │   [x] delete branch fix-tokens  2d7a90c                              merged into origin/main │      │
