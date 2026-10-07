@@ -9,6 +9,8 @@
 
 **Keep agent-touched repositories and worktrees visible, synchronized and safe.**
 
+_gitperch doesn't manage your coding agents. It manages the Git state they — or anything else — leave behind._
+
 [![CI](https://github.com/mark-lvl/gitperch/actions/workflows/ci.yml/badge.svg)](https://github.com/mark-lvl/gitperch/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mark-lvl/gitperch.svg)](https://pkg.go.dev/github.com/mark-lvl/gitperch)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -101,10 +103,8 @@ inspect → plan → review → revalidate → execute → refresh
 
 gitperch does not replace Git, lazygit or your shell. For staging, interactive
 rebases or conflict surgery it opens a shell or lazygit in the repository and
-refreshes when you return. Nor is it an agent orchestrator: it observes the Git
-state agents leave behind rather than controlling them. Use your favourite
-agent to create the work, then gitperch to answer: _what state did all of that
-leave my repositories in?_
+refreshes when you return. Use your favourite agent to create the work, then
+gitperch to answer: _what state did all of that leave my repositories in?_
 
 | Tool | Interface | What it is for |
 | --- | --- | --- |
