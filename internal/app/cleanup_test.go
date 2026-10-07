@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
@@ -925,5 +926,58 @@ func TestCleanupSkipsWorktreeThatGainedAnIgnoredFileAfterReview(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(merged, ".env")); err != nil {
 		t.Fatal("ignored file lost")
+	}
+}
+
+// countingInspect counts full status inspections, the expensive Git call.
+type countingInspect struct {
+	gitcli.Service
+	mu    sync.Mutex
+	paths map[string]int
+}
+
+func (c *countingInspect) Inspect(ctx context.Context, path string) repository.Status {
+	c.mu.Lock()
+	c.paths[path]++
+	c.mu.Unlock()
+	return c.Service.Inspect(ctx, path)
+}
+
+func TestCleanupBranchChecksDoNotInspectEveryWorktree(t *testing.T) {
+	repo, merged, ahead := cleanupRepo(t)
+	for _, name := range []string{"done-a", "done-b", "done-c"} {
+		actionGit(t, repo, "branch", name)
+	}
+	git := &countingInspect{paths: map[string]int{}}
+	actions := NewActions(git, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var branches []string
+	for _, item := range preview.Items {
+		if item.Kind == DeleteBranch && item.Eligible && strings.HasPrefix(item.Branch, "done-") {
+			branches = append(branches, item.ID)
+		}
+	}
+	if len(branches) != 3 {
+		t.Fatalf("branch items: %+v", preview.Items)
+	}
+	git.paths = map[string]int{}
+	results, err := actions.ExecuteCleanup(context.Background(), preview.ID, branches, nil)
+	if err != nil || len(results) != 3 {
+		t.Fatalf("results %+v, %v", results, err)
+	}
+	for _, r := range results {
+		if r.State != Succeeded {
+			t.Fatalf("result %+v", r)
+		}
+	}
+	// Deleting branches only needs each worktree's operation markers, not a
+	// full status of every worktree for every branch.
+	for _, path := range []string{repo, merged, ahead} {
+		if n := git.paths[path]; n != 0 {
+			t.Fatalf("%s inspected %d times while revalidating branch deletions", path, n)
+		}
 	}
 }

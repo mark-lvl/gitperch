@@ -86,14 +86,34 @@ func (r Runner) localMetadata(ctx context.Context, path string) (string, string,
 	if info, err := os.Stat(filepath.Join(gitDir, "logs", "HEAD")); err == nil {
 		activity = info.ModTime()
 	}
+	operation, err := operationIn(gitDir)
+	if err != nil {
+		return "", "", activity, err
+	}
+	return common, operation, activity, nil
+}
+
+// operationIn names the marker Git leaves in a worktree's Git directory while
+// a merge, cherry-pick, revert, rebase, sequence or bisect is unfinished.
+func operationIn(gitDir string) (string, error) {
 	for _, marker := range []string{"MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer", "BISECT_LOG"} {
 		if _, err := os.Stat(filepath.Join(gitDir, marker)); err == nil {
-			return common, marker, activity, nil
+			return marker, nil
 		} else if !os.IsNotExist(err) {
-			return "", "", activity, err
+			return "", err
 		}
 	}
-	return common, "", activity, nil
+	return "", nil
+}
+
+// Operation reports a worktree's unfinished operation from its markers alone,
+// without the cost of a full status inspection.
+func (r Runner) Operation(ctx context.Context, path string) (string, error) {
+	_, gitDir, err := r.gitDirectories(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	return operationIn(gitDir)
 }
 
 // gitDirectories returns the absolute common and per-worktree Git

@@ -42,6 +42,9 @@ func (s Service) SupportsWorktreeInventory(ctx context.Context) bool {
 func (s Service) Worktrees(ctx context.Context, path string) ([]Worktree, error) {
 	return s.Read.Worktrees(ctx, path)
 }
+func (s Service) Operation(ctx context.Context, path string) (string, error) {
+	return s.Read.Operation(ctx, path)
+}
 func (s Service) ResolveRemote(ctx context.Context, path string, m Metadata, remote string) (FetchTarget, error) {
 	return s.Read.ResolveRemote(ctx, path, m, remote)
 }

@@ -278,3 +278,25 @@ func TestReachableFromRefs(t *testing.T) {
 		t.Fatal("unknown object reported without an error")
 	}
 }
+
+func TestOperationReadsMarkersWithoutStatus(t *testing.T) {
+	repo := disposable(t)
+	write(t, filepath.Join(repo, "f"), "x\n")
+	commit(t, repo)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitCmd(t, repo, "worktree", "add", "-b", "wt", wt)
+	r := Runner{}
+	if op, err := r.Operation(context.Background(), wt); err != nil || op != "" {
+		t.Fatalf("idle worktree: %q, %v", op, err)
+	}
+	gitCmd(t, wt, "bisect", "start")
+	if op, err := r.Operation(context.Background(), wt); err != nil || op != "BISECT_LOG" {
+		t.Fatalf("bisecting worktree: %q, %v", op, err)
+	}
+	if op, err := r.Operation(context.Background(), repo); err != nil || op != "" {
+		t.Fatalf("an operation in one worktree leaked into the main worktree: %q, %v", op, err)
+	}
+	if _, err := r.Operation(context.Background(), filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Fatal("a missing worktree reported no error")
+	}
+}

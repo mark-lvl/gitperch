@@ -50,6 +50,7 @@ type CleanupGit interface {
 	ActionGit
 	SupportsWorktreeInventory(context.Context) bool
 	Worktrees(context.Context, string) ([]gitcli.Worktree, error)
+	Operation(context.Context, string) (string, error)
 	ResolveRemote(context.Context, string, gitcli.Metadata, string) (gitcli.FetchTarget, error)
 	RemoteDefaultRef(context.Context, string, string) (string, error)
 	ResolveCommit(context.Context, string, string) (string, error)
@@ -401,11 +402,11 @@ func operationBlocker(ctx context.Context, git CleanupGit, worktrees []gitcli.Wo
 			continue
 		}
 		name := gitcli.SafeText(filepath.Base(wt.Path))
-		s := git.Inspect(ctx, wt.Path)
+		operation, err := git.Operation(ctx, wt.Path)
 		switch {
-		case s.Error != "":
-			return "inspection failed in " + name + ": " + gitcli.SafeText(s.Error)
-		case s.Operation != "":
+		case err != nil:
+			return "inspection failed in " + name + ": " + gitcli.SafeText(err.Error())
+		case operation != "":
 			return "operation in progress in " + name
 		}
 	}
