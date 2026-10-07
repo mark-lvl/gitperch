@@ -175,7 +175,7 @@ a reason. Results appear in the status line and in details under Batch results.
 | --- | --- | --- |
 | Stale worktree records (one item per repository) | At least one record is stale (directory missing) and not locked | `git worktree prune` |
 | Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
-| Local branch | Its tip is reachable from the default ref, it is not the default branch, and no remaining worktree has it checked out | `git update-ref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
+| Local branch | Its tip is reachable from the default ref, it is not the default branch, and no remaining worktree has it checked out | `git update-ref --no-deref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
 
 Reasons a worktree is kept include `dirty (3 files)`, `locked: agent session`,
 `4 ignored file(s) (.env, node_modules/, …)`, and `not merged into origin/main`.
@@ -199,8 +199,9 @@ shown among the kept items; stale records can still be pruned.
 Local branches are reviewed in the same list, one item per branch with its
 short commit. A branch is eligible when its tip is reachable from the default
 ref (`refs/remotes/<remote>/HEAD` after the fetch, or local `main`/`master`
-without a remote), it is not the default branch itself, and no remaining
-worktree has it checked out.
+without a remote), it is not the default branch itself, it is not a symbolic ref (an alias such
+as `master` pointing at `main` is never listed), and no remaining worktree has
+it checked out.
 
 - A worktree holds its branch unless its record is stale (directory missing).
   A locked worktree holds its branch even when its directory is missing.

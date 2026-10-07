@@ -634,3 +634,52 @@ func TestCleanupTreatsDefaultRefOutsideRemoteAsUnknown(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanupNeverOffersSymbolicBranchesAndKeepsTheirTarget(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actionGit(t, repo, "symbolic-ref", "refs/heads/master", "refs/heads/main")
+	actionGit(t, repo, "branch", "done")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := branchItem(preview, "master"); b != nil {
+		t.Fatalf("symbolic branch offered: %+v", b)
+	}
+	var ids []string
+	for _, item := range preview.Items {
+		if item.Eligible {
+			ids = append(ids, item.ID)
+		}
+	}
+	if _, err := actions.ExecuteCleanup(context.Background(), preview.ID, ids, nil); err != nil {
+		t.Fatal(err)
+	}
+	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/main")
+	if b := strings.TrimSpace(string(actionGit(t, repo, "branch", "--list", "done"))); b != "" {
+		t.Fatalf("done not deleted: %q", b)
+	}
+}
+
+// symrefAfterReview turns the reviewed branch into a symbolic ref between plan
+// and execute.
+func TestCleanupRevalidationRefusesABranchThatBecameSymbolic(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actionGit(t, repo, "branch", "done")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := branchItem(preview, "done")
+	if b == nil || !b.Eligible {
+		t.Fatalf("done: %+v", b)
+	}
+	actionGit(t, repo, "symbolic-ref", "refs/heads/done", "refs/heads/main")
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{b.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "symbolic") {
+		t.Fatalf("results %+v", results)
+	}
+	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/main")
+}

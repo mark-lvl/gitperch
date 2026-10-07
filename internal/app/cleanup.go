@@ -310,8 +310,8 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		return out
 	}
 	for _, b := range branches {
-		if b.Name == base.branch {
-			continue
+		if b.Name == base.branch || b.Symref != "" {
+			continue // the default branch, or an alias whose deletion Git must never follow
 		}
 		merged, err := git.IsAncestor(ctx, path, b.OID, base.ref)
 		item := CleanupItem{Kind: DeleteBranch, Path: group, Branch: b.Name, OID: b.OID}
@@ -596,6 +596,9 @@ func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item Cl
 		for _, b := range branches {
 			if b.Name != item.Branch {
 				continue
+			}
+			if b.Symref != "" {
+				return errors.New("branch became a symbolic ref since review")
 			}
 			if b.OID != item.OID {
 				return errors.New("branch moved since review")

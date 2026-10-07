@@ -102,10 +102,11 @@ type Branch struct {
 	OID      string
 	Upstream string // e.g. refs/remotes/origin/x; "" when none
 	Gone     bool   // upstream configured but its tracking ref is missing
+	Symref   string // target of a symbolic ref such as refs/heads/master -> refs/heads/main; "" for a normal branch
 }
 
 func (r Runner) LocalBranches(ctx context.Context, path string) ([]Branch, error) {
-	out, err := r.Run(ctx, path, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(upstream)%00%(upstream:track)", "refs/heads")
+	out, err := r.Run(ctx, path, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(upstream)%00%(upstream:track)%00%(symref)", "refs/heads")
 	if err != nil {
 		return nil, err
 	}
@@ -116,21 +117,22 @@ func (r Runner) LocalBranches(ctx context.Context, path string) ([]Branch, error
 		}
 		fields := strings.Split(line, "\x00")
 		name, ok := strings.CutPrefix(fields[0], "refs/heads/")
-		if len(fields) != 4 || !ok || name == "" || !objectID(fields[1]) {
+		if len(fields) != 5 || !ok || name == "" || !objectID(fields[1]) {
 			return nil, fmt.Errorf("malformed branch list")
 		}
-		branches = append(branches, Branch{Name: name, OID: fields[1], Upstream: fields[2], Gone: fields[3] == "[gone]"})
+		branches = append(branches, Branch{Name: name, OID: fields[1], Upstream: fields[2], Gone: fields[3] == "[gone]", Symref: fields[4]})
 	}
 	return branches, nil
 }
 
 // DeleteBranch removes refs/heads/<name> only while it still points at oid
 // (Git compares and deletes atomically), then drops its config section.
+// --no-deref makes a symbolic ref delete itself, never the branch it names.
 func (r Runner) DeleteBranch(ctx context.Context, path, name, oid string) error {
 	if name == "" || !objectID(oid) {
 		return fmt.Errorf("invalid reviewed branch")
 	}
-	if _, err := r.Run(ctx, path, "update-ref", "-d", "refs/heads/"+name, oid); err != nil {
+	if _, err := r.Run(ctx, path, "update-ref", "--no-deref", "-d", "refs/heads/"+name, oid); err != nil {
 		return err
 	}
 	section := "branch." + name

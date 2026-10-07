@@ -186,3 +186,35 @@ func TestDeleteBranchComparesAndCleansConfig(t *testing.T) {
 		t.Fatalf("missing config section is not an error: %v", err)
 	}
 }
+
+func TestLocalBranchesExposesSymbolicRefs(t *testing.T) {
+	repo, _ := repoWithRemote(t)
+	gitCmd(t, repo, "symbolic-ref", "refs/heads/master", "refs/heads/main")
+	got, err := (Runner{}).LocalBranches(context.Background(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]Branch{}
+	for _, b := range got {
+		byName[b.Name] = b
+	}
+	if byName["master"].Symref != "refs/heads/main" || byName["main"].Symref != "" {
+		t.Fatalf("symrefs: %+v", got)
+	}
+}
+
+func TestDeleteBranchOnSymbolicRefRemovesOnlyTheAlias(t *testing.T) {
+	repo, _ := repoWithRemote(t)
+	gitCmd(t, repo, "symbolic-ref", "refs/heads/master", "refs/heads/main")
+	oid := strings.TrimSpace(string(gitCmd(t, repo, "rev-parse", "main")))
+	gitCmd(t, repo, "checkout", "--detach")
+	if err := (Runner{}).DeleteBranch(context.Background(), repo, "master", oid); err != nil {
+		t.Fatal(err)
+	}
+	if out, _ := exec.Command("git", "-C", repo, "rev-parse", "--verify", "--quiet", "refs/heads/main").Output(); strings.TrimSpace(string(out)) != oid {
+		t.Fatal("deleting the alias deleted its target")
+	}
+	if out, _ := exec.Command("git", "-C", repo, "symbolic-ref", "--quiet", "refs/heads/master").Output(); len(out) != 0 {
+		t.Fatal("alias still exists")
+	}
+}

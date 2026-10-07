@@ -142,12 +142,14 @@ ID, so several results per repository stay distinct.
 | --- | --- | --- |
 | Stale worktree records (one item per group) | at least one prunable record that is not locked | `worktree prune` |
 | Linked worktree | exists; not main; not locked; no changes, untracked files or conflicts; no operation in progress; no ignored files; HEAD reachable from the default ref | `worktree remove <path>` |
-| Local branch | not the default branch; tip reachable from the default ref; not checked out in any worktree that remains after this plan | `update-ref -d refs/heads/<b> <oid>`, then `config --remove-section branch.<b>` |
+| Local branch | not the default branch; not a symbolic ref (such as `master -> main`, skipped silently); tip reachable from the default ref; not checked out in any worktree that remains after this plan | `update-ref --no-deref -d refs/heads/<b> <oid>`, then `config --remove-section branch.<b>` |
 
 - Ignored files are detected with
   `ls-files --others --ignored --exclude-standard --directory -z` in the
   worktree; the reason names the count and up to three paths.
 - Reachability uses `merge-base --is-ancestor <oid> <default-ref>`.
+- `--no-deref` and the symbolic-ref exclusion together guarantee that deleting
+  an alias can never delete the branch it points at.
 - `branch -d` is not used: it judges "merged" against HEAD or the upstream,
   not the remote default ref. `update-ref -d` with the expected OID is an
   atomic compare-and-delete, so a branch that moved after review is refused by
