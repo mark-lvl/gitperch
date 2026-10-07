@@ -218,3 +218,30 @@ func TestDeleteBranchOnSymbolicRefRemovesOnlyTheAlias(t *testing.T) {
 		t.Fatal("alias still exists")
 	}
 }
+
+func TestDeleteBranchLeavesConfigOfBranchesWithLongerNames(t *testing.T) {
+	repo, _ := repoWithRemote(t)
+	gitCmd(t, repo, "branch", "foo")
+	gitCmd(t, repo, "branch", "foo.bar")
+	gitCmd(t, repo, "config", "branch.foo.bar.description", "keep me")
+	oid := strings.TrimSpace(string(gitCmd(t, repo, "rev-parse", "foo")))
+	// Only the longer name has configuration: nothing to remove for foo.
+	if err := (Runner{}).DeleteBranch(context.Background(), repo, "foo", oid); err != nil {
+		t.Fatalf("delete foo: %v", err)
+	}
+	if out, _ := exec.Command("git", "-C", repo, "config", "--get", "branch.foo.bar.description").Output(); strings.TrimSpace(string(out)) != "keep me" {
+		t.Fatalf("branch.foo.bar config lost: %q", out)
+	}
+	// Both have configuration: only foo's section goes.
+	gitCmd(t, repo, "branch", "foo")
+	gitCmd(t, repo, "config", "branch.foo.description", "mine")
+	if err := (Runner{}).DeleteBranch(context.Background(), repo, "foo", oid); err != nil {
+		t.Fatalf("delete foo with config: %v", err)
+	}
+	if out, _ := exec.Command("git", "-C", repo, "config", "--get", "branch.foo.description").Output(); len(out) != 0 {
+		t.Fatal("branch.foo config left behind")
+	}
+	if out, _ := exec.Command("git", "-C", repo, "config", "--get", "branch.foo.bar.description").Output(); strings.TrimSpace(string(out)) != "keep me" {
+		t.Fatalf("branch.foo.bar config lost: %q", out)
+	}
+}

@@ -136,7 +136,7 @@ func (r Runner) DeleteBranch(ctx context.Context, path, name, oid string) error 
 		return err
 	}
 	section := "branch." + name
-	_, err := r.Run(ctx, path, "config", "--local", "--name-only", "--get-regexp", "^"+regexp.QuoteMeta(section)+`\.`)
+	_, err := r.Run(ctx, path, "config", "--local", "--name-only", "--get-regexp", "^"+regexp.QuoteMeta(section)+`\.[^.]+$`) // direct keys only, not branch.<name>.<more>.<key>
 	var exit *exec.ExitError
 	if errors.As(err, &exit) && exit.ExitCode() == 1 {
 		return nil // no configuration for this branch
