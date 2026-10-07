@@ -135,10 +135,10 @@ func (m *Model) cleanupMessage(msg cleanupMsg) tea.Cmd {
 	m.cleanup = &msg.preview
 	m.cleanupTicked = map[string]bool{}
 	for _, item := range msg.preview.Items {
-		if item.Eligible {
+		if item.Eligible() {
 			m.cleanupTicked[item.ID] = true
 		}
-		if item.Failed {
+		if item.Failed() {
 			m.actionFailed = true
 		}
 	}
@@ -150,7 +150,7 @@ func (m *Model) cleanupMessage(msg cleanupMsg) tea.Cmd {
 func (m *Model) eligibleCleanup() []app.CleanupItem {
 	var items []app.CleanupItem
 	for _, item := range m.cleanup.Items {
-		if item.Eligible {
+		if item.Eligible() {
 			items = append(items, item)
 		}
 	}
@@ -261,6 +261,44 @@ func (m *Model) cleanupItemLabel(item app.CleanupItem, withOID bool) string {
 	return gitcli.SafeText(m.targetName(item.Path))
 }
 
+// wrapSpaces wraps text at spaces only: ansi.Wrap also breaks after hyphens,
+// which would split a command such as "git branch rescue/old-spike <commit>".
+// The first line holds first cells and later lines rest (rest <= first); a
+// word longer than its line is cut at rest cells.
+func wrapSpaces(text string, first, rest int) []string {
+	words := strings.Split(text, " ")
+	var lines []string
+	line, limit := words[0], first
+	flush := func() {
+		if ansi.StringWidth(line) > limit {
+			lines = append(lines, strings.Split(ansi.Hardwrap(line, rest, true), "\n")...)
+		} else {
+			lines = append(lines, line)
+		}
+		limit = rest
+	}
+	for _, word := range words[1:] {
+		if ansi.StringWidth(line+" "+word) <= limit {
+			line += " " + word
+			continue
+		}
+		flush()
+		line = word
+	}
+	flush()
+	return lines
+}
+
+// cleanupChecks lists every fact an assessment rests on, such as
+// "✓ working tree clean · no ignored files · merged into origin/main".
+func (m *Model) cleanupChecks(item app.CleanupItem) string {
+	var facts []string
+	for _, r := range item.Assessment.Reasons {
+		facts = append(facts, r.Text)
+	}
+	return m.symbols().clean + " " + strings.Join(facts, " · ")
+}
+
 // cleanupView lists ticked-by-default eligible items per repository, then
 // what stays and why. Only ticked item IDs reach ExecuteCleanup.
 func (m *Model) cleanupView() tea.View {
@@ -276,7 +314,8 @@ func (m *Model) cleanupView() tea.View {
 	w := min(96, m.width-4)
 	inner := max(1, w-4)
 	lines := []string{m.style(title, ink, true)}
-	room := max(3, m.height-10)
+	// One line is reserved for the highlighted item's checks.
+	room := max(3, m.height-11)
 	start := max(0, min(m.cleanupCursor-room/2, len(eligible)-room))
 	group := ""
 	for i := start; i < min(len(eligible), start+room); i++ {
@@ -293,21 +332,27 @@ func (m *Model) cleanupView() tea.View {
 		if i == m.cleanupCursor {
 			pointer = m.symbols().pointer + " "
 		}
-		lines = append(lines, m.between(pointer+box+" "+m.cleanupLabel(item), m.style(gitcli.SafeText(item.Reason), muted, false), inner))
+		lines = append(lines, m.between(pointer+box+" "+m.cleanupLabel(item), m.style(item.Assessment.Summary(), muted, false), inner))
+		if i == m.cleanupCursor && len(item.Assessment.Reasons) > 1 {
+			lines = append(lines, m.style(ansi.Truncate("      "+m.cleanupChecks(item), inner, "…"), muted, false))
+		}
 	}
-	// Failed checks come first and always show; ordinary kept items fill the
-	// remaining budget of four lines.
+	// Failed planning steps come first and always show. The other kept items
+	// follow from most to least restrictive and fill the remaining budget of
+	// four lines.
 	var kept []app.CleanupItem
 	failed := 0
 	for _, item := range m.cleanup.Items {
-		if !item.Eligible && item.Failed {
+		if !item.Eligible() && item.Failed() {
 			kept = append(kept, item)
 			failed++
 		}
 	}
-	for _, item := range m.cleanup.Items {
-		if !item.Eligible && !item.Failed {
-			kept = append(kept, item)
+	for _, status := range []app.CleanupStatus{app.CleanupBlocked, app.CleanupUnknown, app.CleanupNeedsReview, ""} {
+		for _, item := range m.cleanup.Items {
+			if !item.Eligible() && !item.Failed() && item.Assessment.Status == status {
+				kept = append(kept, item)
+			}
 		}
 	}
 	shown := max(4, failed)
@@ -319,20 +364,23 @@ func (m *Model) cleanupView() tea.View {
 			lines = append(lines, m.style(fmt.Sprintf("  +%d more kept", len(kept)-shown), muted, false))
 			break
 		}
-		color := amber
-		if item.Failed {
-			color = danger
+		color, tag := amber, item.Assessment.Status.Label()
+		switch {
+		case item.Failed():
+			color, tag = danger, "failed"
+		case item.Assessment.Status == app.CleanupNeedsReview:
+			color = muted
 		}
 		// Reasons wrap instead of truncating: a kept prune item ends with the
 		// command that saves a stranded commit, which must stay readable.
 		// The first line keeps the full width; continuations indent further.
-		text := m.cleanupItemLabel(item, false) + ": " + gitcli.SafeText(item.Reason)
-		first, rest, _ := strings.Cut(ansi.Wrap(text, max(1, inner-2), " "), "\n")
-		lines = append(lines, m.style("  "+first, color, false))
-		if rest != "" {
-			for _, line := range strings.Split(ansi.Wrap(strings.ReplaceAll(rest, "\n", " "), max(1, inner-4), " "), "\n") {
-				lines = append(lines, m.style("    "+line, color, false))
+		text := fmt.Sprintf("%-7s  %s: %s", tag, m.cleanupItemLabel(item, false), item.Assessment.Summary())
+		for j, line := range wrapSpaces(text, max(1, inner-2), max(1, inner-4)) {
+			indent := "    "
+			if j == 0 {
+				indent = "  "
 			}
+			lines = append(lines, m.style(indent+line, color, false))
 		}
 	}
 	footer := "Space toggle · ↑↓ move · " + m.symbols().enter + " clean up · Esc cancel"

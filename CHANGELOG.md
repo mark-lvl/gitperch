@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Worktree section lists the signals behind the state, and both raise medium
   attention. JSON adds a `lifecycle` object and `worktree.integration`. It is a
   suggestion only: Clean up still decides removal against a fresh fetch.
+- Clean up explains each decision. Kept items show a status (`blocked`,
+  `unknown`, `review` or `failed`) and every reason found, such as
+  `1 uncommitted file; 1 untracked file; not merged into origin/main`, and the
+  highlighted item lists the checks it passed. Unmerged worktrees now say
+  whether their commits are unpushed, diverged, published, or reachable only
+  from a detached HEAD (with the `git branch rescue/…` command that saves
+  them).
 
 ### Changed
 
@@ -32,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A detached HEAD needs attention only when no branch, remote-tracking branch
   or tag contains its commit; otherwise it shows a muted `detached` status.
 - The header's attention chip turns red when a repository needs intervention.
+- Clean up skips a worktree whose checked-out branch changed since review,
+  even at the same commit, and asks you to review again. Worktree reasons
+  read like attention reasons: `dirty (3 files)` is now
+  `2 uncommitted files; 1 untracked file`.
 
 - A new logo: a songbird perched on a branch of commits that forks. The
   README, icon and the mark the dashboard draws while the first scan runs and

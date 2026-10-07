@@ -233,12 +233,25 @@ group. Clean up is hidden below Git 2.36, where `c` explains the requirement.
 gitperch first fetches each repository's default remote, so "merged" is judged
 against fresh data, then opens a review. Eligible items start ticked: Space
 toggles the highlighted item, `a` toggles all, Enter runs the ticked items and
-Esc discards the review without changing anything. Items that are kept stay
-listed below with the reason. Only the ticked items you reviewed run, each
-revalidated right before it runs; if anything changed in the meantime (HEAD,
-status, lock state, ignored files, hidden changes, reachability) the item is
-skipped with a reason. Results appear in the status line and in details under
-Batch results.
+Esc discards the review without changing anything. The highlighted item lists
+every check it passed, such as
+`✓ working tree clean · no ignored files · no hidden edits · merged into origin/main`.
+Items that are kept stay listed below with a status and every reason found:
+
+| Status | Meaning |
+| --- | --- |
+| `blocked` | Running it would lose work or disturb Git: changes, untracked, ignored or hidden files, conflicts, an operation in progress, a lock, unpushed or diverged commits, a commit no ref reaches, a branch still checked out, or state that changed since review |
+| `unknown` | A check could not be made, such as the default branch or a merge check, so safety is not established |
+| `review` | Nothing at risk was found, but Git cannot show the work is finished: not merged into the default branch (squash and rebase merges look like this), no upstream, or an upstream that is gone |
+| `failed` | A step for the whole repository failed, such as the preflight fetch |
+
+Only items whose every check passed can be ticked; gitperch never runs a
+`review` item, so decide those yourself. Only the ticked items you reviewed
+run, each revalidated right before it runs; if anything changed in the meantime
+(HEAD, the checked-out branch, status, lock state, ignored files, hidden
+changes, reachability) the item is skipped with the reason and
+"review again". Results appear in the status line and in details under Batch
+results.
 
 | Item | Removed when | Command |
 | --- | --- | --- |
@@ -246,12 +259,23 @@ Batch results.
 | Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, has no files marked assume-unchanged or (present) skip-worktree, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
 | Local branch | Its tip is reachable from the default ref, it is not the default branch, and no remaining worktree has it checked out | `git update-ref --no-deref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
 
-Reasons a worktree is kept include `dirty (3 files)`, `locked: agent session`,
-`4 ignored file(s) (.env, node_modules/, …)`,
-`1 file(s) marked assume-unchanged or skip-worktree (config/dev.env)`, and
-`not merged into origin/main`. Edits to assume-unchanged and skip-worktree
+Reasons a worktree is kept include `3 uncommitted files`, `1 untracked file`,
+`locked: agent session`, `4 ignored file(s) (.env, node_modules/, …)`,
+`1 file(s) marked assume-unchanged or skip-worktree (config/dev.env)`,
+`not merged into origin/main` and `2 commits not pushed to origin/feat/x`.
+Edits to assume-unchanged and skip-worktree
 files are invisible to `git status` and `git worktree remove` would delete
-them; skip-worktree files a sparse checkout left absent do not count.
+them; skip-worktree files a sparse checkout left absent do not count. Ignored
+and hidden files are listed only for an otherwise clean worktree, since they
+read the whole directory.
+
+For a worktree not merged into the default branch, the review says where its
+commits are. A detached HEAD whose commit no branch, remote-tracking branch or
+tag contains is blocked with the command that saves it, such as
+`git branch rescue/spike <commit>`; one that another ref reaches needs review.
+A branch with commits not pushed to its upstream, or diverged from it, is
+blocked; a branch whose commits are all pushed, or that has no upstream or a
+gone upstream, needs review. Removing a worktree never deletes its branch.
 A stale record whose HEAD is a commit no ref reaches (for example work done on
 a detached HEAD) is kept: pruning would leave that commit unreferenced. The
 review names each such commit and the command that saves it, such as

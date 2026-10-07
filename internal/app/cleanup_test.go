@@ -59,11 +59,11 @@ func TestCleanupPlansMergedWorktreeAndKeepsOthers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, merged); !item.Eligible || item.Branch != "merged" || item.BaseName != "origin/main" {
+	if item := itemFor(t, preview, RemoveWorktree, merged); !item.Eligible() || item.Branch != "merged" || item.BaseName != "origin/main" {
 		t.Fatalf("merged: %+v", item)
 	}
-	for path, reason := range map[string]string{ahead: "not merged into origin/main", dirty: "dirty", ignored: "ignored file", locked: "locked: agent session"} {
-		if item := itemFor(t, preview, RemoveWorktree, path); item.Eligible || !strings.Contains(item.Reason, reason) {
+	for path, reason := range map[string]string{ahead: "not merged into origin/main", dirty: "1 untracked file", ignored: "ignored file", locked: "locked: agent session"} {
+		if item := itemFor(t, preview, RemoveWorktree, path); item.Eligible() || !strings.Contains(item.Assessment.Summary(), reason) {
 			t.Fatalf("%s: %+v", path, item)
 		}
 	}
@@ -85,7 +85,7 @@ func TestCleanupExecutesOnlyChosenItems(t *testing.T) {
 		t.Fatal(err)
 	}
 	prune := itemFor(t, preview, PruneStale, preview.Items[0].Group)
-	if !prune.Eligible || len(prune.Stale) != 1 {
+	if !prune.Eligible() || len(prune.Stale) != 1 {
 		t.Fatalf("prune: %+v", prune)
 	}
 	results, err := actions.ExecuteCleanup(context.Background(), preview.ID, []string{prune.ID}, nil)
@@ -126,7 +126,7 @@ func TestCleanupDanglingDefaultRef(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible || !strings.Contains(item.Reason, "default branch") {
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible() || !strings.Contains(item.Assessment.Summary(), "default branch") {
 		t.Fatalf("dangling origin/HEAD: %+v", item)
 	}
 }
@@ -136,7 +136,7 @@ func TestCleanupMissingDefaultRefSuggestsSetHead(t *testing.T) {
 	actionGit(t, repo, "remote", "set-head", "origin", "--delete")
 	actions := NewActions(gitcli.Service{}, 1)
 	preview, _ := actions.PlanCleanup(context.Background(), []string{repo})
-	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible || !strings.Contains(item.Reason, "git remote set-head origin -a") {
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible() || !strings.Contains(item.Assessment.Summary(), "git remote set-head origin -a") {
 		t.Fatalf("missing origin/HEAD: %+v", item)
 	}
 }
@@ -151,7 +151,7 @@ func TestCleanupLocalDefaultWithoutRemote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, wt); !item.Eligible || item.BaseName != "main (local default)" {
+	if item := itemFor(t, preview, RemoveWorktree, wt); !item.Eligible() || item.BaseName != "main (local default)" {
 		t.Fatalf("local default: %+v", item)
 	}
 }
@@ -168,7 +168,7 @@ func TestCleanupKeepsWorktreeWhenIgnoredListingOverflows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible || !strings.Contains(item.Reason, "too many ignored files") {
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible() || !strings.Contains(item.Assessment.Summary(), "too many ignored files") {
 		t.Fatalf("overflow: %+v", item)
 	}
 }
@@ -216,17 +216,17 @@ func TestCleanupPreflightFetchFailureIsReported(t *testing.T) {
 	}
 	var failed int
 	for _, item := range preview.Items {
-		if item.Kind == CleanupGroup && item.Failed && strings.Contains(item.Reason, "preflight fetch failed") {
+		if item.Kind == CleanupGroup && item.Failed() && strings.Contains(item.Assessment.Summary(), "preflight fetch failed") {
 			failed++
 		}
-		if item.Kind == RemoveWorktree && item.Eligible {
+		if item.Kind == RemoveWorktree && item.Eligible() {
 			t.Fatalf("removal eligible after a failed fetch: %+v", item)
 		}
 	}
 	if failed != 1 {
 		t.Fatalf("want one failed group item, got %d in %+v", failed, preview.Items)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible {
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible() {
 		t.Fatalf("merged: %+v", item)
 	}
 }
@@ -253,7 +253,7 @@ func TestCleanupSkipsWhenInspectedHeadDiffersFromReviewed(t *testing.T) {
 		t.Fatal(err)
 	}
 	item := itemFor(t, preview, RemoveWorktree, merged)
-	if !item.Eligible {
+	if !item.Eligible() {
 		t.Fatalf("not eligible: %+v", item)
 	}
 	svc.oid = strings.Repeat("a", len(item.OID))
@@ -286,13 +286,13 @@ func TestCleanupPlansMergedBranchesAfterTheirWorktree(t *testing.T) {
 		}
 		return nil
 	}
-	if b := branch("done"); b == nil || !b.Eligible {
+	if b := branch("done"); b == nil || !b.Eligible() {
 		t.Fatalf("done: %+v", b)
 	}
-	if b := branch("merged"); b == nil || !b.Eligible {
+	if b := branch("merged"); b == nil || !b.Eligible() {
 		t.Fatalf("branch of a removable worktree should be eligible: %+v", b)
 	}
-	if b := branch("gone-squash"); b == nil || b.Eligible || !strings.Contains(b.Reason, "squash merge?") {
+	if b := branch("gone-squash"); b == nil || b.Eligible() || !strings.Contains(b.Assessment.Summary(), "squash merge?") {
 		t.Fatalf("gone-squash: %+v", b)
 	}
 	if b := branch("ahead"); b != nil {
@@ -300,7 +300,7 @@ func TestCleanupPlansMergedBranchesAfterTheirWorktree(t *testing.T) {
 	}
 	var ids []string
 	for _, item := range preview.Items {
-		if item.Eligible {
+		if item.Eligible() {
 			ids = append(ids, item.ID)
 		}
 	}
@@ -411,7 +411,7 @@ func TestCleanupNeverDeletesLocalDefaultWithoutRemote(t *testing.T) {
 		if item.Kind == DeleteBranch && item.Branch == "main" {
 			t.Fatalf("local default offered: %+v", item)
 		}
-		done = done || (item.Kind == DeleteBranch && item.Branch == "done" && item.Eligible)
+		done = done || (item.Kind == DeleteBranch && item.Branch == "done" && item.Eligible())
 	}
 	if !done {
 		t.Fatalf("done not offered: %+v", preview.Items)
@@ -431,7 +431,7 @@ func TestCleanupDeletesBranchOfStaleWorktreeAfterPrune(t *testing.T) {
 	var ids []string
 	for _, item := range preview.Items {
 		if item.Kind == PruneStale || (item.Kind == DeleteBranch && item.Branch == "stale-br") {
-			if !item.Eligible {
+			if !item.Eligible() {
 				t.Fatalf("not eligible: %+v", item)
 			}
 			ids = append(ids, item.ID)
@@ -470,7 +470,7 @@ func TestCleanupDefaultBranchSkippedForRemoteNameWithSlash(t *testing.T) {
 		if item.Kind == DeleteBranch && item.Branch == "main" {
 			t.Fatalf("default branch offered: %+v", item)
 		}
-		done = done || (item.Kind == DeleteBranch && item.Branch == "done" && item.Eligible)
+		done = done || (item.Kind == DeleteBranch && item.Branch == "done" && item.Eligible())
 	}
 	if !done {
 		t.Fatalf("done not offered: %+v", preview.Items)
@@ -496,7 +496,7 @@ func TestCleanupKeepsBranchOfLockedWorktreeWithMissingDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b := branchItem(preview, "onusb"); b == nil || b.Eligible || !strings.Contains(b.Reason, "checked out") {
+	if b := branchItem(preview, "onusb"); b == nil || b.Eligible() || !strings.Contains(b.Assessment.Summary(), "checked out") {
 		t.Fatalf("branch of locked worktree: %+v", b)
 	}
 	actions.Discard(preview.ID)
@@ -513,7 +513,7 @@ func TestCleanupSkipsBranchWhoseStaleWorktreeGotLockedAfterReview(t *testing.T) 
 		t.Fatal(err)
 	}
 	b := branchItem(preview, "onusb")
-	if b == nil || !b.Eligible {
+	if b == nil || !b.Eligible() {
 		t.Fatalf("branch of stale worktree should be eligible: %+v", b)
 	}
 	actionGit(t, repo, "worktree", "lock", usb)
@@ -563,7 +563,7 @@ func TestCleanupKeepsMergedBranchesWhileAWorktreeIsRebasing(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"rb", "done", "merged"} {
-		if b := branchItem(preview, name); b == nil || b.Eligible || !strings.Contains(b.Reason, "operation in progress in rb") {
+		if b := branchItem(preview, name); b == nil || b.Eligible() || !strings.Contains(b.Assessment.Summary(), "rebase in progress in rb") {
 			t.Fatalf("%s: %+v", name, b)
 		}
 	}
@@ -579,12 +579,12 @@ func TestCleanupSkipsBranchWhenAWorktreeStartsRebasingAfterReview(t *testing.T) 
 		t.Fatal(err)
 	}
 	b := branchItem(preview, "done")
-	if b == nil || !b.Eligible {
+	if b == nil || !b.Eligible() {
 		t.Fatalf("done: %+v", b)
 	}
 	startConflictRebase(t, wt)
 	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{b.ID}, nil)
-	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "operation in progress") {
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "rebase in progress") {
 		t.Fatalf("results %+v", results)
 	}
 	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/done")
@@ -601,10 +601,10 @@ func TestCleanupKeepsBranchCheckedOutInASecondWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, first); !item.Eligible {
+	if item := itemFor(t, preview, RemoveWorktree, first); !item.Eligible() {
 		t.Fatalf("first worktree should be removable: %+v", item)
 	}
-	if b := branchItem(preview, "dup"); b == nil || b.Eligible || !strings.Contains(b.Reason, "dup2") {
+	if b := branchItem(preview, "dup"); b == nil || b.Eligible() || !strings.Contains(b.Assessment.Summary(), "dup2") {
 		t.Fatalf("dup: %+v", b)
 	}
 }
@@ -623,11 +623,11 @@ func TestCleanupTreatsDefaultRefOutsideRemoteAsUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible || !strings.Contains(item.Reason, "default branch unknown") {
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible() || !strings.Contains(item.Assessment.Summary(), "default branch unknown") {
 		t.Fatalf("worktree: %+v", item)
 	}
 	for _, item := range preview.Items {
-		if item.Eligible {
+		if item.Eligible() {
 			t.Fatalf("eligible item without a known default: %+v", item)
 		}
 		if item.Kind == DeleteBranch {
@@ -650,7 +650,7 @@ func TestCleanupNeverOffersSymbolicBranchesAndKeepsTheirTarget(t *testing.T) {
 	}
 	var ids []string
 	for _, item := range preview.Items {
-		if item.Eligible {
+		if item.Eligible() {
 			ids = append(ids, item.ID)
 		}
 	}
@@ -674,7 +674,7 @@ func TestCleanupRevalidationRefusesABranchThatBecameSymbolic(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := branchItem(preview, "done")
-	if b == nil || !b.Eligible {
+	if b == nil || !b.Eligible() {
 		t.Fatalf("done: %+v", b)
 	}
 	actionGit(t, repo, "symbolic-ref", "refs/heads/done", "refs/heads/main")
@@ -758,7 +758,7 @@ func TestCleanupNamesEveryStrandedCommitsRescueCommand(t *testing.T) {
 	}
 	prune := pruneItem(t, preview)
 	for _, want := range []string{"git branch rescue/spike-a " + first, "git branch rescue/spike-b " + second} {
-		if prune.Eligible || !strings.Contains(prune.Reason, want) {
+		if prune.Eligible() || !strings.Contains(prune.Assessment.Summary(), want) {
 			t.Fatalf("missing %q in %+v", want, prune)
 		}
 	}
@@ -773,7 +773,7 @@ func TestCleanupKeepsStaleRecordHoldingUnreferencedCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	prune := pruneItem(t, preview)
-	if prune.Eligible || !strings.Contains(prune.Reason, "stale worktree spike holds unreferenced commit "+oid[:7]) || !strings.Contains(prune.Reason, "create a branch first: git branch rescue/spike "+oid) {
+	if prune.Eligible() || !strings.Contains(prune.Assessment.Summary(), "stale worktree spike holds unreferenced commit "+oid[:7]) || !strings.Contains(prune.Assessment.Summary(), "create a branch first: git branch rescue/spike "+oid) {
 		t.Fatalf("prune: %+v", prune)
 	}
 	// Choosing it anyway runs nothing.
@@ -796,7 +796,7 @@ func TestCleanupPrunesStaleRecordWhoseCommitIsReachable(t *testing.T) {
 		t.Fatal(err)
 	}
 	prune := pruneItem(t, preview)
-	if !prune.Eligible {
+	if !prune.Eligible() {
 		t.Fatalf("prune: %+v", prune)
 	}
 	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{prune.ID}, nil)
@@ -815,7 +815,7 @@ func TestCleanupSkipsPruneWhenItsCommitBecameUnreferencedAfterReview(t *testing.
 		t.Fatal(err)
 	}
 	prune := pruneItem(t, preview)
-	if !prune.Eligible {
+	if !prune.Eligible() {
 		t.Fatalf("prune: %+v", prune)
 	}
 	actionGit(t, repo, "branch", "-D", "rescue")
@@ -835,7 +835,7 @@ func TestCleanupQuotesShellSignificantNamesInThePruneHint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if prune := pruneItem(t, preview); prune.Eligible || !strings.Contains(prune.Reason, "git branch 'rescue/x;echo$(id)' ") {
+	if prune := pruneItem(t, preview); prune.Eligible() || !strings.Contains(prune.Assessment.Summary(), "git branch 'rescue/x;echo$(id)' ") {
 		t.Fatalf("prune: %+v", prune)
 	}
 }
@@ -853,7 +853,7 @@ func TestCleanupKeepsStaleRecordsWhenReachabilityCannotBeChecked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if prune := pruneItem(t, preview); prune.Eligible || !strings.Contains(prune.Reason, "boom") {
+	if prune := pruneItem(t, preview); prune.Eligible() || !strings.Contains(prune.Assessment.Summary(), "boom") {
 		t.Fatalf("prune: %+v", prune)
 	}
 }
@@ -868,7 +868,7 @@ func TestCleanupSkipsWorktreeLockedAfterReview(t *testing.T) {
 		t.Fatal(err)
 	}
 	item := itemFor(t, preview, RemoveWorktree, merged)
-	if !item.Eligible {
+	if !item.Eligible() {
 		t.Fatalf("not eligible: %+v", item)
 	}
 	actionGit(t, repo, "worktree", "lock", "--reason", "agent resumed", merged)
@@ -892,7 +892,7 @@ func TestCleanupSkipsPruneWhenAnotherStaleRecordAppearsAfterReview(t *testing.T)
 		t.Fatal(err)
 	}
 	prune := pruneItem(t, preview)
-	if !prune.Eligible {
+	if !prune.Eligible() {
 		t.Fatalf("prune: %+v", prune)
 	}
 	second := filepath.Join(t.TempDir(), "second")
@@ -916,7 +916,7 @@ func TestCleanupSkipsWorktreeThatGainedAnIgnoredFileAfterReview(t *testing.T) {
 		t.Fatal(err)
 	}
 	item := itemFor(t, preview, RemoveWorktree, merged)
-	if !item.Eligible {
+	if !item.Eligible() {
 		t.Fatalf("not eligible: %+v", item)
 	}
 	actionTestWrite(t, filepath.Join(merged, ".env"), "SECRET=1\n")
@@ -956,7 +956,7 @@ func TestCleanupBranchChecksDoNotInspectEveryWorktree(t *testing.T) {
 	}
 	var branches []string
 	for _, item := range preview.Items {
-		if item.Kind == DeleteBranch && item.Eligible && strings.HasPrefix(item.Branch, "done-") {
+		if item.Kind == DeleteBranch && item.Eligible() && strings.HasPrefix(item.Branch, "done-") {
 			branches = append(branches, item.ID)
 		}
 	}
@@ -999,7 +999,7 @@ func TestCleanupKeepsWorktreeWithHiddenLocalChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible || !strings.Contains(item.Reason, "1 file(s) marked assume-unchanged or skip-worktree (tracked)") {
+	if item := itemFor(t, preview, RemoveWorktree, merged); item.Eligible() || !strings.Contains(item.Assessment.Summary(), "1 file(s) marked assume-unchanged or skip-worktree (tracked)") {
 		t.Fatalf("hidden edit: %+v", item)
 	}
 }

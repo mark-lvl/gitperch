@@ -212,7 +212,7 @@ func attachIntegration(ctx context.Context, rows []Row, service GitService, work
 				path := rows[members[0]].Path
 				var base cleanupBase
 				if remotes, err := checker.Remotes(ctx, path); err != nil {
-					base.reason = "remote list failed: " + gitcli.SafeText(err.Error())
+					base.reason = CleanupReason{Code: CleanupCheckFailed, Text: "remote list failed: " + gitcli.SafeText(err.Error())}
 				} else {
 					base = defaultBase(ctx, checker, path, remotes, nil)
 				}
@@ -221,7 +221,7 @@ func attachIntegration(ctx context.Context, rows []Row, service GitService, work
 					info := &Integration{Base: base.name}
 					switch {
 					case base.ref == "":
-						info.Error = base.reason
+						info.Error = base.reason.Text
 					case !row.Status.Detached && row.Status.Branch == base.branch:
 						info.Error = "the default branch is checked out here"
 					default:

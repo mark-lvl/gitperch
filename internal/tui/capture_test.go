@@ -58,15 +58,20 @@ func writeANSICapture(t *testing.T, name, content string) {
 // engine produces. It never touches Git.
 func captureCleanup(main string) *app.CleanupPreview {
 	base := "origin/main"
-	branch := func(id, name, oid string, eligible bool, reason string) app.CleanupItem {
-		return app.CleanupItem{ID: id, Group: main, Kind: app.DeleteBranch, Path: main, Branch: name, OID: oid, BaseName: base, Eligible: eligible, Reason: reason}
+	branch := func(id, name, oid string, reason app.CleanupReason) app.CleanupItem {
+		return app.CleanupItem{ID: id, Group: main, Kind: app.DeleteBranch, Path: main, Branch: name, OID: oid, BaseName: base, Assessment: app.Assess(reason)}
 	}
+	merged := app.CleanupReason{Code: app.CleanupMerged, Text: "merged into " + base}
 	return &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{
-		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Eligible: true, Reason: "directory missing: old-spike"},
-		{ID: "fix-tokens", Group: main, Kind: app.RemoveWorktree, Path: main + "/.worktrees/fix-tokens", Branch: "fix-tokens", BaseName: base, Eligible: true, Reason: "merged into " + base},
-		branch("branch-fix-tokens", "fix-tokens", "2d7a90c3e1f4856b0a9d8c7e6f5a4b3c2d1e0f9a", true, "merged into "+base),
-		branch("branch-old-login", "feat/old-login", "9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2", true, "merged into "+base),
-		branch("branch-squashed", "feat/squashed", "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", false, "upstream gone but not merged into "+base+" — squash merge?"),
+		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Assessment: app.Assess(app.CleanupReason{Code: app.CleanupDirectoryMissing, Text: "directory missing: old-spike"})},
+		{ID: "fix-tokens", Group: main, Kind: app.RemoveWorktree, Path: main + "/.worktrees/fix-tokens", Branch: "fix-tokens", BaseName: base, Assessment: app.Assess(
+			app.CleanupReason{Code: app.CleanupClean, Text: "working tree clean"},
+			app.CleanupReason{Code: app.CleanupNoIgnoredFiles, Text: "no ignored files"},
+			app.CleanupReason{Code: app.CleanupNoHiddenChanges, Text: "no hidden edits"},
+			merged)},
+		branch("branch-fix-tokens", "fix-tokens", "2d7a90c3e1f4856b0a9d8c7e6f5a4b3c2d1e0f9a", merged),
+		branch("branch-old-login", "feat/old-login", "9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2", merged),
+		branch("branch-squashed", "feat/squashed", "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", app.CleanupReason{Code: app.CleanupUpstreamGone, Text: "upstream gone but not merged into " + base + " — squash merge?"}),
 	}}
 }
 
@@ -171,7 +176,7 @@ func TestOverlayRenderCaptures(t *testing.T) {
 				m.cleanup = captureCleanup(m.highlightedRow().Path)
 				m.cleanupTicked = map[string]bool{}
 				for _, item := range m.cleanup.Items {
-					m.cleanupTicked[item.ID] = item.Eligible
+					m.cleanupTicked[item.ID] = item.Eligible()
 				}
 				m.cleanupCursor = 1
 			default:

@@ -6,10 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
 	"github.com/mark-lvl/gitperch/internal/discovery"
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
@@ -211,7 +213,7 @@ func TestCleanupPreflightFailureMarksActionFailed(t *testing.T) {
 	m.applySnapshot(app.Snapshot{Rows: dashboardRows()})
 	m.actionGeneration = 1
 	m.cleanupMessage(cleanupMsg{generation: 1, preview: app.CleanupPreview{ID: 1, Items: []app.CleanupItem{
-		{ID: "x", Group: "/repos/a", Kind: app.CleanupGroup, Path: "/repos/a", Reason: "fetch failed", Failed: true},
+		{ID: "x", Group: "/repos/a", Kind: app.CleanupGroup, Path: "/repos/a", Assessment: app.Assess(app.CleanupReason{Code: app.CleanupFetchFailed, Text: "fetch failed"})},
 	}}})
 	if m.cleanup == nil || !m.actionFailed {
 		t.Fatalf("failed preflight not flagged: %v %v", m.cleanup, m.actionFailed)
@@ -329,9 +331,9 @@ func TestCleanupKeptListShowsFailedFirstAndNoFalsePointer(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
 	items := []app.CleanupItem{}
 	for i := 0; i < 6; i++ {
-		items = append(items, app.CleanupItem{ID: fmt.Sprint("k", i), Group: "/repos/a", Kind: app.RemoveWorktree, Path: fmt.Sprint("/w/k", i), Reason: "dirty (1 files)"})
+		items = append(items, app.CleanupItem{ID: fmt.Sprint("k", i), Group: "/repos/a", Kind: app.RemoveWorktree, Path: fmt.Sprint("/w/k", i), Assessment: app.Assess(app.CleanupReason{Code: app.CleanupUncommitted, Text: "1 uncommitted file"})})
 	}
-	items = append(items, app.CleanupItem{ID: "fail", Group: "/repos/a", Kind: app.CleanupGroup, Path: "/repos/a", Reason: "preflight fetch failed: no route", Failed: true})
+	items = append(items, app.CleanupItem{ID: "fail", Group: "/repos/a", Kind: app.CleanupGroup, Path: "/repos/a", Assessment: app.Assess(app.CleanupReason{Code: app.CleanupFetchFailed, Text: "preflight fetch failed: no route"})})
 	m.cleanup = &app.CleanupPreview{ID: 1, Items: items}
 	m.cleanupTicked = map[string]bool{}
 	view := m.View().Content
@@ -350,7 +352,7 @@ func TestCleanupLateResultAfterCancelDoesNotOpenReview(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.actionGeneration, m.actionCancel, m.actionCtx, m.preparing = 1, cancel, ctx, true
 	cancel() // Esc arrived after the plan's last context check
-	items := []app.CleanupItem{{ID: "a", Group: "/r", Kind: app.PruneStale, Path: "/r", Eligible: true}}
+	items := []app.CleanupItem{{ID: "a", Group: "/r", Kind: app.PruneStale, Path: "/r", Assessment: app.Assess(app.CleanupReason{Code: app.CleanupDirectoryMissing, Text: "directory missing: x"})}}
 	m.cleanupMessage(cleanupMsg{generation: 1, preview: app.CleanupPreview{ID: 1, Items: items}})
 	if m.cleanup != nil || m.message != "Cleanup preparation cancelled" || m.actionCancel != nil {
 		t.Fatalf("review opened after cancel: %v %q", m.cleanup, m.message)
@@ -397,7 +399,7 @@ func TestCleanupKeptReasonWrapsToShowRescueCommand(t *testing.T) {
 	m.width, m.height = 110, 35
 	oid := "890ae7e5c1d2b3a4f5e6d7c8b9a0f1e2d3c4b5a6"
 	reason := "stale worktree feature-experiment-2026 holds unreferenced commit 890ae7e — create a branch first: git branch rescue/feature-experiment-2026 " + oid
-	m.cleanup = &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{{ID: "p", Group: "/r", Kind: app.PruneStale, Path: "/r", Stale: []string{"/w/feature-experiment-2026"}, Reason: reason}}}
+	m.cleanup = &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{{ID: "p", Group: "/r", Kind: app.PruneStale, Path: "/r", Stale: []string{"/w/feature-experiment-2026"}, Assessment: app.Assess(app.CleanupReason{Code: app.CleanupUnreferencedCommit, Text: reason})}}}
 	content := m.View().Content
 	text := overlayText(content)
 	for _, want := range []string{"feature-experiment-2026 holds unreferenced commit 890ae7e", "git branch rescue/feature-experiment-2026 " + oid, "Esc close"} {
@@ -416,9 +418,9 @@ func TestCleanupKeptBranchOmitsCommitSoReasonFits(t *testing.T) {
 	m := New(context.Background(), nil, true)
 	m.EnableActions(app.NewActions(newActionFake(false), 1))
 	m.width, m.height = 110, 35
-	m.cleanup = &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{{ID: "b", Group: "/r", Kind: app.DeleteBranch, Path: "/r", Branch: "feat/squashed", OID: "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", Reason: "upstream gone but not merged into origin/main — squash merge?"}}}
+	m.cleanup = &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{{ID: "b", Group: "/r", Kind: app.DeleteBranch, Path: "/r", Branch: "feat/squashed", OID: "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", Assessment: app.Assess(app.CleanupReason{Code: app.CleanupUpstreamGone, Text: "upstream gone but not merged into origin/main — squash merge?"})}}}
 	content := m.View().Content
-	if text := overlayText(content); !strings.Contains(text, "delete branch feat/squashed: upstream gone but not merged into origin/main — squash merge?") || strings.Contains(text, "4be81d0") {
+	if text := overlayText(content); !strings.Contains(text, "review delete branch feat/squashed: upstream gone but not merged into origin/main — squash merge?") || strings.Contains(text, "4be81d0") {
 		t.Fatalf("kept branch: %s", content)
 	}
 }
@@ -454,5 +456,18 @@ func TestRestoreCommandsCollectAcrossBatches(t *testing.T) {
 	got, logged := m.RestoreCommands()
 	if len(got) != 2 || !strings.Contains(got[0], "branch one") || !strings.Contains(got[1], "branch two") || logged {
 		t.Fatalf("restore commands: %q, logged %v", got, logged)
+	}
+}
+
+func TestWrapSpacesKeepsHyphenatedWordsWhole(t *testing.T) {
+	got := wrapSpaces("create a branch first: git branch rescue/feature-experiment-2026 890ae7e", 34, 32)
+	want := []string{"create a branch first: git branch", "rescue/feature-experiment-2026", "890ae7e"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	for _, line := range wrapSpaces("x "+strings.Repeat("y", 25), 12, 10) {
+		if ansi.StringWidth(line) > 10 && line != "x" {
+			t.Fatalf("overlong word not cut to the narrower width: %q", line)
+		}
 	}
 }
