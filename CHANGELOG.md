@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A new logo: a songbird perched on a branch of commits that forks. The
+  README, icon and the mark the dashboard draws while the first scan runs and
+  when no repositories are found all use it. The original artwork is
+  `docs/assets/logo.png`.
+
 ## [0.2.0] - 2026-10-07
 
 ### Added

@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-  <img src="docs/assets/logo-light.svg" alt="gitperch logo: a bird perched on a line of commits" width="160">
+  <img src="docs/assets/logo-light.svg" alt="gitperch logo: a songbird perched on a branch of commits" width="200">
 </picture>
 
 # gitperch

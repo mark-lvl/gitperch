@@ -41,11 +41,11 @@ repository appear.
 
 While the first scan runs, and when no repositories are found, the empty list
 shows the gitperch mark centered above its message: the logo's songbird in half
-blocks, perched on a heavy rule between two commits, with the bird in the
-accent color and the branch in the branch color. Mark and message need seven
+blocks, perched on a heavy rule of four commits that forks up beside its beak,
+with the bird in the accent color and the branch in the branch color. Mark and message need seven
 rows below the column headings; shorter lists and ASCII icons show the message
 alone. Once repositories exist, an empty search or scope shows only its
-message. The vector logo lives in [assets](assets/).
+message. The logo artwork and its vector traces live in [assets](assets/).
 
 Columns follow three terminal tiers:
 

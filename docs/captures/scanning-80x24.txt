@@ -4,10 +4,10 @@
 │      REPO                           STATUS                   Δ               │
 │                                                                              │
 │                                                                              │
-│                                      ▄█▀█▄                                   │
-│                                     ▄████▀▀                                  │
-│                                   ▄██████                                    │
-│                             ●━━━▄█▀▀▀▀▀▀━━━━━━━●                             │
+│                                       ▄█▀█▄                                  │
+│                                    ▄▄██████▀▀                                │
+│                               ▄▄██▀█████▀▀ ┏━━●                              │
+│                              ●━━━━━●━━━━━●━┻━━●                              │
 │                                                                              │
 │                           Scanning your workspace…                           │
 │                     Repository status will appear here.                      │

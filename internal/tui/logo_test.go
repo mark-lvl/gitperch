@@ -11,9 +11,9 @@ import (
 	"github.com/mark-lvl/gitperch/internal/app"
 )
 
-// markBranch is the start of the mark's bottom row: a commit and the heavy
-// rule the bird perches on.
-const markBranch = "●━━━"
+// markBranch is the start of the mark's bottom row: the first two commits on
+// the heavy rule the bird perches on.
+const markBranch = "●━━━━━●"
 
 func emptyWorkspace(w, h int, icons string) *Model {
 	m := New(context.Background(), nil, true)
@@ -41,11 +41,11 @@ func TestScanningCentersMarkInEmptyList(t *testing.T) {
 	// 80 columns leave a 76-cell list after the frame; rows 4–14 sit between
 	// the table header and the six-row preview card.
 	row, col := lineWith(view, markBranch)
-	if row != 9 || col != 30 {
-		t.Fatalf("mark branch at row %d col %d, want row 9 col 30:\n%s", row, col, view)
+	if row != 9 || col != 31 {
+		t.Fatalf("mark branch at row %d col %d, want row 9 col 31:\n%s", row, col, view)
 	}
-	if row, col := lineWith(view, "▄█▀█▄"); row != 6 || col != 39 {
-		t.Fatalf("bird head at row %d col %d, want row 6 col 39:\n%s", row, col, view)
+	if row, col := lineWith(view, "▄█▀█▄"); row != 6 || col != 40 {
+		t.Fatalf("bird head at row %d col %d, want row 6 col 40:\n%s", row, col, view)
 	}
 	if row, col := lineWith(view, "Scanning your workspace…"); row != 11 || col != 28 {
 		t.Fatalf("title at row %d col %d, want row 11 col 28:\n%s", row, col, view)

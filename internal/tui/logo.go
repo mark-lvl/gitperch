@@ -7,16 +7,17 @@ import (
 )
 
 // markLines draws the gitperch logo with text: the songbird in half blocks,
-// perched on a heavy rule between two commits. The bottom row is the branch
-// itself; the belly rests on the rule and the tail crosses it.
+// perched on a heavy rule of four commits that forks up to a fifth beside the
+// beak. The bottom row is the branch itself; the belly rests on it and the
+// tail slopes down over the first commit.
 func (m *Model) markLines() []string {
 	bird := func(s string) string { return m.style(s, accent, false) }
 	branch := func(s string) string { return m.style(s, branchColor, false) }
 	return []string{
 		"         " + bird("▄█▀█▄"),
-		"        " + bird("▄████▀▀"),
-		"      " + bird("▄██████"),
-		branch("●━━━") + bird("▄█▀▀▀▀▀▀") + branch("━━━━━━━●"),
+		"      " + bird("▄▄██████▀▀"),
+		" " + bird("▄▄██▀█████▀▀") + " " + branch("┏━━●"),
+		branch("●━━━━━●━━━━━●━┻━━●"),
 	}
 }
 
