@@ -9,31 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Each repository's icon, now a filled `▰` so its color shows, has its own
-  color, derived from its path, which its
-  linked worktrees, preview card and Clean up heading share. The palette is
-  chosen to stay distinguishable with color-vision deficiency and apart from
-  status colors; status keeps its color in the status column.
 - The workspace groups linked worktrees under their main repository, including
   worktrees nested inside a repository, outside the scanned roots, or whose
   directory no longer exists. `→`/`←` expand and collapse a group, a collapsed
   group's badge counts stale worktrees and hidden ones that need attention, and
   the details Worktree section lists the group.
 - Clean up (`c`) reviews and removes stale worktree records and clean linked
-  worktrees already merged into the remote default branch. Dirty, locked,
-  unmerged worktrees, worktrees with ignored files and worktrees with
-  assume-unchanged or present skip-worktree files are kept with the reason
-  shown; a stale record whose commit no branch or tag reaches is kept too, with
-  the `git branch` command that saves it; nothing is forced.
+  worktrees already merged into the remote default branch. Dirty, locked and
+  unmerged worktrees, and worktrees with ignored, assume-unchanged or present
+  skip-worktree files, are kept with the reason shown; a stale record whose
+  commit no branch or tag reaches is kept too, with the `git branch` command
+  that saves it. Nothing is forced.
 - Clean up also deletes local branches fully merged into the remote default
-  branch, only at the commit you reviewed; Diagnostics (`d`) lists a
-  `git branch <name> <commit>` command to restore each one. The commands are also
-  appended to `$XDG_STATE_HOME/gitperch/cleanup.log` (by default
-  `~/.local/state/gitperch/cleanup.log`) and
-  printed when the dashboard closes. Worktree and branch cleanup need Git 2.36
-  or newer.
+  branch, only at the commit you reviewed. Diagnostics (`d`) lists a
+  `git branch <name> <commit>` command to restore each one; the commands are
+  also appended to `$XDG_STATE_HOME/gitperch/cleanup.log` (by default
+  `~/.local/state/gitperch/cleanup.log`) and printed when the dashboard closes.
 - `gitperch status --json` reports a `worktree` object per repository (schema
   version 1, additive).
+- Worktree grouping and cleanup need Git 2.36 or newer; with older Git they are
+  off and everything else works as before.
+
+### Changed
+
+- The repository icon is a filled `▰` in a color of its own, derived from the
+  repository's path and shared by its worktrees, preview card and Clean up
+  heading, instead of the status color; status keeps its color in the status
+  column. The palette stays distinguishable with color-vision deficiency and
+  apart from status colors.
 
 ## [0.1.1] - 2026-10-06
 
