@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clean up (`c`) reviews and removes stale worktree records and clean linked
   worktrees already merged into the remote default branch. Dirty, locked,
   unmerged worktrees and worktrees with ignored files are kept with the reason
-  shown; nothing is forced.
+  shown; a stale record whose commit no branch or tag reaches is kept too, with
+  the `git branch` command that saves it; nothing is forced.
 - Clean up also deletes local branches fully merged into the remote default
   branch, only at the commit you reviewed; Diagnostics (`d`) lists a
   `git branch <name> <commit>` command to restore each one. Worktree and branch

@@ -149,3 +149,17 @@ func (r Runner) DeleteBranch(ctx context.Context, path, name, oid string) error 
 	}
 	return nil
 }
+
+// ReachableFromRefs reports whether any branch, remote-tracking branch or tag
+// contains oid. A commit only a worktree's detached HEAD reaches becomes
+// unreachable (and eventually collectable) when that worktree record is pruned.
+func (r Runner) ReachableFromRefs(ctx context.Context, path, oid string) (bool, error) {
+	if !objectID(oid) {
+		return false, fmt.Errorf("invalid reachability check")
+	}
+	out, err := r.Run(ctx, path, "for-each-ref", "--count=1", "--contains", oid, "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags")
+	if err != nil {
+		return false, err
+	}
+	return len(bytes.TrimSpace(out.Stdout)) > 0, nil
+}

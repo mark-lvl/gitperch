@@ -245,3 +245,36 @@ func TestDeleteBranchLeavesConfigOfBranchesWithLongerNames(t *testing.T) {
 		t.Fatalf("branch.foo.bar config lost: %q", out)
 	}
 }
+
+func TestReachableFromRefs(t *testing.T) {
+	repo, _ := repoWithRemote(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitCmd(t, repo, "worktree", "add", "--detach", wt)
+	write(t, filepath.Join(wt, "new"), "unreferenced\n")
+	commit(t, wt)
+	oid := strings.TrimSpace(string(gitCmd(t, wt, "rev-parse", "HEAD")))
+	main := strings.TrimSpace(string(gitCmd(t, repo, "rev-parse", "main")))
+	r := Runner{}
+	ctx := context.Background()
+	if ok, err := r.ReachableFromRefs(ctx, repo, main); err != nil || !ok {
+		t.Fatalf("main commit: %v %v", ok, err)
+	}
+	if ok, err := r.ReachableFromRefs(ctx, repo, oid); err != nil || ok {
+		t.Fatalf("detached-only commit: %v %v", ok, err)
+	}
+	gitCmd(t, repo, "tag", "keep", oid)
+	if ok, err := r.ReachableFromRefs(ctx, repo, oid); err != nil || !ok {
+		t.Fatalf("tagged commit: %v %v", ok, err)
+	}
+	gitCmd(t, repo, "tag", "-d", "keep")
+	gitCmd(t, repo, "branch", "rescue", oid)
+	if ok, err := r.ReachableFromRefs(ctx, repo, oid); err != nil || !ok {
+		t.Fatalf("branched commit: %v %v", ok, err)
+	}
+	if _, err := r.ReachableFromRefs(ctx, repo, "--all"); err == nil {
+		t.Fatal("non-OID accepted")
+	}
+	if _, err := r.ReachableFromRefs(ctx, repo, strings.Repeat("1", 40)); err == nil {
+		t.Fatal("unknown object reported without an error")
+	}
+}

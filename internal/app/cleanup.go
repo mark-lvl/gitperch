@@ -54,6 +54,7 @@ type CleanupGit interface {
 	RemoteDefaultRef(context.Context, string, string) (string, error)
 	ResolveCommit(context.Context, string, string) (string, error)
 	IsAncestor(context.Context, string, string, string) (bool, error)
+	ReachableFromRefs(context.Context, string, string) (bool, error)
 	IgnoredFiles(context.Context, string) ([]string, error)
 	PruneWorktrees(context.Context, string) error
 	RemoveWorktree(context.Context, string, string) error
@@ -283,7 +284,14 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 	}
 	if len(stale) > 0 {
 		sort.Strings(stale)
-		add(CleanupItem{Kind: PruneStale, Path: group, Stale: stale, Eligible: true, Reason: fmt.Sprintf("%d stale worktree record(s)", len(stale))})
+		item := CleanupItem{Kind: PruneStale, Path: group, Stale: stale}
+		// Pruning drops the record's reflog; a commit only that record's HEAD
+		// reaches would be left unreferenced, so such a record must be kept.
+		item.Reason = unreferencedStale(ctx, git, path, worktrees, stale)
+		if item.Eligible = item.Reason == ""; item.Eligible {
+			item.Reason = "directory missing: " + staleNames(stale)
+		}
+		add(item)
 	}
 	if base.ref == "" {
 		return out
@@ -332,6 +340,51 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		add(item)
 	}
 	return out
+}
+
+// staleNames lists up to three stale directory names for the review.
+func staleNames(stale []string) string {
+	var names []string
+	for _, p := range stale[:min(3, len(stale))] {
+		names = append(names, gitcli.SafeText(filepath.Base(p)))
+	}
+	text := strings.Join(names, ", ")
+	if len(stale) > 3 {
+		text += ", …"
+	}
+	return text
+}
+
+// unreferencedStale returns why the stale records must not be pruned: a record
+// whose HEAD commit no branch, remote-tracking branch or tag contains would
+// strand that commit, and an unanswerable check is treated the same. "" means
+// every record's commit stays reachable. Planning and revalidation share it.
+func unreferencedStale(ctx context.Context, git CleanupGit, path string, worktrees []gitcli.Worktree, stale []string) string {
+	var problems []string
+	for _, wt := range worktrees {
+		if wt.Main || !slices.Contains(stale, wt.Path) {
+			continue
+		}
+		if wt.HeadOID == "" || strings.Trim(wt.HeadOID, "0") == "" {
+			continue // unborn: no commit to lose
+		}
+		name := gitcli.SafeText(filepath.Base(wt.Path))
+		reachable, err := git.ReachableFromRefs(ctx, path, wt.HeadOID)
+		switch {
+		case err != nil:
+			problems = append(problems, fmt.Sprintf("stale worktree %s: reachability check failed: %s", name, gitcli.SafeText(err.Error())))
+		case !reachable:
+			problems = append(problems, fmt.Sprintf("stale worktree %s holds unreferenced commit %s — create a branch first: git branch %s %s",
+				name, wt.HeadOID[:min(7, len(wt.HeadOID))], shellQuote("rescue/"+name), wt.HeadOID))
+		}
+	}
+	if len(problems) == 0 {
+		return ""
+	}
+	if len(problems) > 1 {
+		return fmt.Sprintf("%s (and %d more)", problems[0], len(problems)-1)
+	}
+	return problems[0]
 }
 
 // isStale reports a linked worktree whose record outlived its directory.
@@ -584,6 +637,9 @@ func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item Cl
 		sort.Strings(stale)
 		if !slices.Equal(stale, item.Stale) {
 			return errors.New("stale worktrees changed since review")
+		}
+		if reason := unreferencedStale(ctx, git, item.Group, worktrees, stale); reason != "" {
+			return errors.New(reason)
 		}
 		return nil
 	case RemoveWorktree:

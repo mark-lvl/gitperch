@@ -54,6 +54,9 @@ func (s Service) ResolveCommit(ctx context.Context, path, ref string) (string, e
 func (s Service) IsAncestor(ctx context.Context, path, oid, ref string) (bool, error) {
 	return s.Read.IsAncestor(ctx, path, oid, ref)
 }
+func (s Service) ReachableFromRefs(ctx context.Context, path, oid string) (bool, error) {
+	return s.Read.ReachableFromRefs(ctx, path, oid)
+}
 func (s Service) IgnoredFiles(ctx context.Context, path string) ([]string, error) {
 	return s.Read.IgnoredFiles(ctx, path)
 }

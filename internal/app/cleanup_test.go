@@ -720,3 +720,194 @@ func TestDeletedBranchMessageQuotesShellSignificantNames(t *testing.T) {
 		t.Fatalf("unprintable name: %q", odd)
 	}
 }
+
+// staleDetached adds a detached linked worktree with one commit no ref reaches,
+// then deletes its directory so only the administrative record remains.
+func staleDetached(t *testing.T, repo, dir string) (path, oid string) {
+	t.Helper()
+	path = filepath.Join(t.TempDir(), dir)
+	actionGit(t, repo, "worktree", "add", "--detach", path)
+	actionTestWrite(t, filepath.Join(path, "precious"), "only here\n")
+	actionTestCommit(t, path, "unreferenced work")
+	oid = strings.TrimSpace(string(actionGit(t, path, "rev-parse", "HEAD")))
+	if err := os.RemoveAll(path); err != nil {
+		t.Fatal(err)
+	}
+	return path, oid
+}
+
+func pruneItem(t *testing.T, p CleanupPreview) CleanupItem {
+	t.Helper()
+	for _, item := range p.Items {
+		if item.Kind == PruneStale {
+			return item
+		}
+	}
+	t.Fatalf("no prune item in %+v", p.Items)
+	return CleanupItem{}
+}
+
+func TestCleanupKeepsStaleRecordHoldingUnreferencedCommit(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	_, oid := staleDetached(t, repo, "spike")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prune := pruneItem(t, preview)
+	if prune.Eligible || !strings.Contains(prune.Reason, "stale worktree spike holds unreferenced commit "+oid[:7]) || !strings.Contains(prune.Reason, "create a branch first: git branch rescue/spike "+oid) {
+		t.Fatalf("prune: %+v", prune)
+	}
+	// Choosing it anyway runs nothing.
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{prune.ID}, nil)
+	if len(results) != 0 {
+		t.Fatalf("ineligible prune ran: %+v", results)
+	}
+	if out := actionGit(t, repo, "worktree", "list", "--porcelain"); !strings.Contains(string(out), "spike") {
+		t.Fatalf("record was pruned: %s", out)
+	}
+}
+
+func TestCleanupPrunesStaleRecordWhoseCommitIsReachable(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	_, oid := staleDetached(t, repo, "spike")
+	actionGit(t, repo, "branch", "rescue", oid)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prune := pruneItem(t, preview)
+	if !prune.Eligible {
+		t.Fatalf("prune: %+v", prune)
+	}
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{prune.ID}, nil)
+	if len(results) != 1 || results[0].State != Succeeded {
+		t.Fatalf("results %+v", results)
+	}
+}
+
+func TestCleanupSkipsPruneWhenItsCommitBecameUnreferencedAfterReview(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	_, oid := staleDetached(t, repo, "spike")
+	actionGit(t, repo, "branch", "rescue", oid)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prune := pruneItem(t, preview)
+	if !prune.Eligible {
+		t.Fatalf("prune: %+v", prune)
+	}
+	actionGit(t, repo, "branch", "-D", "rescue")
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{prune.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "unreferenced commit") {
+		t.Fatalf("results %+v", results)
+	}
+	if out := actionGit(t, repo, "worktree", "list", "--porcelain"); !strings.Contains(string(out), "spike") {
+		t.Fatalf("record was pruned: %s", out)
+	}
+}
+
+func TestCleanupQuotesShellSignificantNamesInThePruneHint(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	staleDetached(t, repo, "x;echo$(id)")
+	preview, err := NewActions(gitcli.Service{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prune := pruneItem(t, preview); prune.Eligible || !strings.Contains(prune.Reason, "git branch 'rescue/x;echo$(id)' ") {
+		t.Fatalf("prune: %+v", prune)
+	}
+}
+
+type failingReachability struct{ gitcli.Service }
+
+func (failingReachability) ReachableFromRefs(context.Context, string, string) (bool, error) {
+	return false, errors.New("boom")
+}
+
+func TestCleanupKeepsStaleRecordsWhenReachabilityCannotBeChecked(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	staleDetached(t, repo, "spike")
+	preview, err := NewActions(failingReachability{}, 1).PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prune := pruneItem(t, preview); prune.Eligible || !strings.Contains(prune.Reason, "boom") {
+		t.Fatalf("prune: %+v", prune)
+	}
+}
+
+// Race tests: each change happens between PlanCleanup and ExecuteCleanup.
+
+func TestCleanupSkipsWorktreeLockedAfterReview(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := itemFor(t, preview, RemoveWorktree, merged)
+	if !item.Eligible {
+		t.Fatalf("not eligible: %+v", item)
+	}
+	actionGit(t, repo, "worktree", "lock", "--reason", "agent resumed", merged)
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{item.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "locked") {
+		t.Fatalf("locked worktree not skipped: %+v", results)
+	}
+	if _, err := os.Stat(merged); err != nil {
+		t.Fatal("locked worktree directory was removed")
+	}
+}
+
+func TestCleanupSkipsPruneWhenAnotherStaleRecordAppearsAfterReview(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	first := filepath.Join(t.TempDir(), "first")
+	actionGit(t, repo, "worktree", "add", "-b", "first", first)
+	os.RemoveAll(first)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prune := pruneItem(t, preview)
+	if !prune.Eligible {
+		t.Fatalf("prune: %+v", prune)
+	}
+	second := filepath.Join(t.TempDir(), "second")
+	actionGit(t, repo, "worktree", "add", "-b", "second", second)
+	os.RemoveAll(second)
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{prune.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "stale worktrees changed since review") {
+		t.Fatalf("results %+v", results)
+	}
+	if out := actionGit(t, repo, "worktree", "list", "--porcelain"); !strings.Contains(string(out), "first") || !strings.Contains(string(out), "second") {
+		t.Fatalf("records were pruned: %s", out)
+	}
+}
+
+func TestCleanupSkipsWorktreeThatGainedAnIgnoredFileAfterReview(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	actionTestWrite(t, filepath.Join(repo, ".git", "info", "exclude"), ".env\n")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := itemFor(t, preview, RemoveWorktree, merged)
+	if !item.Eligible {
+		t.Fatalf("not eligible: %+v", item)
+	}
+	actionTestWrite(t, filepath.Join(merged, ".env"), "SECRET=1\n")
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{item.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "ignored file") {
+		t.Fatalf("ignored file not protected: %+v", results)
+	}
+	if _, err := os.Stat(filepath.Join(merged, ".env")); err != nil {
+		t.Fatal("ignored file lost")
+	}
+}

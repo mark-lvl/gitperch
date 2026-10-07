@@ -140,10 +140,15 @@ ID, so several results per repository stay distinct.
 
 | Item | Eligible when | Command |
 | --- | --- | --- |
-| Stale worktree records (one item per group) | at least one prunable record that is not locked | `worktree prune` |
+| Stale worktree records (one item per group) | at least one prunable record that is not locked, and every such record's HEAD commit is reachable from some branch, remote-tracking branch or tag (otherwise the item is kept, naming the commit and a `git branch` command that saves it) | `worktree prune` |
 | Linked worktree | exists; not main; not locked; no changes, untracked files or conflicts; no operation in progress; no ignored files; HEAD reachable from the default ref | `worktree remove <path>` |
 | Local branch | not the default branch; not a symbolic ref (such as `master -> main`, skipped silently); tip reachable from the default ref; not checked out in any worktree that remains after this plan | `update-ref --no-deref -d refs/heads/<b> <oid>`, then `config --remove-section branch.<b>` |
 
+- Reachability of a stale record's HEAD uses
+  `for-each-ref --count=1 --contains <oid> refs/heads refs/remotes refs/tags`.
+  Pruning deletes the record's reflog, so a commit only a detached HEAD reaches
+  would become unreferenced; a record on a branch is safe because the branch
+  keeps the commits.
 - Ignored files are detected with
   `ls-files --others --ignored --exclude-standard --directory -z` in the
   worktree; the reason names the count and up to three paths.
@@ -168,7 +173,8 @@ ID, so several results per repository stay distinct.
 - Groups run concurrently up to `workers`; items within a group run serially
   under the common-directory lock.
 - Revalidate each item immediately before running it:
-  - prune: the set of prunable, unlocked records equals the reviewed set;
+  - prune: the set of prunable, unlocked records equals the reviewed set and
+    every record's HEAD commit is still reachable from a ref;
   - worktree: same HEAD OID, still clean, still no ignored files, still
     unlocked, still reachable from the default ref;
   - branch: same OID, still reachable, still not checked out.

@@ -173,12 +173,16 @@ a reason. Results appear in the status line and in details under Batch results.
 
 | Item | Removed when | Command |
 | --- | --- | --- |
-| Stale worktree records (one item per repository) | At least one record is stale (directory missing) and not locked | `git worktree prune` |
+| Stale worktree records (one item per repository) | At least one record is stale (directory missing) and not locked, and every such record's HEAD commit is reachable from a branch, remote-tracking branch or tag | `git worktree prune` |
 | Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
 | Local branch | Its tip is reachable from the default ref, it is not the default branch, and no remaining worktree has it checked out | `git update-ref --no-deref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
 
 Reasons a worktree is kept include `dirty (3 files)`, `locked: agent session`,
 `4 ignored file(s) (.env, node_modules/, …)`, and `not merged into origin/main`.
+A stale record whose HEAD is a commit no ref reaches (for example work done on
+a detached HEAD) is kept: pruning would leave that commit unreferenced. The
+review names the commit and the command that saves it, such as
+`git branch rescue/spike <commit>`; run it, and the record becomes prunable.
 Nothing is forced: gitperch never passes `--force` and never removes the main
 worktree. gitperch checks for ignored files immediately before removal, but
 files another program writes in the instant between that check and
