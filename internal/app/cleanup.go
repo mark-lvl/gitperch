@@ -539,9 +539,33 @@ func (a *Actions) executeCleanupItem(ctx context.Context, git CleanupGit, p plan
 	return result
 }
 
+// shellQuote makes a Git name safe to paste into a POSIX shell: names made of
+// [A-Za-z0-9._/@+-] pass unchanged, anything else is single-quoted with ' as '\”.
+func shellQuote(s string) string {
+	plain := s != ""
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._/@+-", r)) {
+			plain = false
+			break
+		}
+	}
+	if plain {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// deletedBranchMessage reports a deletion with a copy-pasteable restore
+// command. When SafeText has to alter the name (control characters, redacted
+// credentials) the command no longer names the real branch, and the message
+// says so; the commit stays recoverable through its OID.
 func deletedBranchMessage(item CleanupItem) string {
-	b := gitcli.SafeText(item.Branch)
-	return fmt.Sprintf("deleted %s · restore: git branch %s %s", b, b, item.OID)
+	safe := gitcli.SafeText(item.Branch)
+	msg := fmt.Sprintf("deleted %s · restore: git branch %s %s", safe, shellQuote(safe), item.OID)
+	if safe != item.Branch {
+		msg += " (the branch name contains unprintable characters or credentials and is shown altered; choose any name)"
+	}
+	return msg
 }
 
 func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) error {

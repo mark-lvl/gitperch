@@ -683,3 +683,40 @@ func TestCleanupRevalidationRefusesABranchThatBecameSymbolic(t *testing.T) {
 	}
 	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/main")
 }
+
+func TestShellQuote(t *testing.T) {
+	for in, want := range map[string]string{
+		"feat/old-login":      "feat/old-login",
+		"a.b_c@d+e-f/1":       "a.b_c@d+e-f/1",
+		"x;echo${IFS}PWNED":   "'x;echo${IFS}PWNED'",
+		"a$(id)b":             "'a$(id)b'",
+		"a`id`b":              "'a`id`b'",
+		"it's":                `'it'\''s'`,
+		"two words":           "'two words'",
+		"star*":               "'star*'",
+		`back\slash`:          `'back\slash'`,
+		"naïve":               "'naïve'",
+		"quote\"d":            "'quote\"d'",
+		"semi;colon&amp|pipe": "'semi;colon&amp|pipe'",
+	} {
+		if got := shellQuote(in); got != want {
+			t.Errorf("shellQuote(%q) = %s, want %s", in, got, want)
+		}
+	}
+}
+
+func TestDeletedBranchMessageQuotesShellSignificantNames(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	plain := deletedBranchMessage(CleanupItem{Branch: "feat/old-login", OID: oid})
+	if !strings.Contains(plain, "restore: git branch feat/old-login "+oid) || strings.Contains(plain, "'") {
+		t.Fatalf("plain name: %s", plain)
+	}
+	hostile := deletedBranchMessage(CleanupItem{Branch: "x;echo${IFS}PWNED", OID: oid})
+	if !strings.Contains(hostile, "restore: git branch 'x;echo${IFS}PWNED' "+oid) {
+		t.Fatalf("shell-significant name: %s", hostile)
+	}
+	odd := deletedBranchMessage(CleanupItem{Branch: "bad\x1bname", OID: oid})
+	if !strings.Contains(odd, "unprintable") || !strings.Contains(odd, oid) || strings.Contains(odd, "\x1b") {
+		t.Fatalf("unprintable name: %q", odd)
+	}
+}

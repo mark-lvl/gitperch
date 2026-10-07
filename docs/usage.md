@@ -220,6 +220,9 @@ moved since, it is skipped and nothing is lost. Afterwards the branch's
 branch leaves a restore command in Diagnostics (`d`) under Batch results, for
 example `git branch feat/old-login 9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2`;
 the status line points to it with "d restore commands".
+Names with shell-significant characters are single-quoted in that command, so it is
+safe to paste. If a name contains unprintable characters, the command shows the
+escaped name, says so, and the commit stays recoverable through its hash.
 
 ## Fetch
 
