@@ -104,8 +104,8 @@ the whole group, including stale ones, with branch, state and path. The
 | d | Open Changes, including the tracked patch |
 | Tab / Shift+Tab | Toggle All / Focus; in details, cycle sections |
 | [ / ] | Scroll files in the selected repository preview |
-| : or Ctrl+K | Fuzzy command palette; arrows choose, Enter runs, Esc closes |
-| / | Search repository name, path, or branch; arrows navigate results |
+| : or Ctrl+K | Fuzzy command palette; arrows choose, Enter runs, Esc closes; pasted text is typed in |
+| / | Search repository name, path, or branch; arrows navigate results; pasted text is typed in |
 | Esc | Clear/close search, return from details/help, cancel the confirmation popup |
 | Space | Toggle path-based bulk selection |
 | a | Select/deselect all visible repositories (existing binding) |

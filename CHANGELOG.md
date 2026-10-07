@@ -51,6 +51,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   README, icon and the mark the dashboard draws while the first scan runs and
   when no repositories are found all use it. The original artwork is
   `docs/assets/logo.png`.
+- Pasting text into search or the command palette types it, without control
+  characters or line breaks; before, a paste was ignored.
+- Checking whether a detached HEAD's commit is on a branch or tag takes one
+  history walk instead of one per ref, which is much faster with many tags.
+
+### Fixed
+
+- A repository with more than about 100,000 changed or untracked files no
+  longer shows `Git output exceeded capture limit` and no longer blocks fetch,
+  push and pull.
+- A worktree whose status cannot be read is listed once, not twice.
+- Clean up keeps a branch that a stale worktree record still names when the
+  record is not pruned first (prune blocked, not chosen or failed). It also
+  says why no branches were considered when the default branch is unknown,
+  instead of `Nothing to clean up`.
+- Push accepts `remote.<name>.push = HEAD`. Pull and push accept duplicate
+  fetch refspecs that map the upstream to the same tracking ref.
+- `gitperch status` no longer prints `no upstream` for detached, unborn or
+  failed repositories.
+- The list no longer leaves rows hidden above empty space after it shrinks or
+  the terminal grows. The Clean up review and the push/pull popup keep the
+  highlighted item and their footer on screen. Collapsing a group in a search
+  or scope keeps the selection of worktrees still shown. With
+  `icons = "ascii"`, lines showing `->` keep their right border.
 
 ## [0.2.0] - 2026-10-07
 

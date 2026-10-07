@@ -55,8 +55,8 @@ In the TUI, a failed/cancelled/uncertain batch remains an exit-code-1 failure
 even after dismissing its displayed results. Policy skips alone are not failures.
 Ctrl+C exits with 130 while browsing; in a confirmation popup it cancels the
 popup, and during a batch it requests cancellation instead of exiting immediately.
-Git command output is capped at 4 MiB per stream,
-with a 15-second default deadline. Repository-routing environment variables are
+Git command output is capped at 4 MiB per stream (64 MiB for commands that
+list every file, such as `git status`), with a 15-second default deadline. Repository-routing environment variables are
 removed. Background Git has closed stdin, disabled terminal/askpass authentication,
 and SSH BatchMode. Normal credential helpers and SSH agents remain available;
 authenticate in a normal shell first. Custom `GIT_SSH_COMMAND` overrides are not
@@ -295,7 +295,8 @@ after the fresh fetch. There is no squash or rebase-merge detection: a branch
 merged that way shows as not merged and is kept. A repository without a remote
 uses local `main`, else `master`, labelled "local default". When the remote's
 default branch is unknown, no worktree in the repository is eligible for
-removal (stale records can still be pruned); run
+removal and no branch is considered; the review shows the reason as a kept
+item, and stale records can still be pruned. Run
 `git remote set-head <remote> -a` yourself, because gitperch never sets it. A
 failed fetch likewise makes no worktree eligible for removal, and the error is
 shown among the kept items; stale records can still be pruned.
@@ -309,7 +310,9 @@ without a remote), it is not the default branch itself, it is not a symbolic ref
 as `master` pointing at `main` is never listed), and no remaining worktree has
 it checked out.
 
-- A worktree holds its branch unless its record is stale (directory missing).
+- A worktree holds its branch. A stale record (directory missing) frees it
+  only when the stale records can be pruned, because pruning runs first; if
+  the prune is unticked, blocked or fails, the branch is skipped at run time.
   A locked worktree holds its branch even when its directory is missing.
 - A branch whose worktree removal you unticked, or whose removal fails, is
   skipped at run time ("checked out in ...").
