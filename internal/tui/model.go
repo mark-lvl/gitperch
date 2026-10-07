@@ -81,6 +81,8 @@ type Model struct {
 	actionGeneration uint64
 	events           chan app.Event
 	results          map[string]app.Event
+	restores         []string // restore commands for branches deleted this session
+	restoresUnlogged bool     // a restore command failed to reach the log
 	interrupted      bool
 	actionFailed     bool
 	clock            func() time.Time // header clock and relative ages; fixed in captures

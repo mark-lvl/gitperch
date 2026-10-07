@@ -31,6 +31,13 @@ type batchDoneMsg struct {
 
 func (m *Model) EnableActions(actions *app.Actions) { m.actions = actions }
 
+// RestoreCommands lists this session's commands that recreate deleted
+// branches, for printing after the dashboard closes, and whether every one of
+// them reached the restore log.
+func (m *Model) RestoreCommands() ([]string, bool) {
+	return append([]string(nil), m.restores...), !m.restoresUnlogged
+}
+
 func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 	switch msg := msg.(type) {
 	case cleanupMsg:
@@ -84,6 +91,10 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 			m.results[resultKey(result)] = result
 			if result.State == app.Failed || result.State == app.OutcomeUnknown || result.State == app.Cancelled {
 				m.actionFailed = true
+			}
+			if result.State == app.Succeeded && result.Restore != "" {
+				m.restores = append(m.restores, result.Restore)
+				m.restoresUnlogged = m.restoresUnlogged || !result.RestoreLogged
 			}
 		}
 		if m.actionCancel != nil {

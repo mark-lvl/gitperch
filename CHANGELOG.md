@@ -22,8 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `git branch` command that saves it; nothing is forced.
 - Clean up also deletes local branches fully merged into the remote default
   branch, only at the commit you reviewed; Diagnostics (`d`) lists a
-  `git branch <name> <commit>` command to restore each one. Worktree and branch
-  cleanup need Git 2.36 or newer.
+  `git branch <name> <commit>` command to restore each one. The commands are also
+  appended to `~/.local/state/gitperch/cleanup.log` (or `$XDG_STATE_HOME`) and
+  printed when the dashboard closes. Worktree and branch cleanup need Git 2.36
+  or newer.
 - `gitperch status --json` reports a `worktree` object per repository (schema
   version 1, additive).
 

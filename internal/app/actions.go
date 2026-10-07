@@ -61,7 +61,10 @@ type Event struct {
 	Item    string // cleanup item ID; empty for fetch, push and pull
 	State   State
 	Message string
-	Status  repository.Status
+	Restore string // command that recreates a deleted branch
+	// RestoreLogged reports that Restore was appended to the restore log.
+	RestoreLogged bool
+	Status        repository.Status
 }
 type plannedTarget struct {
 	display  Target
@@ -85,6 +88,8 @@ type Actions struct {
 	pendingCleanup []plannedCleanup
 	locks          map[string]chan struct{}
 	lastFetch      map[string]time.Time
+	restoreLog     string     // appended on branch deletion; "" disables
+	logMu          sync.Mutex // serializes appends from concurrent groups
 }
 
 func NewActions(service ActionGit, workers int) *Actions {

@@ -580,6 +580,7 @@ func (a *Actions) executeCleanupItem(ctx context.Context, git CleanupGit, p plan
 			// The ref is gone; report success and keep the recovery command.
 			result.State = Succeeded
 			result.Message = deletedBranchMessage(item) + " · " + gitcli.SafeText(err.Error())
+			a.noteRestore(&result, item)
 			return result
 		}
 	default:
@@ -601,8 +602,21 @@ func (a *Actions) executeCleanupItem(ctx context.Context, git CleanupGit, p plan
 		result.Message = "removed worktree " + gitcli.SafeText(item.Path)
 	case DeleteBranch:
 		result.Message = deletedBranchMessage(item)
+		a.noteRestore(&result, item)
 	}
 	return result
+}
+
+// noteRestore attaches a deleted branch's restore command to its result and
+// records it in the restore log. A log failure never undoes the success; the
+// message says the command was not recorded.
+func (a *Actions) noteRestore(result *Event, item CleanupItem) {
+	result.Restore = restoreAnywhere(item)
+	logged, err := a.recordRestore(item, result.Restore)
+	if err != nil {
+		result.Message += " · restore log not written: " + gitcli.SafeText(err.Error())
+	}
+	result.RestoreLogged = logged
 }
 
 // shellQuote makes a Git name safe to paste into a POSIX shell: names made of
@@ -627,11 +641,23 @@ func shellQuote(s string) string {
 // says so; the commit stays recoverable through its OID.
 func deletedBranchMessage(item CleanupItem) string {
 	safe := gitcli.SafeText(item.Branch)
-	msg := fmt.Sprintf("deleted %s · restore: git branch %s %s", safe, shellQuote(safe), item.OID)
+	msg := fmt.Sprintf("deleted %s · restore: %s", safe, restoreCommand(item))
 	if safe != item.Branch {
 		msg += " (the branch name contains unprintable characters or credentials and is shown altered; choose any name)"
 	}
 	return msg
+}
+
+// restoreCommand recreates a deleted branch at its reviewed commit, run from
+// inside the repository.
+func restoreCommand(item CleanupItem) string {
+	return fmt.Sprintf("git branch %s %s", shellQuote(gitcli.SafeText(item.Branch)), item.OID)
+}
+
+// restoreAnywhere is restoreCommand with the repository named, so it works
+// from any directory once the dashboard has closed.
+func restoreAnywhere(item CleanupItem) string {
+	return fmt.Sprintf("git -C %s branch %s %s", shellQuote(gitcli.SafeText(item.Group)), shellQuote(gitcli.SafeText(item.Branch)), item.OID)
 }
 
 func (a *Actions) revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) error {

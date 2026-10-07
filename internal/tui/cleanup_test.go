@@ -437,3 +437,22 @@ func overlayText(content string) string {
 	}
 	return strings.Join(words, " ")
 }
+
+func TestRestoreCommandsCollectAcrossBatches(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	finish := func(results ...app.Event) {
+		m.running, m.runningAction, m.results = true, app.Cleanup, map[string]app.Event{}
+		m.Update(batchDoneMsg{generation: m.actionGeneration, results: results})
+	}
+	finish(app.Event{Item: "a", State: app.Succeeded, Restore: "git -C /r branch one 1111111111111111111111111111111111111111", RestoreLogged: true},
+		app.Event{Item: "b", State: app.Skipped, Message: "checked out in wt"})
+	if _, logged := m.RestoreCommands(); !logged {
+		t.Fatal("first batch was logged")
+	}
+	finish(app.Event{Item: "c", State: app.Succeeded, Restore: "git -C /r branch two 2222222222222222222222222222222222222222"})
+	got, logged := m.RestoreCommands()
+	if len(got) != 2 || !strings.Contains(got[0], "branch one") || !strings.Contains(got[1], "branch two") || logged {
+		t.Fatalf("restore commands: %q, logged %v", got, logged)
+	}
+}

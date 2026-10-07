@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/mark-lvl/gitperch/internal/app"
 	"os"
@@ -168,5 +169,28 @@ func TestStatusAfterDoubleDashIsARoot(t *testing.T) {
 	errOut.Reset()
 	if code := run([]string{"--max-depth", "0", "status", t.TempDir()}, &out, &errOut); code != 0 || !strings.Contains(out.String(), "REPOSITORY") {
 		t.Fatalf("options before status: exit %d, stdout %q, stderr %q", code, &out, &errOut)
+	}
+}
+
+func TestPrintRestoreCommands(t *testing.T) {
+	var out strings.Builder
+	printRestoreCommands(&out, nil, true, "/state/gitperch/cleanup.log", nil)
+	if out.Len() != 0 {
+		t.Fatalf("nothing deleted printed %q", out.String())
+	}
+	cmds := []string{"git -C /r branch one 1111111111111111111111111111111111111111"}
+	printRestoreCommands(&out, cmds, true, "/state/gitperch/cleanup.log", nil)
+	if text := out.String(); !strings.Contains(text, "Deleted branches can be restored with:\n  "+cmds[0]+"\n") || !strings.Contains(text, "also recorded in /state/gitperch/cleanup.log") {
+		t.Fatalf("printed %q", text)
+	}
+	out.Reset()
+	printRestoreCommands(&out, cmds, false, "/state/gitperch/cleanup.log", nil)
+	if text := out.String(); !strings.Contains(text, "could not be recorded in /state/gitperch/cleanup.log") {
+		t.Fatalf("printed %q", text)
+	}
+	out.Reset()
+	printRestoreCommands(&out, cmds, false, "", errors.New("no home directory"))
+	if text := out.String(); !strings.Contains(text, cmds[0]) || !strings.Contains(text, "not recorded: no home directory") {
+		t.Fatalf("printed %q", text)
 	}
 }
