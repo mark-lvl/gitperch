@@ -50,22 +50,21 @@ func writeANSICapture(t *testing.T, name, content string) {
 	}
 }
 
-// captureCleanup is a fixed review: one prune, two eligible removals, one
-// eligible merged branch, two kept worktrees and one kept branch whose
-// upstream is gone. It never touches Git.
+// captureCleanup is a fixed review of the design-system group in captureRows:
+// its stale old-spike record, its merged fix-tokens worktree, two merged
+// branches and one kept branch whose upstream is gone. Reasons repeat what the
+// engine produces. It never touches Git.
 func captureCleanup(main string) *app.CleanupPreview {
 	base := "origin/main"
-	remove := func(id, name, branch string, eligible bool, reason string) app.CleanupItem {
-		return app.CleanupItem{ID: id, Group: main, Kind: app.RemoveWorktree, Path: "/home/mark/worktrees/" + name, Branch: branch, BaseName: base, Eligible: eligible, Reason: reason}
+	branch := func(id, name, oid string, eligible bool, reason string) app.CleanupItem {
+		return app.CleanupItem{ID: id, Group: main, Kind: app.DeleteBranch, Path: main, Branch: name, OID: oid, BaseName: base, Eligible: eligible, Reason: reason}
 	}
 	return &app.CleanupPreview{ID: 1, Items: []app.CleanupItem{
-		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Eligible: true, Reason: "1 stale worktree record(s)"},
-		remove("fix-tokens", "fix-tokens", "fix/tokens", true, "merged into "+base),
-		remove("add-icons", "add-icons", "feat/icons", true, "merged into "+base),
-		{ID: "branch-old-login", Group: main, Kind: app.DeleteBranch, Path: main, Branch: "feat/old-login", OID: "9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2", BaseName: base, Eligible: true, Reason: "merged into " + base},
-		remove("wip-dark", "wip-dark", "wip/dark-mode", false, "dirty (3 files)"),
-		remove("agent-run", "agent-run", "agent/run-42", false, "locked: agent session"),
-		{ID: "branch-squashed", Group: main, Kind: app.DeleteBranch, Path: main, Branch: "feat/squashed", OID: "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", BaseName: base, Reason: "upstream gone but not merged into " + base + " — squash merge?"},
+		{ID: "prune", Group: main, Kind: app.PruneStale, Path: main, Stale: []string{"/home/mark/worktrees/old-spike"}, Eligible: true, Reason: "directory missing: old-spike"},
+		{ID: "fix-tokens", Group: main, Kind: app.RemoveWorktree, Path: main + "/.worktrees/fix-tokens", Branch: "fix-tokens", BaseName: base, Eligible: true, Reason: "merged into " + base},
+		branch("branch-fix-tokens", "fix-tokens", "2d7a90c3e1f4856b0a9d8c7e6f5a4b3c2d1e0f9a", true, "merged into "+base),
+		branch("branch-old-login", "feat/old-login", "9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2", true, "merged into "+base),
+		branch("branch-squashed", "feat/squashed", "4be81d09a7c3f5261e8d0b9c7a6f5e4d3c2b1a09", false, "upstream gone but not merged into "+base+" — squash merge?"),
 	}}
 }
 

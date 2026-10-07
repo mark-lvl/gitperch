@@ -8,21 +8,21 @@
 │    ▱ experiment                             ! no upstream                            —                     │
 │    ▱ mobile                                 × failed                                 —                     │
 │    ▱ worker                                 ! conflict ↑2 ↓1                         1 file                │
+│                                                                                                            │
 │      ╭──────────────────────────────────────────────────────────────────────────────────────────────╮      │
 │      │ Clean up 4 items?                                                                            │      │
 │      │ design-system                                                                                │      │
-│      │   [x] prune 1 stale worktree record                               1 stale worktree record(s) │      │
-│      │ ▌ [x] remove worktree fix-tokens  fix/tokens                         merged into origin/main │      │
-│      │   [x] remove worktree add-icons  feat/icons                          merged into origin/main │      │
+│      │   [x] prune 1 stale worktree record                             directory missing: old-spike │      │
+│      │ ▌ [x] remove worktree fix-tokens  fix-tokens                         merged into origin/main │      │
+│      │   [x] delete branch fix-tokens  2d7a90c                              merged into origin/main │      │
 │      │   [x] delete branch feat/old-login  9f3c2a7                          merged into origin/main │      │
 │      │                                                                                              │      │
 │      │ kept                                                                                         │      │
-│      │   remove worktree wip-dark  wip/dark-mode: dirty (3 files)                                   │      │
-│      │   remove worktree agent-run  agent/run-42: locked: agent session                             │      │
 │      │   delete branch feat/squashed: upstream gone but not merged into origin/main — squash merge? │      │
 │      │                                                                                              │      │
 │      │ Space toggle · ↑↓ move · ↵ clean up · Esc cancel                                             │      │
 │      ╰──────────────────────────────────────────────────────────────────────────────────────────────╯      │
+│                                                                                                            │
 │ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ ▱ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
 │ │ ↑3 ahead · locally known refs                                                                          │ │
