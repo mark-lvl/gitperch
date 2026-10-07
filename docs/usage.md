@@ -20,6 +20,27 @@ uses Git's no-optional-locks mode. JSON schema version 1 has deterministic repos
 ordering, raw path identity, inspection timestamps, and per-repository errors.
 Terminal output escapes control characters and redacts credentials in URLs.
 
+### Attention
+
+gitperch ranks each repository and worktree by the Git state most likely to
+need you. Every condition is read from that worktree's own status, so linked
+worktrees of one repository are judged independently.
+
+| Level | Reasons (JSON code) |
+| --- | --- |
+| critical | `inspection_failed`, `conflicts`, `operation_in_progress` (merge, rebase, cherry-pick, revert, bisect), `action_failed` (dashboard only: a fetch, push or pull failed or has an unknown outcome) |
+| high | `uncommitted_changes` (staged or unstaged), `untracked_files`, `unpushed_commits`, `diverged`, `detached_commits` (a detached HEAD no branch, remote-tracking branch or tag contains) |
+| medium | `behind_upstream`, `no_upstream`, `tracking_unknown` (the upstream's local tracking ref is missing), `no_commits`, `stale_worktree` |
+| low | Nothing to do: clean and synchronized, a detached HEAD a ref contains, a locked or bare worktree |
+
+The level is the most severe reason. Levels above low count as needing
+attention in the dashboard header, Focus and collapsed-group badges; attention
+order (`s`) sorts by level, then name and path. The table's `ATTENTION` column
+and each JSON repository's `attention` object (`{"level": "high", "reasons":
+["uncommitted_changes", "unpushed_commits"]}`, reasons most severe first and
+`[]` at low) carry the same result. Attention describes Git state; it does not
+decide what to do, and age alone never raises it.
+
 Absolute paths distinguish duplicate names. Root depth is zero. Scanning stops
 at a repository; explicitly supplied nested repositories are still eligible.
 Both `.git` directories and regular worktree `.git` files are candidates.

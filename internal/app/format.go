@@ -13,25 +13,32 @@ import (
 // Report's JSON schema has stable field names and deterministic repository order.
 type Report struct {
 	SchemaVersion int                 `json:"schema_version"`
-	Repositories  []Row               `json:"repositories"`
+	Repositories  []ReportRow         `json:"repositories"`
 	Warnings      []discovery.Warning `json:"warnings"`
 }
 
+// ReportRow is a row with the attention derived from its status.
+type ReportRow struct {
+	Row
+	Attention Attention `json:"attention"`
+}
+
 func WriteJSON(w io.Writer, rows []Row, warnings []discovery.Warning) error {
-	if rows == nil {
-		rows = []Row{}
+	report := Report{SchemaVersion: 1, Repositories: make([]ReportRow, len(rows)), Warnings: warnings}
+	for i, row := range rows {
+		report.Repositories[i] = ReportRow{row, row.Attention()}
 	}
-	if warnings == nil {
-		warnings = []discovery.Warning{}
+	if report.Warnings == nil {
+		report.Warnings = []discovery.Warning{}
 	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(Report{1, rows, warnings})
+	return enc.Encode(report)
 }
 
 func WriteTable(w io.Writer, rows []Row) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "REPOSITORY / PATH\tBRANCH\tCHANGES\tUNTRACKED\tCONFLICTS\tAHEAD*\tBEHIND*\tUPSTREAM\tSTATE"); err != nil {
+	if _, err := fmt.Fprintln(tw, "REPOSITORY / PATH\tBRANCH\tCHANGES\tUNTRACKED\tCONFLICTS\tAHEAD*\tBEHIND*\tUPSTREAM\tSTATE\tATTENTION"); err != nil {
 		return err
 	}
 	for _, row := range rows {
@@ -80,7 +87,7 @@ func WriteTable(w io.Writer, rows []Row) error {
 		if s.Operation != "" {
 			markers = append(markers, "operation: "+s.Operation)
 		}
-		if _, err := fmt.Fprintf(tw, "%s / %s\t%s\tchanges:%d\t%d\t%d\t%s\t%s\t%s\t%s\n", gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), s.Changes, s.Untracked, s.Conflicts, ahead, behind, gitcli.SafeText(s.Upstream), gitcli.SafeText(strings.Join(markers, ", "))); err != nil {
+		if _, err := fmt.Fprintf(tw, "%s / %s\t%s\tchanges:%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\n", gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), s.Changes, s.Untracked, s.Conflicts, ahead, behind, gitcli.SafeText(s.Upstream), gitcli.SafeText(strings.Join(markers, ", ")), row.Attention().Level); err != nil {
 			return err
 		}
 	}

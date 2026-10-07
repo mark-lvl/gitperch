@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `gitperch status --json` reports an `attention` object per repository with a
+  level (`critical`, `high`, `medium`, `low`) and the reasons behind it, such as
+  `conflicts` or `unpushed_commits`; the plain table gains an `ATTENTION`
+  column. Repository details list the reasons, for example
+  `2 commits ahead of origin/main`.
+
 ### Changed
+
+- Attention order ranks repositories by level, then name: conflicts,
+  interrupted operations and failures first, then uncommitted, untracked or
+  unpushed work and diverged branches, then repositories behind or without an
+  upstream. Unpushed commits now rank with uncommitted changes rather than
+  with being behind.
+- A detached HEAD needs attention only when no branch, remote-tracking branch
+  or tag contains its commit; otherwise it shows a muted `detached` status.
+- The header's attention chip turns red when a repository needs intervention.
 
 - A new logo: a songbird perched on a branch of commits that forks. The
   README, icon and the mark the dashboard draws while the first scan runs and

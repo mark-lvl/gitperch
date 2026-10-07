@@ -60,7 +60,10 @@ works less like a directory browser and more like an **attention list**.
   limits, ignored directories, symlink safety and linked-worktree support.
 - **Attention overview**: changes, untracked files, conflicts, branch, upstream
   and ahead/behind counts for every repository. The header counts what needs
-  you; Focus shows only those repositories and attention order puts them first.
+  you and Focus shows only those repositories. Attention order puts conflicts
+  and unfinished operations above uncommitted or unpushed work, and that above
+  repositories that are only behind; clean, synchronized ones stay out of the
+  way. Details and JSON list the reasons.
 - **First-class worktrees**: every linked worktree, including nested,
   outside-root and stale ones, grouped under its repository.
 - **Repository details**: overview, changed files, recent commits and worktree

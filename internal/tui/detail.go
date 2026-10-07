@@ -157,7 +157,15 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 	if m.loadDetails != nil && !loaded {
 		lines = append(lines, m.style(" Loading repository context…", muted, false))
 	}
-	if m.attentionRank(*row) > 0 {
+	if a := m.attention(*row); a.Needs() {
+		color := amber
+		if a.Level == app.Critical {
+			color = danger
+		}
+		lines = append(lines, "", m.style(" Needs attention", accent, true)+m.style(" · "+a.Level.String(), color, false))
+		for _, reason := range a.Reasons {
+			lines = append(lines, " - "+row.Describe(reason))
+		}
 		lines = append(lines, "", m.style(" Next step", accent, true), " "+m.guidance(*row))
 	}
 	return m.appendDetailDiagnostics(lines), patchAt

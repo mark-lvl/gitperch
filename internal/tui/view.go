@@ -14,48 +14,21 @@ import (
 
 var scopes = []string{"All", "Attention", "Changed", "Ahead", "Behind", "Issues"}
 
-// Attention is deliberately broader than dirty: unknown tracking state and
-// interrupted operations need review even when the worktree is clean.
-func attentionRank(row app.Row) int {
-	if w := row.Worktree; w != nil {
-		if w.Bare {
-			return 0
-		}
-		if w.Prunable {
-			return 2
-		}
-	}
-	s := row.Status
-	switch {
-	case s.Error != "":
-		return 6
-	case s.Conflicts > 0 || s.Operation != "":
-		return 5
-	case s.ComparisonKnown && s.Ahead > 0 && s.Behind > 0:
-		return 4
-	case s.Dirty():
-		return 3
-	case s.Detached || s.Unborn || s.Upstream == "" || !s.ComparisonKnown:
-		return 2
-	case s.Ahead > 0 || s.Behind > 0:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func (m *Model) attentionRank(row app.Row) int {
+// attention is the row's Git attention plus this session's failed or
+// uncertain action on it, which the snapshot cannot know about.
+func (m *Model) attention(row app.Row) app.Attention {
+	a := row.Attention()
 	if result, ok := m.results[row.Path]; ok && (result.State == app.Failed || result.State == app.OutcomeUnknown) {
-		return 7
+		a = a.With(app.ReasonActionFailed)
 	}
-	return attentionRank(row)
+	return a
 }
 
 func (m *Model) inScope(row app.Row) bool {
 	s := row.Status
 	switch m.scope {
 	case 1:
-		return m.attentionRank(row) > 0
+		return m.attention(row).Needs()
 	case 2:
 		return s.Dirty()
 	case 3:
@@ -169,11 +142,13 @@ func (m *Model) workspaceLines() []string {
 }
 
 func (m *Model) summaryLineAt(w int) string {
-	attention := 0
+	attention, critical := 0, false
 	for _, row := range m.rows {
-		if m.attentionRank(row) > 0 {
+		a := m.attention(row)
+		if a.Needs() {
 			attention++
 		}
+		critical = critical || a.Level == app.Critical
 	}
 	location := m.workspace
 	if location == "" {
@@ -184,7 +159,11 @@ func (m *Model) summaryLineAt(w int) string {
 	location = gitcli.SafeText(location)
 	right := m.chip(fmt.Sprintf("%d repos", len(m.rows)), ink)
 	if attention > 0 {
-		right += " " + m.chip(fmt.Sprintf("! %d attention", attention), amber)
+		color := amber
+		if critical {
+			color = danger
+		}
+		right += " " + m.chip(fmt.Sprintf("! %d attention", attention), color)
 	}
 	activity := ""
 	if m.refreshing() {
@@ -216,7 +195,7 @@ func (m *Model) summaryLineAt(w int) string {
 func (m *Model) searchLineAt(w int) string {
 	hidden := 0
 	for _, row := range m.rows {
-		if m.attentionRank(row) == 0 {
+		if !m.attention(row).Needs() {
 			hidden++
 		}
 	}
@@ -371,8 +350,10 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 		return "! diverged", danger
 	case row.Worktree != nil && row.Worktree.Locked:
 		return "⊘ locked", muted
-	case s.Detached:
+	case s.Detached && s.HeadUnreferenced:
 		return "! detached", amber
+	case s.Detached:
+		return "detached", muted
 	case s.Unborn:
 		return "! no commits", amber
 	case s.Upstream == "":
@@ -542,8 +523,10 @@ func syncLabel(row app.Row) (string, string) {
 	switch {
 	case s.Error != "":
 		return "unknown", muted
-	case s.Detached:
+	case s.Detached && s.HeadUnreferenced:
 		return "detached", amber
+	case s.Detached:
+		return "detached", muted
 	case s.Unborn:
 		return "no commits", amber
 	case s.Upstream == "":
@@ -570,6 +553,8 @@ func nextStep(row app.Row) string {
 		return "Resolve conflicts in your shell or LazyGit before syncing."
 	case s.Operation != "":
 		return "Finish the Git operation in your shell or LazyGit before syncing."
+	case s.Detached && s.HeadUnreferenced:
+		return "No branch or tag contains this detached HEAD. Create a branch in your shell to keep its commits."
 	case s.Detached:
 		return "HEAD is detached. Check out a branch in your shell or LazyGit to sync."
 	case s.Unborn:

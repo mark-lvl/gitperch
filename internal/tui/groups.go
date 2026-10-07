@@ -46,7 +46,7 @@ func (m *Model) visibleRows() []int {
 		parent   int
 		children []int
 		matched  bool
-		rank     int
+		level    app.Level
 	}
 	groups := map[string]*group{}
 	var keys []string
@@ -65,7 +65,7 @@ func (m *Model) visibleRows() []int {
 		}
 		if m.matchesView(row) {
 			g.matched = true
-			g.rank = max(g.rank, m.attentionRank(row))
+			g.level = max(g.level, m.attention(row).Level)
 		}
 	}
 	var ordered []*group
@@ -82,8 +82,8 @@ func (m *Model) visibleRows() []int {
 	}
 	sort.SliceStable(ordered, func(i, j int) bool {
 		a, b := m.rows[ordered[i].parent], m.rows[ordered[j].parent]
-		if m.attentionFirst && ordered[i].rank != ordered[j].rank {
-			return ordered[i].rank > ordered[j].rank
+		if m.attentionFirst && ordered[i].level != ordered[j].level {
+			return ordered[i].level > ordered[j].level
 		}
 		if a.Name != b.Name {
 			return a.Name < b.Name
@@ -142,7 +142,7 @@ func (m *Model) groupBadges(row app.Row) []string {
 			switch {
 			case other.Worktree != nil && other.Worktree.Prunable:
 				stale++
-			case m.attentionRank(other) > 0:
+			case m.attention(other).Needs():
 				attention++
 			}
 		}

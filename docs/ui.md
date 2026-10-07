@@ -4,9 +4,14 @@ The workspace answers what needs attention, what the selected repository contain
 and what can be done next. The Git backend and synchronization safeguards are
 unchanged. There is no production demo data.
 
-The compact header counts repositories and attention. Attention covers failed
-inspection/operations, conflicts, interrupted Git operations, divergence, local
-changes, unknown tracking, and pending commits. Healthy repositories stay quiet.
+The compact header counts repositories and attention; the attention chip turns
+red when a repository needs intervention (conflicts, an interrupted Git
+operation, a failed inspection or action). Repositories with uncommitted,
+untracked or unpushed work, divergence, or tracking to review count too; clean,
+synchronized ones and a detached HEAD that a branch or tag contains stay quiet.
+The [attention levels](usage.md#attention) are listed in the usage guide. The
+details list each reason, such as `2 commits ahead of origin/main`, above the
+next step.
 The table shows one primary status plus independent ahead/behind counts, using
 locally known refs. Fetch checks remote state. Untracked files have no line count;
 tracked counts sum staged and unstaged changes rather than claiming a net diff.

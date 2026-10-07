@@ -13,13 +13,13 @@
                 │  29ac81  Add semantic theme tokens                                                  12m ago
                 │  fe2034  Refactor shared components                                                  1h ago
                 │
+                │  Needs attention · high
+                │  - 2 uncommitted files
+                │  - 1 untracked file
+                │  - 3 commits ahead of origin/feat/tokens
+                │
                 │  Next step
                 │  Press p to review a push. Only committed changes are included.
-                │
-                │
-                │
-                │
-                │
                 │
                 │
                 │
