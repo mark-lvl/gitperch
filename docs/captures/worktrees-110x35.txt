@@ -2,14 +2,14 @@
 │ ◇ gitperch  ~/dev/platform                                                [8 repos] [! 7 attention]  19:42 │
 │ ────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │      REPO                                   STATUS                                   Δ                     │
-│    ▱ api-service                            ✓ clean                                  —                     │
-│ ▌  ▱ design-system                          ● changed ↑3                             +8 -2                 │
-│    ▱ ├─ fix-tokens                          ! no upstream                            —                     │
-│    ▱ └─ old-spike                           ◌ stale · directory missing              —                     │
-│    ▱ docs                                   ↓ 4 behind                               —                     │
-│    ▱ experiment                             ! no upstream                            —                     │
-│    ▱ mobile                                 × failed                                 —                     │
-│    ▱ worker                                 ! conflict ↑2 ↓1                         1 file                │
+│    ▰ api-service                            ✓ clean                                  —                     │
+│ ▌  ▰ design-system                          ● changed ↑3                             +8 -2                 │
+│    ▰ ├─ fix-tokens                          ! no upstream                            —                     │
+│    ▰ └─ old-spike                           ◌ stale · directory missing              —                     │
+│    ▰ docs                                   ↓ 4 behind                               —                     │
+│    ▰ experiment                             ! no upstream                            —                     │
+│    ▰ mobile                                 × failed                                 —                     │
+│    ▰ worker                                 ! conflict ↑2 ↓1                         1 file                │
 │                                                                                                            │
 │                                                                                                            │
 │                                                                                                            │
@@ -24,7 +24,7 @@
 │                                                                                                            │
 │                                                                                                            │
 │ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
-│ │ ▱ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
+│ │ ▰ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
 │ │ ↑3 ahead · locally known refs                                                                          │ │
 │ │ Working tree · 2 files                                                                                 │ │
 │ │ M  src/theme/tokens.go                                                                          +8 -2  │ │

@@ -2,12 +2,12 @@
 │ ◇ gitperch  ~/dev/platform                [8 repos] [! 7 attention]  19:42 │
 │ ────────────────────────────────────────────────────────────────────────── │
 │        REPO                           STATUS                Δ              │
-│    1 ▱ api-service                    ✓ clean               —              │
-│ ▌  2 ▱ design-system ⑂2 ◌1 !1         ● changed ↑3          +12 -2         │
-│    3 ▱ docs                           ↓ 4 behind            —              │
-│    4 ▱ experiment                     ! no upstream         —              │
-│    5 ▱ mobile                         × failed              —              │
-│    6 ▱ worker                         ! conflict ↑2 ↓1      1 file         │
+│    1 ▰ api-service                    ✓ clean               —              │
+│ ▌  2 ▰ design-system ⑂2 ◌1 !1         ● changed ↑3          +12 -2         │
+│    3 ▰ docs                           ↓ 4 behind            —              │
+│    4 ▰ experiment                     ! no upstream         —              │
+│    5 ▰ mobile                         × failed              —              │
+│    6 ▰ worker                         ! conflict ↑2 ↓1      1 file         │
 │                                                                            │
 │                                                                            │
 │                                                                            │
@@ -16,7 +16,7 @@
 │                                                                            │
 │                                                                            │
 │ ╭────────────────────────────────────────────────────────────────────────╮ │
-│ │ ▱ design-system  feat/tokens → origin/feat/tokens               2m ago │ │
+│ │ ▰ design-system  feat/tokens → origin/feat/tokens               2m ago │ │
 │ │ ↑3 ahead · locally known refs                                          │ │
 │ │ Working tree · 3 files                                                 │ │
 │ │ M  src/theme/tokens.go                                          +8 -2  │ │

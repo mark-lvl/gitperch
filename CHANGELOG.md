@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Each repository's icon has its own color, derived from its path, which its
+- Each repository's icon, now a filled `▰` so its color shows, has its own
+  color, derived from its path, which its
   linked worktrees, preview card and Clean up heading share. The palette is
   chosen to stay distinguishable with color-vision deficiency and apart from
   status colors; status keeps its color in the status column.

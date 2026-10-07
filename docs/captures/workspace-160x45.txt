@@ -2,12 +2,12 @@
 │ ◇ gitperch  ~/dev/platform                                                                                                  [8 repos] [! 7 attention]  19:42 │
 │ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │      REPO                                   BRANCH                                             STATUS                         Δ                    UPDATED   │
-│    ▱ api-service                            main                                               ✓ clean                        —                    3h ago    │
-│ ▌  ▱ design-system ⑂2 ◌1 !1                 feat/tokens                                        ● changed ↑3                   +12 -2               2m ago    │
-│    ▱ docs                                   main                                               ↓ 4 behind                     —                    1d ago    │
-│    ▱ experiment                             prototype                                          ! no upstream                  —                    —         │
-│    ▱ mobile                                 main                                               × failed                       —                    7m ago    │
-│    ▱ worker                                 main                                               ! conflict ↑2 ↓1               1 file               11m ago   │
+│    ▰ api-service                            main                                               ✓ clean                        —                    3h ago    │
+│ ▌  ▰ design-system ⑂2 ◌1 !1                 feat/tokens                                        ● changed ↑3                   +12 -2               2m ago    │
+│    ▰ docs                                   main                                               ↓ 4 behind                     —                    1d ago    │
+│    ▰ experiment                             prototype                                          ! no upstream                  —                    —         │
+│    ▰ mobile                                 main                                               × failed                       —                    7m ago    │
+│    ▰ worker                                 main                                               ! conflict ↑2 ↓1               1 file               11m ago   │
 │                                                                                                                                                              │
 │                                                                                                                                                              │
 │                                                                                                                                                              │
@@ -33,7 +33,7 @@
 │                                                                                                                                                              │
 │                                                                                                                                                              │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
-│ │ ▱ design-system  feat/tokens → origin/feat/tokens                                                                                                 2m ago │ │
+│ │ ▰ design-system  feat/tokens → origin/feat/tokens                                                                                                 2m ago │ │
 │ │ ↑3 ahead · locally known refs                                                                                                                            │ │
 │ │ Working tree · 3 files                                                              Recent commits                                                       │ │
 │ │ M  src/theme/tokens.go                                                     +8 -2  │ 29ac81  Add semantic theme tokens                            12m ago │ │

@@ -2,16 +2,16 @@
 │ ◇ gitperch  ~/dev/platform                                                [8 repos] [! 7 attention]  19:42 │
 │ ────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │      REPO                                   STATUS                                   Δ                     │
-│    ▱ api-service                            ✓ clean                                  —                     │
-│ ▌  ▱ design-system ⑂2 ◌1 !1                 ● changed ↑3                             +8 -2                 │
-│    ▱ docs                                   ↓ 4 behind                               —                     │
-│    ▱ experiment                             ! no upstream                            —                     │
-│    ▱ mobile                                 × failed                                 —                     │
-│    ▱ worker                                 ! conflict ↑2 ↓1                         1 file                │
+│    ▰ api-service                            ✓ clean                                  —                     │
+│ ▌  ▰ design-system ⑂2 ◌1 !1                 ● changed ↑3                             +8 -2                 │
+│    ▰ docs                                   ↓ 4 behind                               —                     │
+│    ▰ experiment                             ! no upstream                            —                     │
+│    ▰ mobile                                 × failed                                 —                     │
+│    ▰ worker                                 ! conflict ↑2 ↓1                         1 file                │
 │                                                                                                            │
 │      ╭──────────────────────────────────────────────────────────────────────────────────────────────╮      │
 │      │ Clean up 4 items?                                                                            │      │
-│      │ ▱ design-system                                                                              │      │
+│      │ ▰ design-system                                                                              │      │
 │      │   [x] prune 1 stale worktree record                             directory missing: old-spike │      │
 │      │ ▌ [x] remove worktree fix-tokens  fix-tokens                         merged into origin/main │      │
 │      │   [x] delete branch fix-tokens  2d7a90c                              merged into origin/main │      │
@@ -24,7 +24,7 @@
 │      ╰──────────────────────────────────────────────────────────────────────────────────────────────╯      │
 │                                                                                                            │
 │ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
-│ │ ▱ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
+│ │ ▰ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
 │ │ ↑3 ahead · locally known refs                                                                          │ │
 │ │ Working tree · 2 files                                                                                 │ │
 │ │ M  src/theme/tokens.go                                                                          +8 -2  │ │

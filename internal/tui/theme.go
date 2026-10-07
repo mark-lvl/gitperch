@@ -59,7 +59,7 @@ var (
 )
 
 func iconSet(mode string) icons {
-	i := icons{clean: "✓", changed: "●", ahead: "↑", behind: "↓", failed: "×", pointer: "▌", rule: "─", repo: "▱", brand: "◇", enter: "↵", worktree: "⑂", stale: "◌", spinner: brailleSpinner}
+	i := icons{clean: "✓", changed: "●", ahead: "↑", behind: "↓", failed: "×", pointer: "▌", rule: "─", repo: "▰", brand: "◇", enter: "↵", worktree: "⑂", stale: "◌", spinner: brailleSpinner}
 	switch mode {
 	case "ascii":
 		i = icons{clean: "ok", changed: "*", ahead: "^", behind: "v", failed: "!", pointer: ">", rule: "-", repo: "/", brand: "*", enter: "Enter", worktree: "wt", stale: "~", spinner: asciiSpinner}

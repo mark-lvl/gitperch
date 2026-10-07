@@ -772,7 +772,7 @@ func (m *Model) screen(lines []string) tea.View {
 	}
 	for i := range lines {
 		if m.iconMode == "ascii" {
-			lines[i] = strings.NewReplacer("…", "~", "·", "|", "→", "->", "↑", "^", "↓", "v", "—", "-", "▏", "|", "─", "-", "│", "|", "╭", "+", "╮", "+", "╰", "+", "╯", "+", "◇", "*", "●", "*", "◐", "o", "▱", "/", "↵", "Enter").Replace(lines[i])
+			lines[i] = strings.NewReplacer("…", "~", "·", "|", "→", "->", "↑", "^", "↓", "v", "—", "-", "▏", "|", "─", "-", "│", "|", "╭", "+", "╮", "+", "╰", "+", "╯", "+", "◇", "*", "●", "*", "◐", "o", "▱", "/", "▰", "/", "↵", "Enter").Replace(lines[i])
 		}
 		lines[i] = ansi.Truncate(lines[i], w, "")
 	}

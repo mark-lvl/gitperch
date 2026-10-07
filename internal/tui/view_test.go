@@ -208,7 +208,7 @@ func TestNoticeDoesNotHideHighlightedRow(t *testing.T) {
 // highlight marker; narrow layouts insert a row number before the name.
 func highlightedLine(content, repository string) bool {
 	for _, line := range strings.Split(content, "\n") {
-		if strings.Contains(line, "▱ "+repository+" ") && strings.Contains(line, "▌") {
+		if strings.Contains(line, "▰ "+repository+" ") && strings.Contains(line, "▌") {
 			return true
 		}
 	}
