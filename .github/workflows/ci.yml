@@ -9,8 +9,14 @@ permissions:
   contents: read
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest is Apple Silicon; macos-15-intel is GitHub's last Intel
+        # image, supported until August 2027.
+        os: [ubuntu-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -18,7 +24,11 @@ jobs:
           go-version-file: go.mod
           cache: false
       - name: Formatting
+        if: runner.os == 'Linux'
         run: test -z "$(gofmt -l .)"
+      - name: Shellcheck installer
+        if: runner.os == 'Linux'
+        run: shellcheck --shell=sh scripts/install.sh
       - name: Test
         run: go test ./...
       - name: Race

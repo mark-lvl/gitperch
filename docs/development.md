@@ -4,8 +4,10 @@
 
 - Go 1.27.1 or newer to build from source (see `go.mod`).
 - The Git CLI at runtime; development and validation used Git 2.43.0.
-- Linux or WSL2. macOS and Windows builds are expected to compile but are not
-  yet validated.
+- Linux, WSL2 or macOS; CI tests Linux and macOS on Apple Silicon and Intel.
+  Windows builds are expected to compile but are not yet validated.
+- `make dist` uses GNU tar for reproducible archives, so build release
+  archives on Linux.
 - Optional: [LazyGit](https://github.com/jesseduffield/lazygit) for the
   in-dashboard LazyGit launcher, and Python with `pillow` and `pyte` to
   regenerate PNG render captures.

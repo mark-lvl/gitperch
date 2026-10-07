@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds static, versioned release archives and checksums.txt under dist/.
+# Builds versioned release archives, install.sh and checksums.txt under dist/.
+# Uses GNU tar options for reproducible archives, so run it on Linux.
 # Usage: scripts/build-release.sh X.Y.Z
 set -euo pipefail
 
@@ -11,8 +12,8 @@ fi
 go_command=${GO:-go}
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
-# Linux is the only validated platform; see README.md#installation.
-targets=(linux/amd64 linux/arm64)
+# Validated platforms; see README.md#installation.
+targets=(linux/amd64 linux/arm64 darwin/amd64 darwin/arm64)
 # Archive timestamps come from the release commit so rebuilds are identical.
 mtime=$(git log -1 --format=%ct)
 
@@ -30,4 +31,5 @@ for target in "${targets[@]}"; do
         -C dist -cf - "$name" | gzip -n >"dist/$name.tar.gz"
     rm -rf "$stage"
 done
-(cd dist && sha256sum -- *.tar.gz >checksums.txt && cat checksums.txt)
+cp scripts/install.sh dist/install.sh
+(cd dist && sha256sum -- *.tar.gz install.sh >checksums.txt && cat checksums.txt)

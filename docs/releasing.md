@@ -2,7 +2,8 @@
 
 gitperch is released from version tags on `main`. Pushing a `vX.Y.Z` tag
 runs the [release workflow](../.github/workflows/release.yml), which publishes
-a GitHub release with Linux archives and checksums.
+a GitHub release with Linux and macOS archives, the install script and
+checksums.
 
 ## Versions
 
@@ -57,17 +58,26 @@ The release workflow then:
 
 - checks that the tag is on `main` and that CHANGELOG.md has a section for it;
 - runs `make check`;
-- builds static `linux/amd64` and `linux/arm64` binaries with
-  `scripts/build-release.sh`, packed with `LICENSE`, `README.md` and
-  `CHANGELOG.md` into `gitperch_X.Y.Z_linux_<arch>.tar.gz`, plus
-  `checksums.txt` (SHA-256);
+- builds `linux/amd64`, `linux/arm64`, `darwin/amd64` and `darwin/arm64`
+  binaries with `CGO_ENABLED=0` using `scripts/build-release.sh`, packed with
+  `LICENSE`, `README.md` and `CHANGELOG.md` into
+  `gitperch_X.Y.Z_<os>_<arch>.tar.gz`. Linux binaries are static; macOS
+  binaries link only the system libraries, and Go's linker ad-hoc signs the
+  arm64 one as Apple Silicon requires;
+- copies `scripts/install.sh` to the release as `install.sh`, which
+  `releases/latest/download/install.sh` serves to the one-line installer, and
+  writes `checksums.txt` (SHA-256) for the archives and the script;
 - creates the GitHub release `vX.Y.Z` with the changelog section as its notes.
 
 Archives are reproducible: rebuilding a tag with the same Go version gives the
 same checksums. Build them locally with `make dist` (version from the current
-tag) or `make dist VERSION=0.2.0`.
+tag) or `make dist VERSION=0.2.0`; this needs GNU tar, so run it on Linux.
 
-macOS and Windows archives are left out until those platforms are validated.
+The installer finds the latest version from the file names in
+`releases/latest/download/checksums.txt`, so keep the archive naming above and
+the archive's top-level `gitperch_X.Y.Z_<os>_<arch>/` directory unchanged, or
+update `scripts/install.sh` in the same release. Windows archives are left out
+until that platform is validated.
 
 ## When a release fails
 

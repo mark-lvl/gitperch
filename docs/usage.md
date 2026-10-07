@@ -46,7 +46,9 @@ Absolute paths distinguish duplicate names. Root depth is zero. Scanning stops
 at a repository; explicitly supplied nested repositories are still eligible.
 Both `.git` directories and regular worktree `.git` files are candidates.
 Bare repositories are not candidates. Directory symlinks and roots reached via
-symlink ancestors are skipped. Descendants named `node_modules`, `vendor`,
+symlink ancestors are skipped. On macOS that includes roots under `/tmp` and
+`/var`, which are symlinks into `/private`; name the `/private/...` path
+instead. Descendants named `node_modules`, `vendor`,
 `target`, `.cache`, `.next`, `dist`, or `build` are ignored.
 
 Missing or inaccessible roots print warnings while valid roots continue.
@@ -66,8 +68,9 @@ by Git; this tool does not sandbox repositories.
 ## Workspaces
 
 On Linux/WSL, config defaults to `$XDG_CONFIG_HOME/gitperch/config.toml` or
-`~/.config/gitperch/config.toml`. Other platforms use Go's platform-specific
-user config directory. An absent default config scans the current directory.
+`~/.config/gitperch/config.toml`. On macOS it is
+`~/Library/Application Support/gitperch/config.toml`; `XDG_CONFIG_HOME` is not
+used there. An absent default config scans the current directory.
 An explicitly named missing config is an error.
 
 ```toml

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- macOS support: releases include `darwin_arm64` (Apple Silicon) and
+  `darwin_amd64` (Intel) archives, and CI also runs the test suite on Apple
+  Silicon and Intel Macs.
+- One-command install and upgrade on Linux, WSL and macOS:
+  `curl -fsSL https://github.com/mark-lvl/gitperch/releases/latest/download/install.sh | sh`.
+  The script, attached to each release, verifies the archive against
+  `checksums.txt`, installs to `~/.local/bin` (or `INSTALL_DIR`) and accepts
+  `GITPERCH_VERSION` to pin a release.
+
 ## [0.3.0] - 2026-10-07
 
 ### Added

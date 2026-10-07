@@ -122,19 +122,36 @@ registration and understands linked worktrees.
 
 ## Installation
 
-gitperch needs the `git` CLI at runtime; worktree grouping and cleanup need
-Git 2.36 or newer. Linux and WSL2 are the supported platforms today; macOS and
-Windows are not yet validated.
+gitperch runs on Linux, WSL2 and macOS (Apple Silicon and Intel). It needs the
+`git` CLI at runtime; worktree grouping and cleanup need Git 2.36 or newer.
+Windows is not supported yet; use WSL2.
 
-Prebuilt Linux binaries (amd64 and arm64) are attached to each
-[GitHub release](https://github.com/mark-lvl/gitperch/releases). Download the
-archive for your architecture and `checksums.txt`, then:
+Install or upgrade to the latest release in `~/.local/bin`:
 
 ```sh
-sha256sum --check --ignore-missing checksums.txt
+curl -fsSL https://github.com/mark-lvl/gitperch/releases/latest/download/install.sh | sh
+```
+
+The script picks the archive for your platform, verifies it against the
+release's `checksums.txt` and replaces an earlier installation. Set
+`GITPERCH_VERSION` to pin a release or `INSTALL_DIR` to install elsewhere, for
+example `curl -fsSL … | GITPERCH_VERSION=0.4.0 sh`. To uninstall, delete the
+binary.
+
+To install by hand, download the archive for your platform and `checksums.txt`
+from the [GitHub releases](https://github.com/mark-lvl/gitperch/releases),
+then (on macOS, use `shasum -a 256 -c` and the `darwin_arm64` or
+`darwin_amd64` archive):
+
+```sh
+grep _linux_amd64 checksums.txt | sha256sum -c
 tar -xzf gitperch_*_linux_amd64.tar.gz
+mkdir -p ~/.local/bin
 install -m 0755 gitperch_*_linux_amd64/gitperch ~/.local/bin/
 ```
+
+If macOS refuses to open a binary downloaded with a browser, clear the
+quarantine flag: `xattr -d com.apple.quarantine ~/.local/bin/gitperch`.
 
 With Go 1.27.1 or newer:
 
@@ -181,8 +198,9 @@ Inside the dashboard:
 ## Configuration
 
 gitperch reads `$XDG_CONFIG_HOME/gitperch/config.toml` (or
-`~/.config/gitperch/config.toml`). Without a config file it scans the current
-directory.
+`~/.config/gitperch/config.toml`) on Linux and WSL, and
+`~/Library/Application Support/gitperch/config.toml` on macOS. Without a config
+file it scans the current directory.
 
 ```toml
 default_workspace = "agents"
@@ -220,8 +238,7 @@ heuristics:
 - Show which agent session is active in which repository or worktree.
 - Surface "waiting for review" and "agent finished" states next to Git status.
 - Run project checks (tests, linters) from the dashboard.
-- Validated macOS and Windows support, with release binaries for both
-  (Linux binaries are already published).
+- Validated Windows support, with release binaries.
 
 Ideas and use cases are welcome in
 [GitHub Discussions](https://github.com/mark-lvl/gitperch/discussions)
