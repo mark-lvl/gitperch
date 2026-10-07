@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -125,7 +126,11 @@ func (r Runner) SupportsWorktreeInventory(ctx context.Context) bool {
 	out, err := r.Run(ctx, ".", "version")
 	major, minor, ok := parseGitVersion(string(out.Stdout))
 	supported := err == nil && ok && (major > 2 || major == 2 && minor >= 36)
-	if ctx.Err() == nil { // do not cache a cancelled probe
+	// Cache only definitive answers: a parsed version, or Git itself exiting
+	// with an error. Timeouts, cancellation, output overflow and failures to
+	// start Git may pass, so they are retried on the next call.
+	var exit *exec.ExitError
+	if err == nil && ok || errors.As(err, &exit) {
 		inventorySupport.Store(key, supported)
 	}
 	return supported

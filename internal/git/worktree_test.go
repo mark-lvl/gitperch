@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const oidA = "d4d4e4095f071aea427e7ce86dc1c11eff4fd181"
@@ -120,5 +121,50 @@ func TestSupportsWorktreeInventory(t *testing.T) {
 	}
 	if (Runner{Executable: filepath.Join(t.TempDir(), "missing-git")}).SupportsWorktreeInventory(ctx) {
 		t.Fatal("an unreadable version must disable the feature")
+	}
+}
+
+// A probe that failed for a transient reason (timeout) must not stick: the same
+// executable can report support on the next call.
+func TestSupportsWorktreeInventoryDoesNotCacheTransientFailures(t *testing.T) {
+	dir := t.TempDir()
+	slow := filepath.Join(dir, "slow")
+	exe := filepath.Join(dir, "git")
+	script := "#!/bin/sh\nif [ -e '" + slow + "' ]; then sleep 5; fi\necho 'git version 2.40.0'\n"
+	if err := os.WriteFile(exe, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(slow, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := Runner{Executable: exe, Timeout: 100 * time.Millisecond}
+	if r.SupportsWorktreeInventory(context.Background()) {
+		t.Fatal("a timed-out probe reported support")
+	}
+	if err := os.Remove(slow); err != nil {
+		t.Fatal(err)
+	}
+	if !r.SupportsWorktreeInventory(context.Background()) {
+		t.Fatal("a transient timeout was cached as unsupported")
+	}
+}
+
+// A definitive answer (Git exits with an error for `git version`) is cached.
+func TestSupportsWorktreeInventoryCachesDefinitiveFailures(t *testing.T) {
+	exe := filepath.Join(t.TempDir(), "git")
+	marker := exe + ".ok"
+	script := "#!/bin/sh\nif [ -e '" + marker + "' ]; then echo 'git version 2.40.0'; exit 0; fi\nexit 3\n"
+	if err := os.WriteFile(exe, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := Runner{Executable: exe}
+	if r.SupportsWorktreeInventory(context.Background()) {
+		t.Fatal("failing git reported support")
+	}
+	if err := os.WriteFile(marker, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r.SupportsWorktreeInventory(context.Background()) {
+		t.Fatal("a definitive failure should stay cached for the process")
 	}
 }
