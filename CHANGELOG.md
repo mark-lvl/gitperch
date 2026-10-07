@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whether their commits are unpushed, diverged, published, or reachable only
   from a detached HEAD (with the `git branch rescue/…` command that saves
   them).
+- A removed worktree's result includes the command that adds it back, such as
+  `git -C <repository> worktree add <path> <branch>`, and the status line
+  points to it.
 
 ### Changed
 

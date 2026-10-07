@@ -276,6 +276,10 @@ tag contains is blocked with the command that saves it, such as
 A branch with commits not pushed to its upstream, or diverged from it, is
 blocked; a branch whose commits are all pushed, or that has no upstream or a
 gone upstream, needs review. Removing a worktree never deletes its branch.
+Each removal's result carries the command that adds it back, such as
+`git -C ~/src/app worktree add ~/src/app-fix fix` (or
+`worktree add --detach <path> <commit>` for a detached HEAD); if its branch was
+deleted in the same cleanup, run that branch's restore command first.
 A stale record whose HEAD is a commit no ref reaches (for example work done on
 a detached HEAD) is kept: pruning would leave that commit unreferenced. The
 review names each such commit and the command that saves it, such as

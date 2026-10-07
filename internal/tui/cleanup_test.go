@@ -471,3 +471,13 @@ func TestWrapSpacesKeepsHyphenatedWordsWhole(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanupSummaryPointsToRecreateCommands(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.EnableActions(app.NewActions(newActionFake(false), 1))
+	m.running, m.runningAction, m.results = true, app.Cleanup, map[string]app.Event{}
+	m.Update(batchDoneMsg{generation: m.actionGeneration, results: []app.Event{{Path: "/w", Item: "remove worktree\x00/r\x00/w", State: app.Succeeded, Message: "removed worktree /w · re-create: git -C /r worktree add /w feat"}}})
+	if !strings.Contains(m.message, "d restore commands") {
+		t.Fatalf("summary: %q", m.message)
+	}
+}

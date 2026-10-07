@@ -737,7 +737,7 @@ func (a *Actions) executeCleanupItem(ctx context.Context, git CleanupGit, p plan
 	case PruneStale:
 		result.Message = fmt.Sprintf("pruned %d stale worktree record(s)", len(item.Stale))
 	case RemoveWorktree:
-		result.Message = "removed worktree " + gitcli.SafeText(item.Path)
+		result.Message = "removed worktree " + gitcli.SafeText(item.Path) + " · re-create: " + recreateCommand(item)
 	case DeleteBranch:
 		result.Message = deletedBranchMessage(item)
 		a.noteRestore(&result, item)
@@ -790,6 +790,26 @@ func deletedBranchMessage(item CleanupItem) string {
 // inside the repository.
 func restoreCommand(item CleanupItem) string {
 	return fmt.Sprintf("git branch %s %s", shellQuote(gitcli.SafeText(item.Branch)), item.OID)
+}
+
+// recreateCommand adds a removed worktree back at its reviewed path, on its
+// branch or detached at its reviewed commit, from any directory. Removal keeps
+// the branch, so the command works unless the branch is deleted too; then its
+// own restore command comes first. Escaped names are flagged as in
+// restoreAnywhere.
+func recreateCommand(item CleanupItem) string {
+	repo, path := gitcli.SafeText(item.Group), gitcli.SafeText(item.Path)
+	command := fmt.Sprintf("git -C %s worktree add %s ", shellQuote(repo), shellQuote(path))
+	branch := gitcli.SafeText(item.Branch)
+	if item.Branch == "" {
+		command += "--detach " + item.OID
+	} else {
+		command += shellQuote(branch)
+	}
+	if repo != item.Group || path != item.Path || branch != item.Branch {
+		command += "  # names shown escaped; use the real repository, path and branch"
+	}
+	return command
 }
 
 // restoreAnywhere is restoreCommand with the repository named, so it works

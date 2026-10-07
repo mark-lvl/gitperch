@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -161,5 +162,52 @@ func TestCleanupRefusesTheMainWorktreeInTheDomain(t *testing.T) {
 	check := revalidateCleanup(context.Background(), gitcli.Service{}, item)
 	if check.Status != CleanupBlocked || !check.Has(CleanupMainWorktree) {
 		t.Fatalf("main worktree: %+v", check)
+	}
+}
+
+// The re-create command in a removal result must work as printed.
+func TestCleanupRemovalResultRecreatesTheWorktree(t *testing.T) {
+	repo, merged, _ := cleanupRepo(t)
+	detached := filepath.Join(t.TempDir(), "detached")
+	actionGit(t, repo, "worktree", "add", "--detach", detached, "main")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	branchItem, detachedItem := itemFor(t, preview, RemoveWorktree, merged), itemFor(t, preview, RemoveWorktree, detached)
+	results, err := actions.ExecuteCleanup(context.Background(), preview.ID, []string{branchItem.ID, detachedItem.ID}, nil)
+	if err != nil || len(results) != 2 {
+		t.Fatalf("results %+v, %v", results, err)
+	}
+	for _, r := range results {
+		_, command, ok := strings.Cut(r.Message, " · re-create: ")
+		if r.State != Succeeded || !ok {
+			t.Fatalf("result %+v", r)
+		}
+		cmd := exec.Command("sh", "-c", command)
+		cmd.Env = actionTestGitEnv(t)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s: %v\n%s", command, err, out)
+		}
+	}
+	if branch := strings.TrimSpace(string(actionGit(t, merged, "branch", "--show-current"))); branch != "merged" {
+		t.Fatalf("re-created worktree on %q", branch)
+	}
+	if head := strings.TrimSpace(string(actionGit(t, detached, "rev-parse", "HEAD"))); head != detachedItem.OID {
+		t.Fatalf("re-created detached worktree at %s, want %s", head, detachedItem.OID)
+	}
+}
+
+func TestRecreateCommandQuotesAndFlagsEscapedNames(t *testing.T) {
+	oid := strings.Repeat("a", 40)
+	if got := recreateCommand(CleanupItem{Group: "/r", Path: "/w/two words", Branch: "x;id"}); got != "git -C /r worktree add '/w/two words' 'x;id'" {
+		t.Fatalf("quoted: %s", got)
+	}
+	if got := recreateCommand(CleanupItem{Group: "/r", Path: "/w/d", OID: oid}); got != "git -C /r worktree add /w/d --detach "+oid {
+		t.Fatalf("detached: %s", got)
+	}
+	if got := recreateCommand(CleanupItem{Group: "/r", Path: "/w/x", Branch: "bad\x1bname"}); strings.Contains(got, "\x1b") || !strings.Contains(got, "names shown escaped") {
+		t.Fatalf("escaped: %q", got)
 	}
 }

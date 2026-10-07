@@ -124,7 +124,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 		}
 		if m.runningAction == app.Cleanup {
 			for _, result := range msg.results {
-				if result.State == app.Succeeded && strings.Contains(result.Message, "restore: git branch") {
+				if result.State == app.Succeeded && (strings.Contains(result.Message, "restore: git branch") || strings.Contains(result.Message, "re-create: git")) {
 					m.message += " · d restore commands"
 					break
 				}
