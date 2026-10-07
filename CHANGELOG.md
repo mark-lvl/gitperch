@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `conflicts` or `unpushed_commits`; the plain table gains an `ATTENTION`
   column. Repository details list the reasons, for example
   `2 commits ahead of origin/main`.
+- Linked worktrees get a lifecycle inferred from their Git state: `blocked`,
+  `in_progress`, `active`, `likely_finished` (clean, merged into the default
+  branch and quiet for a day), `idle` (clean and quiet for 14 days) or
+  `unknown`. The status column shows `✓ finished?` or `idle 21d`, the details
+  Worktree section lists the signals behind the state, and both raise medium
+  attention. JSON adds a `lifecycle` object and `worktree.integration`. It is a
+  suggestion only: Clean up still decides removal against a fresh fetch.
 
 ### Changed
 

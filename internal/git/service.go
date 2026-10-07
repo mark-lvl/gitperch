@@ -14,6 +14,9 @@ func (s Service) Inspect(ctx context.Context, path string) repository.Status {
 func (s Service) Metadata(ctx context.Context, path string) (Metadata, error) {
 	return s.Read.Metadata(ctx, path)
 }
+func (s Service) Remotes(ctx context.Context, path string) ([]string, error) {
+	return s.Read.Remotes(ctx, path)
+}
 func (s Service) ResolveFetch(ctx context.Context, path string, m Metadata) (FetchTarget, error) {
 	return s.Read.ResolveFetch(ctx, path, m)
 }

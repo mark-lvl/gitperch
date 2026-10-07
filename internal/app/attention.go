@@ -73,6 +73,10 @@ const (
 	ReasonTrackingUnknown Reason = "tracking_unknown"
 	ReasonNoCommits       Reason = "no_commits"
 	ReasonStaleWorktree   Reason = "stale_worktree"
+	// ReasonWorktreeFinished and ReasonWorktreeIdle come from a linked
+	// worktree's Lifecycle: worth a review, nothing at risk.
+	ReasonWorktreeFinished Reason = "worktree_finished"
+	ReasonWorktreeIdle     Reason = "worktree_idle"
 )
 
 // reasonOrder lists reasons from most to least severe; Attention.Reasons
@@ -81,6 +85,7 @@ var reasonOrder = []Reason{
 	ReasonActionFailed, ReasonInspectionFailed, ReasonConflicts, ReasonOperation,
 	ReasonDiverged, ReasonUncommitted, ReasonUntracked, ReasonUnpushed, ReasonDetachedCommits,
 	ReasonBehind, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree,
+	ReasonWorktreeFinished, ReasonWorktreeIdle,
 }
 
 // Level is the attention level the reason alone warrants.
@@ -90,7 +95,7 @@ func (r Reason) Level() Level {
 		return Critical
 	case ReasonDiverged, ReasonUncommitted, ReasonUntracked, ReasonUnpushed, ReasonDetachedCommits:
 		return High
-	case ReasonBehind, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree:
+	case ReasonBehind, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree, ReasonWorktreeFinished, ReasonWorktreeIdle:
 		return Medium
 	}
 	return Low
@@ -168,6 +173,15 @@ func (r Row) Attention() Attention {
 	case s.Behind > 0:
 		a = a.With(ReasonBehind)
 	}
+	// Lifecycle reads the same facts, never attention, so the two cannot loop.
+	if l := r.Lifecycle(); l != nil {
+		switch l.State {
+		case WorktreeFinished:
+			a = a.With(ReasonWorktreeFinished)
+		case WorktreeIdle:
+			a = a.With(ReasonWorktreeIdle)
+		}
+	}
 	return a
 }
 
@@ -208,6 +222,12 @@ func (r Row) Describe(reason Reason) string {
 			return "stale worktree record: " + gitcli.SafeText(w.PrunableReason)
 		}
 		return "stale worktree record"
+	case ReasonWorktreeFinished:
+		idle, _ := r.Inactivity()
+		return "linked worktree looks finished: " + r.DescribeSignal(SignalMerged) + ", no HEAD activity for " + span(idle)
+	case ReasonWorktreeIdle:
+		idle, _ := r.Inactivity()
+		return "linked worktree idle: no HEAD activity for " + span(idle)
 	}
 	return gitcli.SafeText(string(reason))
 }

@@ -17,16 +17,18 @@ type Report struct {
 	Warnings      []discovery.Warning `json:"warnings"`
 }
 
-// ReportRow is a row with the attention derived from its status.
+// ReportRow is a row with the attention and, for a linked worktree, the
+// lifecycle derived from its Git facts.
 type ReportRow struct {
 	Row
-	Attention Attention `json:"attention"`
+	Attention Attention  `json:"attention"`
+	Lifecycle *Lifecycle `json:"lifecycle,omitempty"`
 }
 
 func WriteJSON(w io.Writer, rows []Row, warnings []discovery.Warning) error {
 	report := Report{SchemaVersion: 1, Repositories: make([]ReportRow, len(rows)), Warnings: warnings}
 	for i, row := range rows {
-		report.Repositories[i] = ReportRow{row, row.Attention()}
+		report.Repositories[i] = ReportRow{row, row.Attention(), row.Lifecycle()}
 	}
 	if report.Warnings == nil {
 		report.Warnings = []discovery.Warning{}
@@ -74,6 +76,9 @@ func WriteTable(w io.Writer, rows []Row) error {
 			case w.Locked:
 				markers = append(markers, "locked worktree")
 			}
+		}
+		if l := row.Lifecycle(); l != nil && (l.State == WorktreeFinished || l.State == WorktreeIdle) {
+			markers = append(markers, l.State.Label()+" worktree")
 		}
 		if s.Upstream == "" && (row.Worktree == nil || !row.Worktree.Prunable && !row.Worktree.Bare) {
 			markers = append(markers, "no upstream")

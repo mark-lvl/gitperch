@@ -26,12 +26,34 @@ type WorktreeInfo struct {
 	PrunableReason string `json:"prunable_reason,omitempty"`
 	MainPath       string `json:"main_path"`
 	OutsideRoots   bool   `json:"outside_roots,omitempty"`
+	// Integration compares a linked worktree's HEAD with the default branch;
+	// nil where no comparison applies. See attachIntegration.
+	Integration *Integration `json:"integration,omitempty"`
+}
+
+// Integration records whether the repository's default branch, as local refs
+// know it, already contains a linked worktree's HEAD commit. Nothing is
+// fetched for it, so a merge the local refs have not seen reads as not merged,
+// and squash or rebase merges, which rewrite commits, read as not merged too.
+type Integration struct {
+	Base   string `json:"base,omitempty"` // e.g. origin/main; "" when unknown
+	Merged bool   `json:"merged"`
+	Error  string `json:"error,omitempty"` // why no comparison was made
 }
 
 // WorktreeLister is implemented by Git services that can list worktrees.
 type WorktreeLister interface {
 	SupportsWorktreeInventory(context.Context) bool
 	Worktrees(context.Context, string) ([]gitcli.Worktree, error)
+}
+
+// IntegrationChecker is implemented by Git services that can compare a
+// worktree's HEAD with the default branch from local refs.
+type IntegrationChecker interface {
+	Remotes(context.Context, string) ([]string, error)
+	RemoteDefaultRef(context.Context, string, string) (string, error)
+	ResolveCommit(context.Context, string, string) (string, error)
+	IsAncestor(context.Context, string, string, string) (bool, error)
 }
 
 // identity compares paths the way Git reports them (symlinks resolved) while
@@ -154,6 +176,69 @@ func attachWorktrees(ctx context.Context, rows []Row, service GitService, worker
 		info := p.info
 		rows = append(rows, Row{Repository: repository.Repository{Path: path, Name: filepath.Base(path)}, Status: repository.Status{Branch: p.wt.Branch, HeadOID: p.wt.HeadOID, Detached: p.wt.Detached}, Worktree: &info})
 	}
+	attachIntegration(ctx, rows, service, workers)
 	sortRows(rows)
 	return rows, warnings
+}
+
+// attachIntegration compares each inspectable linked worktree's HEAD with its
+// repository's default branch, chosen as cleanup chooses it but from local
+// refs only: one lookup per group, then one ancestry check per worktree.
+func attachIntegration(ctx context.Context, rows []Row, service GitService, workers int) {
+	checker, ok := service.(IntegrationChecker)
+	if !ok {
+		return
+	}
+	groups := map[string][]int{}
+	var order []string
+	for i, row := range rows {
+		w, s := row.Worktree, row.Status
+		if w == nil || !w.Linked || w.Bare || w.Prunable || s.Error != "" || s.Unborn || s.HeadOID == "" {
+			continue
+		}
+		if _, seen := groups[w.MainPath]; !seen {
+			order = append(order, w.MainPath)
+		}
+		groups[w.MainPath] = append(groups[w.MainPath], i)
+	}
+	jobs := make(chan string)
+	var wg sync.WaitGroup
+	for range max(1, min(workers, len(order))) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for key := range jobs {
+				members := groups[key]
+				path := rows[members[0]].Path
+				var base cleanupBase
+				if remotes, err := checker.Remotes(ctx, path); err != nil {
+					base.reason = "remote list failed: " + gitcli.SafeText(err.Error())
+				} else {
+					base = defaultBase(ctx, checker, path, remotes, nil)
+				}
+				for _, i := range members {
+					row := rows[i]
+					info := &Integration{Base: base.name}
+					switch {
+					case base.ref == "":
+						info.Error = base.reason
+					case !row.Status.Detached && row.Status.Branch == base.branch:
+						info.Error = "the default branch is checked out here"
+					default:
+						merged, err := checker.IsAncestor(ctx, row.Path, row.Status.HeadOID, base.ref)
+						if err != nil {
+							info.Error = "merge check failed: " + gitcli.SafeText(err.Error())
+						}
+						info.Merged = merged && err == nil
+					}
+					rows[i].Worktree.Integration = info
+				}
+			}
+		}()
+	}
+	for _, key := range order {
+		jobs <- key
+	}
+	close(jobs)
+	wg.Wait()
 }

@@ -30,7 +30,7 @@ worktrees of one repository are judged independently.
 | --- | --- |
 | critical | `inspection_failed`, `conflicts`, `operation_in_progress` (merge, rebase, cherry-pick, revert, bisect), `action_failed` (dashboard only: a fetch, push or pull failed or has an unknown outcome) |
 | high | `uncommitted_changes` (staged or unstaged), `untracked_files`, `unpushed_commits`, `diverged`, `detached_commits` (a detached HEAD no branch, remote-tracking branch or tag contains) |
-| medium | `behind_upstream`, `no_upstream`, `tracking_unknown` (the upstream's local tracking ref is missing), `no_commits`, `stale_worktree` |
+| medium | `behind_upstream`, `no_upstream`, `tracking_unknown` (the upstream's local tracking ref is missing), `no_commits`, `stale_worktree`, `worktree_finished` and `worktree_idle` (a linked worktree's [lifecycle](#worktree-lifecycle)) |
 | low | Nothing to do: clean and synchronized, a detached HEAD a ref contains, a locked or bare worktree |
 
 The level is the most severe reason. Levels above low count as needing
@@ -39,7 +39,8 @@ order (`s`) sorts by level, then name and path. The table's `ATTENTION` column
 and each JSON repository's `attention` object (`{"level": "high", "reasons":
 ["uncommitted_changes", "unpushed_commits"]}`, reasons most severe first and
 `[]` at low) carry the same result. Attention describes Git state; it does not
-decide what to do, and age alone never raises it.
+decide what to do, and age alone never raises it: only a clean linked
+worktree with nothing unfinished can become `worktree_idle`.
 
 Absolute paths distinguish duplicate names. Root depth is zero. Scanning stops
 at a repository; explicitly supplied nested repositories are still eligible.
@@ -178,6 +179,49 @@ inventory is available (schema version still 1; the field is additive):
 | `prunable`, `prunable_reason` | Stale worktree and Git's reason, if any (omitted when empty) |
 | `main_path` | Path of the main worktree that owns this group |
 | `outside_roots` | Listed by Git but outside the scanned roots (omitted when false) |
+| `integration` | Linked worktrees only: `base` (the default branch compared with, such as `origin/main`), `merged` (the base contains HEAD) and `error` (why no comparison was made, omitted when empty) |
+
+### Worktree lifecycle
+
+Each linked worktree also gets a lifecycle: a suggestion of what to review,
+inferred from its current Git state. It never removes anything and never
+makes a worktree eligible for Clean up, which repeats its own checks against a
+fresh fetch. The main worktree, stale records and bare repositories have none.
+
+| State (JSON) | Shown as | When |
+| --- | --- | --- |
+| `blocked` | the existing status, such as `! conflict` or `⊘ locked` | Conflicts, an operation in progress, a lock, or a status that could not be read |
+| `in_progress` | the existing status, such as `● changed` | Uncommitted or untracked files, unpushed or detached commits, a diverged branch, or no commits |
+| `active` | `✓ clean` | Clean, and HEAD moved in the last 24 hours |
+| `likely_finished` | `✓ finished?` | Clean, nothing unpushed, HEAD merged into the default branch, and no HEAD activity for 24 hours |
+| `idle` | `idle 21d` | Clean, nothing unpushed, not shown merged, and no HEAD activity for 14 days |
+| `unknown` | `✓ clean` | Clean, but the signals point neither way |
+
+"Activity" is when HEAD last moved in that worktree (a commit, checkout, pull
+or reset), read from its HEAD reflog; gitperch does not track creation time or
+who made a change. The default branch is chosen as Clean up chooses it, but from
+local refs without fetching, so a merge the local refs have not seen, and any
+squash or rebase merge, reads as not merged. That costs one lookup per
+repository with linked worktrees and one `git merge-base --is-ancestor` per
+linked worktree on each refresh. A worktree created from the default branch
+looks merged at first, which is why recent activity keeps it `active`.
+
+`likely_finished` and `idle` add the medium attention reasons
+`worktree_finished` and `worktree_idle`, so they rank below unfinished work and
+above clean repositories. The details Worktree section lists the signals behind
+each state, such as `merged into origin/main` and `no HEAD activity for 6 days`.
+JSON adds a top-level `lifecycle` object beside `attention`, omitted for rows
+without one:
+
+```json
+"lifecycle": {"state": "likely_finished", "reasons": ["clean", "nothing_to_push", "merged", "inactive"]}
+```
+
+Signals, in this order: `inspection_failed`, `conflicts`,
+`operation_in_progress`, `locked`, `uncommitted_changes`, `untracked_files`,
+`diverged`, `unpushed_commits`, `detached_commits`, `no_commits`, `clean`,
+`nothing_to_push`, `no_upstream`, `merged`, `not_merged`, `merge_unknown`, then
+one of `recent_activity`, `inactive` or `activity_unknown`.
 
 ## Cleaning up worktrees and branches
 

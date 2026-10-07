@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -337,6 +338,7 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 	if w := row.Worktree; w != nil && w.Prunable {
 		return "◌ stale · directory missing", amber
 	}
+	state := lifecycleState(row)
 	switch {
 	case s.Error != "":
 		return icons.failed + " failed", danger
@@ -352,6 +354,10 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 		return "⊘ locked", muted
 	case s.Detached && s.HeadUnreferenced:
 		return "! detached", amber
+	case state == app.WorktreeFinished:
+		return icons.clean + " finished?", success
+	case state == app.WorktreeIdle:
+		return "idle " + idleDays(row), amber
 	case s.Detached:
 		return "detached", muted
 	case s.Unborn:
@@ -513,9 +519,28 @@ func worktreeLabel(row app.Row) (string, string) {
 			parts = append(parts, fmt.Sprintf("%d new", s.Untracked))
 		}
 		return strings.Join(parts, " + "), amber
-	default:
-		return "clean", muted
 	}
+	switch lifecycleState(row) {
+	case app.WorktreeFinished:
+		return "clean · finished?", success
+	case app.WorktreeIdle:
+		return "clean · idle " + idleDays(row), amber
+	}
+	return "clean", muted
+}
+
+// lifecycleState is the row's worktree lifecycle, or "" when it has none.
+func lifecycleState(row app.Row) app.WorktreeState {
+	if l := row.Lifecycle(); l != nil {
+		return l.State
+	}
+	return ""
+}
+
+// idleDays is how long HEAD had not moved, in whole days, such as "21d".
+func idleDays(row app.Row) string {
+	idle, _ := row.Inactivity()
+	return fmt.Sprintf("%dd", int(idle/(24*time.Hour)))
 }
 
 func syncLabel(row app.Row) (string, string) {
@@ -559,6 +584,10 @@ func nextStep(row app.Row) string {
 		return "HEAD is detached. Check out a branch in your shell or LazyGit to sync."
 	case s.Unborn:
 		return "Create the first commit and configure an upstream in your shell."
+	case lifecycleState(row) == app.WorktreeFinished:
+		return "Looks finished. Press c to review removal; Clean up fetches and rechecks everything first."
+	case lifecycleState(row) == app.WorktreeIdle:
+		return "Idle and clean. Check whether its branch is still needed; Clean up (c) offers removal only once it is merged."
 	case s.Upstream == "":
 		return "Configure an upstream in your shell to compare and sync this branch."
 	case !s.ComparisonKnown:

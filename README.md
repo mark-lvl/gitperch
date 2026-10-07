@@ -65,7 +65,8 @@ works less like a directory browser and more like an **attention list**.
   repositories that are only behind; clean, synchronized ones stay out of the
   way. Details and JSON list the reasons.
 - **First-class worktrees**: every linked worktree, including nested,
-  outside-root and stale ones, grouped under its repository.
+  outside-root and stale ones, grouped under its repository. Clean worktrees
+  that look merged or have sat idle are flagged for review, with the reasons.
 - **Repository details**: overview, changed files, recent commits and worktree
   state, plus a diff view.
 - **Safe synchronization**: fetch, push and fast-forward-only pull across a

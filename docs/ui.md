@@ -85,10 +85,12 @@ attention) and then to `⑂2`, so the repository name stays readable. Expanding 
 group lists each worktree as a child row beneath its main repository, joined by
 tree lines. Child rows show the same status columns as any repository; a stale
 worktree shows `stale` instead and, like a bare repository, cannot be selected.
-Search and scopes reveal matching children without expanding their group. The
-Worktree section of the details lists the whole group, including stale ones,
-with branch, state and path. The `worktrees-110x35` capture below shows an
-expanded group.
+A clean linked worktree that looks done shows `✓ finished?` or `idle 21d`
+([worktree lifecycle](usage.md#worktree-lifecycle)). Search and scopes reveal
+matching children without expanding their group. The Worktree section of the
+details lists a linked worktree's lifecycle with the signals behind it, then
+the whole group, including stale ones, with branch, state and path. The
+`worktrees-110x35` capture below shows an expanded group.
 
 ## Keyboard
 

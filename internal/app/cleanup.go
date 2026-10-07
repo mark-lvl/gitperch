@@ -197,10 +197,30 @@ func (a *Actions) PlanCleanup(ctx context.Context, paths []string) (CleanupPrevi
 	return preview, nil
 }
 
-// resolveBase fetches the cleanup remote and finds the default ref. Without
-// remotes the local main, else master, is the base.
-func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, m gitcli.Metadata, fetch bool) cleanupBase {
-	if len(m.Remotes) == 0 {
+// resolveBase fetches the cleanup remote and finds the default ref; see
+// defaultBase.
+func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, m gitcli.Metadata) cleanupBase {
+	return defaultBase(ctx, git, path, m.Remotes, func(remote string) error {
+		target, err := git.ResolveRemote(ctx, path, m, remote)
+		if err == nil {
+			err = git.Fetch(ctx, path, target)
+		}
+		return err
+	})
+}
+
+// baseResolver reads the refs that name a repository's default branch.
+type baseResolver interface {
+	RemoteDefaultRef(context.Context, string, string) (string, error)
+	ResolveCommit(context.Context, string, string) (string, error)
+}
+
+// defaultBase finds the default branch merges are judged against: the
+// remote's HEAD for origin or a sole remote, or without remotes the local
+// main, else master. A non-nil fetch refreshes the remote first; without it
+// only local refs are read.
+func defaultBase(ctx context.Context, git baseResolver, path string, remotes []string, fetch func(string) error) cleanupBase {
+	if len(remotes) == 0 {
 		for _, name := range []string{"main", "master"} {
 			if _, err := git.ResolveCommit(ctx, path, "refs/heads/"+name); err == nil {
 				return cleanupBase{ref: "refs/heads/" + name, name: name + " (local default)", branch: name}
@@ -210,19 +230,15 @@ func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, 
 	}
 	remote := ""
 	switch {
-	case slices.Contains(m.Remotes, "origin"):
+	case slices.Contains(remotes, "origin"):
 		remote = "origin"
-	case len(m.Remotes) == 1:
-		remote = m.Remotes[0]
+	case len(remotes) == 1:
+		remote = remotes[0]
 	default:
 		return cleanupBase{reason: "several remotes and none named origin"}
 	}
-	if fetch {
-		target, err := git.ResolveRemote(ctx, path, m, remote)
-		if err == nil {
-			err = git.Fetch(ctx, path, target)
-		}
-		if err != nil {
+	if fetch != nil {
+		if err := fetch(remote); err != nil {
 			return cleanupBase{reason: "preflight fetch failed: " + gitcli.SafeText(err.Error()), failed: true}
 		}
 	}
@@ -245,7 +261,7 @@ func (a *Actions) resolveBase(ctx context.Context, git CleanupGit, path string, 
 }
 
 func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path string, m gitcli.Metadata) []plannedCleanup {
-	base := a.resolveBase(ctx, git, path, m, true)
+	base := a.resolveBase(ctx, git, path, m)
 	worktrees, err := git.Worktrees(ctx, path)
 	if err != nil {
 		return []plannedCleanup{{common: m.CommonDir, item: CleanupItem{ID: string(CleanupGroup) + "\x00" + path, Group: path, Kind: CleanupGroup, Path: path, Reason: gitcli.SafeText(err.Error()), Failed: true}}}

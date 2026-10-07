@@ -152,6 +152,7 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 		if !row.LastFetch.IsZero() {
 			lines = append(lines, " Last successful fetch: "+row.LastFetch.Format("2006-01-02 15:04:05"))
 		}
+		lines = append(lines, m.lifecycleLines(*row)...)
 		lines = append(lines, m.worktreeGroupLines(*row)...)
 	}
 	if m.loadDetails != nil && !loaded {
@@ -183,6 +184,35 @@ func (m *Model) appendDetailDiagnostics(lines []string) []string {
 	}
 	if m.loadErr != "" {
 		lines = append(lines, "Load error: "+gitcli.SafeText(m.loadErr))
+	}
+	return lines
+}
+
+// lifecycleLines explains a linked worktree's lifecycle with the signals the
+// application layer inferred it from, and what Clean up would still check.
+func (m *Model) lifecycleLines(row app.Row) []string {
+	l := row.Lifecycle()
+	if l == nil {
+		return nil
+	}
+	color := muted
+	switch l.State {
+	case app.WorktreeBlocked:
+		color = danger
+	case app.WorktreeInProgress, app.WorktreeIdle:
+		color = amber
+	case app.WorktreeFinished:
+		color = success
+	}
+	lines := []string{"", m.style(" Lifecycle", accent, true) + m.style(" · "+l.State.Label(), color, false)}
+	for _, signal := range l.Reasons {
+		lines = append(lines, " - "+row.DescribeSignal(signal))
+	}
+	switch l.State {
+	case app.WorktreeFinished, app.WorktreeIdle:
+		lines = append(lines, m.style(" A suggestion only: Clean up (c) fetches, then rechecks the merge, ignored files and hidden edits before offering removal.", muted, false))
+	case app.WorktreeBlocked:
+		lines = append(lines, m.style(" Clean up keeps this worktree until the blockers are resolved.", muted, false))
 	}
 	return lines
 }

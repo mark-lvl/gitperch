@@ -24,10 +24,12 @@ func captureRows() []app.Row {
 			rows[i].Status.LastActivity = captureNow.Add(-age)
 		}
 	}
-	// design-system owns two linked worktrees: one clean, one stale.
+	// design-system owns two linked worktrees: one likely finished, one stale.
 	main := rows[1].Path
 	rows[1].Worktree = &app.WorktreeInfo{Main: true, MainPath: main}
-	fixTokens := app.Row{Repository: repository.Repository{Name: "fix-tokens", Path: main + "/.worktrees/fix-tokens"}, Status: repository.Status{Branch: "fix-tokens"}, Worktree: &app.WorktreeInfo{Linked: true, MainPath: main}}
+	// fix-tokens is merged and quiet, so it reads as likely finished.
+	fixTokens := app.Row{Repository: repository.Repository{Name: "fix-tokens", Path: main + "/.worktrees/fix-tokens"}, Status: repository.Status{Branch: "fix-tokens", InspectedAt: captureNow, LastActivity: captureNow.Add(-3 * 24 * time.Hour)},
+		Worktree: &app.WorktreeInfo{Linked: true, MainPath: main, Integration: &app.Integration{Base: "origin/main", Merged: true}}}
 	oldSpike := app.Row{Repository: repository.Repository{Name: "old-spike", Path: "/home/mark/worktrees/old-spike"}, Status: repository.Status{Branch: "old-spike"}, Worktree: &app.WorktreeInfo{Linked: true, Prunable: true, PrunableReason: "gitdir file points to non-existent location", OutsideRoots: true, MainPath: main}}
 	return append(rows, fixTokens, oldSpike)
 }

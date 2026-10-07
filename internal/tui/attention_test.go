@@ -2,9 +2,12 @@ package tui
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
 	"github.com/mark-lvl/gitperch/internal/repository"
@@ -87,5 +90,68 @@ func TestDetailsListAttentionReasons(t *testing.T) {
 	m.highlight = 5 // b-clean
 	if text := ansi.Strip(m.View().Content); strings.Contains(text, "Needs attention") || strings.Contains(text, "Next step") {
 		t.Fatalf("clean repository shows attention:\n%s", text)
+	}
+}
+
+func TestLinkedWorktreeLifecycleIsShownAndExplained(t *testing.T) {
+	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
+	linked := func(name string, idle time.Duration, merged bool) app.Row {
+		s := repository.Status{Branch: name, Upstream: "origin/" + name, ComparisonKnown: true, HeadOID: strings.Repeat("a", 40), InspectedAt: now, LastActivity: now.Add(-idle)}
+		return app.Row{Repository: repository.Repository{Name: name, Path: "/repos/main/.worktrees/" + name}, Status: s,
+			Worktree: &app.WorktreeInfo{Linked: true, MainPath: "/repos/main", Integration: &app.Integration{Base: "origin/main", Merged: merged}}}
+	}
+	main := app.Row{Repository: repository.Repository{Name: "main", Path: "/repos/main"}, Status: repository.Status{Branch: "main", Upstream: "origin/main", ComparisonKnown: true, InspectedAt: now, LastActivity: now.Add(-60 * 24 * time.Hour)},
+		Worktree: &app.WorktreeInfo{Main: true, MainPath: "/repos/main"}}
+	done, idle, busy := linked("done", 6*24*time.Hour, true), linked("idle", 21*24*time.Hour, false), linked("busy", time.Hour, true)
+	m := New(context.Background(), nil, true)
+	for _, tc := range []struct {
+		row          app.Row
+		label, color string
+	}{
+		{main, m.symbols().clean + " clean", success},
+		{done, m.symbols().clean + " finished?", success},
+		{idle, "idle 21d", amber},
+		{busy, m.symbols().clean + " clean", success},
+	} {
+		if label, color := m.primaryStatus(tc.row); label != tc.label || color != tc.color {
+			t.Errorf("%s: %q %s, want %q %s", tc.row.Name, label, color, tc.label, tc.color)
+		}
+	}
+
+	m.applySnapshot(app.Snapshot{Rows: []app.Row{main, done, idle, busy}})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 45})
+	m.attentionFirst = true
+	if got := strings.Join(visibleNames(m), ","); got != "main" {
+		t.Fatalf("collapsed group: %s", got)
+	}
+	if badge := strings.Join(m.groupBadges(main), " | "); !strings.Contains(badge, "2 need attention") {
+		t.Fatalf("badge should count finished and idle worktrees: %s", badge)
+	}
+	m.expanded["/repos/main"] = true
+	m.highlight = slices.Index(visibleNames(m), "done")
+	m.details, m.detailTab = true, 3
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"Lifecycle · likely finished", "- clean working tree", "- nothing to push to origin/done", "- merged into origin/main", "- no HEAD activity for 6 days", "A suggestion only: Clean up (c)", "clean · finished?", "clean · idle 21d"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+	m.detailTab = 0
+	view = ansi.Strip(m.View().Content)
+	for _, want := range []string{"Needs attention · medium", "linked worktree looks finished: merged into origin/main, no HEAD activity for 6 days"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("missing %q:\n%s", want, view)
+		}
+	}
+	if got := nextStep(done); !strings.HasPrefix(got, "Looks finished. Press c") {
+		t.Fatalf("finished next step: %s", got)
+	}
+	if got := nextStep(idle); !strings.HasPrefix(got, "Idle and clean.") {
+		t.Fatalf("idle next step: %s", got)
+	}
+	m.highlight = slices.Index(visibleNames(m), "main")
+	m.detailTab = 3
+	if view := ansi.Strip(m.View().Content); strings.Contains(view, "Lifecycle") {
+		t.Fatalf("the main worktree has no lifecycle:\n%s", view)
 	}
 }

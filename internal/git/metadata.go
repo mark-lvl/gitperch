@@ -53,22 +53,29 @@ func (r Runner) Metadata(ctx context.Context, path string) (Metadata, error) {
 		}
 		m.Config[key] = append(m.Config[key], value)
 	}
-	out, err = r.Run(ctx, path, "remote")
+	m.Remotes, err = r.Remotes(ctx, path)
+	return m, err
+}
+
+// Remotes lists the repository's remote names, sorted.
+func (r Runner) Remotes(ctx context.Context, path string) ([]string, error) {
+	out, err := r.Run(ctx, path, "remote")
 	if err != nil {
-		return m, err
+		return nil, err
 	}
+	var remotes []string
 	for _, remote := range strings.Split(strings.TrimSuffix(string(out.Stdout), "\n"), "\n") {
 		if remote == "" {
 			continue
 		}
 		// Fetch passes "-c remote.<name>.pruneTags", which Git splits at "=".
 		if strings.ContainsAny(remote, " \t\r\x00=") || strings.HasPrefix(remote, "-") {
-			return m, fmt.Errorf("unsupported remote name")
+			return nil, fmt.Errorf("unsupported remote name")
 		}
-		m.Remotes = append(m.Remotes, remote)
+		remotes = append(remotes, remote)
 	}
-	sort.Strings(m.Remotes)
-	return m, nil
+	sort.Strings(remotes)
+	return remotes, nil
 }
 
 // localMetadata also reports when HEAD last moved, from the reflog's mtime, so

@@ -4,7 +4,7 @@
 │      REPO                                   STATUS                                   Δ                     │
 │    ▰ api-service                            ✓ clean                                  —                     │
 │ ▌  ▰ design-system                          ● changed ↑3                             +8 -2                 │
-│    ▰ ├─ fix-tokens                          ! no upstream                            —                     │
+│    ▰ ├─ fix-tokens                          ✓ finished?                              —                     │
 │    ▰ └─ old-spike                           ◌ stale · directory missing              —                     │
 │    ▰ docs                                   ↓ 4 behind                               —                     │
 │    ▰ experiment                             ! no upstream                            —                     │
