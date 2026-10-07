@@ -3,7 +3,7 @@
 │ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │      REPO                                   BRANCH                                             STATUS                         Δ                    UPDATED   │
 │    ▱ api-service                            main                                               ✓ clean                        —                    3h ago    │
-│ ▌  ▱ design-system ⑂2 · 1 stale             feat/tokens                                        ● changed ↑3                   +12 -2               2m ago    │
+│ ▌  ▱ design-system ⑂2 ◌1 !1                 feat/tokens                                        ● changed ↑3                   +12 -2               2m ago    │
 │    ▱ docs                                   main                                               ↓ 4 behind                     —                    1d ago    │
 │    ▱ experiment                             prototype                                          ! no upstream                  —                    —         │
 │    ▱ mobile                                 main                                               × failed                       —                    7m ago    │

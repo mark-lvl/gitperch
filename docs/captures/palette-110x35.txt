@@ -3,7 +3,7 @@
 │ ────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │      REPO                                   STATUS                                   Δ                     │
 │    ▱ api-service                            ✓ clean                                  —                     │
-│ ▌  ▱ design-system ⑂2 · 1 stale             ● changed ↑3                             +8 -2                 │
+│ ▌  ▱ design-system ⑂2 ◌1 !1                 ● changed ↑3                             +8 -2                 │
 │    ▱ docs                                   ↓ 4 behind                               —                     │
 │    ▱ experiment                             ! no upstream                            —                     │
 │    ▱ mobile                                 × failed                                 —                     │

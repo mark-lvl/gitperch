@@ -67,7 +67,10 @@ terminals. `--no-color`, `NO_COLOR`, and ASCII icons remain supported.
 ## Worktrees in the list
 
 A repository with linked worktrees shows a badge while collapsed, for example
-`⑂2 · 1 stale` (two linked worktrees, one whose directory is gone). Expanding the
+`⑂2 · 1 stale · 1 needs attention` (two linked worktrees: one whose directory is
+gone, one hidden worktree that needs attention). When the name column is too
+narrow for that wording the badge shortens to `⑂2 ◌1 !1` (`◌` stale, `!` needs
+attention) and then to `⑂2`, so the repository name stays readable. Expanding the
 group lists each worktree as a child row beneath its main repository, joined by
 tree lines. Child rows show the same status columns as any repository; a stale
 worktree shows `stale` instead and, like a bare repository, cannot be selected.

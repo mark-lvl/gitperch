@@ -125,7 +125,10 @@ Ctrl+C interrupts; during operations they request cancellation and wait.
 gitperch asks Git for each repository's worktree list, so linked worktrees are
 grouped under their main repository even when they are nested inside it, live
 outside the scanned roots (marked `outside roots`), or have been deleted from
-disk. A collapsed group shows a badge such as `⑂2 · 1 stale`. `→` expands the
+disk. A collapsed group shows a badge such as `⑂3 · 1 stale · 1 needs attention`
+(three linked worktrees, one stale, one dirty, ahead or otherwise needing
+attention); where the name column is narrow it shortens to `⑂3 ◌1 !1`, then to
+`⑂3`. `→` expands the
 group, `←` collapses it, and `←` on a worktree jumps to its repository. Search
 and scopes show matching worktrees without expanding. The details Worktree
 section lists every worktree in the group with its branch, state and path.

@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The workspace groups linked worktrees under their main repository, including
   worktrees nested inside a repository, outside the scanned roots, or whose
-  directory no longer exists. `→`/`←` expand and collapse a group, and the
-  details Worktree section lists the group.
+  directory no longer exists. `→`/`←` expand and collapse a group, a collapsed
+  group's badge counts stale worktrees and hidden ones that need attention, and
+  the details Worktree section lists the group.
 - Clean up (`c`) reviews and removes stale worktree records and clean linked
   worktrees already merged into the remote default branch. Dirty, locked,
   unmerged worktrees, worktrees with ignored files and worktrees with files

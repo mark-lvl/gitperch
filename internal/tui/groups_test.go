@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mark-lvl/gitperch/internal/app"
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
 	"github.com/mark-lvl/gitperch/internal/repository"
@@ -246,5 +247,50 @@ func TestDetailsOnUnselectableRowsStateFacts(t *testing.T) {
 				t.Fatalf("group list missing:\n%s", view)
 			}
 		}
+	}
+}
+
+func TestCollapsedBadgeCountsHiddenWorktreesNeedingAttention(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	rows := groupedRows()
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	parent := rows[0]
+	// fix-auth is dirty; the stale record is counted on its own.
+	if got := m.groupBadge(parent); got != "⑂2 · 1 stale · 1 needs attention" {
+		t.Fatalf("badge: %q", got)
+	}
+	clean := groupedRows()
+	clean[1].Status = clean[0].Status
+	m.applySnapshot(app.Snapshot{Rows: clean})
+	if got := m.groupBadge(clean[0]); got != "⑂2 · 1 stale" {
+		t.Fatalf("badge without attention: %q", got)
+	}
+	extra := append(groupedRows(), app.Row{Repository: repository.Repository{Name: "wip", Path: "/home/mark/projects/api/.claude/worktrees/wip"}, Status: repository.Status{Branch: "wip", Conflicts: 1}, Worktree: &app.WorktreeInfo{Linked: true, MainPath: "/home/mark/projects/api"}})
+	m.applySnapshot(app.Snapshot{Rows: extra})
+	if got := m.groupBadge(extra[0]); got != "⑂3 · 1 stale · 2 need attention" {
+		t.Fatalf("plural badge: %q", got)
+	}
+	m.key(key("right"))
+	if got := m.groupBadge(extra[0]); got != "" {
+		t.Fatalf("expanded groups show their worktrees instead of a badge: %q", got)
+	}
+}
+
+func TestBadgeShortensBeforeTheNameDoes(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	rows := groupedRows()
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	// Room for the name and the compact badge, not the full one.
+	got := ansi.Strip(m.nameCell(rows[0], "", false, false, 14))
+	if strings.TrimRight(got, " ") != "api ⑂2 ◌1 !1" {
+		t.Fatalf("compact badge: %q", got)
+	}
+	// Plenty of room keeps the full wording.
+	if got := ansi.Strip(m.nameCell(rows[0], "", false, false, 40)); !strings.Contains(got, "api ⑂2 · 1 stale · 1 needs attention") {
+		t.Fatalf("full badge: %q", got)
+	}
+	// Barely any room still names the worktree count rather than dropping it.
+	if got := strings.TrimRight(ansi.Strip(m.nameCell(rows[0], "", false, false, 7)), " "); got != "api ⑂2" {
+		t.Fatalf("minimal badge: %q", got)
 	}
 }

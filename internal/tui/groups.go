@@ -106,26 +106,57 @@ func (m *Model) treePrefix(pos int, indices []int) string {
 	return "└─ "
 }
 
-// groupBadge summarizes a collapsed parent's worktrees, e.g. "⑂2 · 1 stale".
+// groupBadge summarizes a collapsed parent's worktrees in full, e.g.
+// "⑂3 · 1 stale · 1 needs attention".
 func (m *Model) groupBadge(row app.Row) string {
-	if !isParent(row) || m.expanded[row.Path] {
-		return ""
+	if badges := m.groupBadges(row); len(badges) > 0 {
+		return badges[0]
 	}
-	linked, stale := 0, 0
+	return ""
+}
+
+// groupBadges returns the collapsed-group badge from widest to narrowest: the
+// full wording, a compact "⑂3 ◌1 !1", and the worktree count alone. Stale
+// records are counted on their own; attention counts the other hidden
+// worktrees that would raise the group in the attention order.
+func (m *Model) groupBadges(row app.Row) []string {
+	if !isParent(row) || m.expanded[row.Path] {
+		return nil
+	}
+	linked, stale, attention := 0, 0, 0
 	for _, other := range m.rows {
 		if other.Path != row.Path && groupKey(other) == row.Path {
 			linked++
-			if other.Worktree != nil && other.Worktree.Prunable {
+			switch {
+			case other.Worktree != nil && other.Worktree.Prunable:
 				stale++
+			case m.attentionRank(other) > 0:
+				attention++
 			}
 		}
 	}
 	if linked == 0 {
-		return ""
+		return nil
 	}
-	badge := fmt.Sprintf("%s%d", m.symbols().worktree, linked)
+	count := fmt.Sprintf("%s%d", m.symbols().worktree, linked)
+	full, compact := count, count
 	if stale > 0 {
-		badge += fmt.Sprintf(" · %d stale", stale)
+		full += fmt.Sprintf(" · %d stale", stale)
+		compact += fmt.Sprintf(" ◌%d", stale)
 	}
-	return badge
+	if attention == 1 {
+		full += " · 1 needs attention"
+	} else if attention > 1 {
+		full += fmt.Sprintf(" · %d need attention", attention)
+	}
+	if attention > 0 {
+		compact += fmt.Sprintf(" !%d", attention)
+	}
+	if compact == count {
+		return []string{count}
+	}
+	if full == compact {
+		return []string{full, count}
+	}
+	return []string{full, compact, count}
 }
