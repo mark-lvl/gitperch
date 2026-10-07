@@ -7,7 +7,7 @@
 
 # gitperch
 
-**A terminal Git dashboard for keeping watch over the many repositories your AI coding agents work in.**
+**Keep agent-touched repositories and worktrees visible, synchronized and safe.**
 
 [![CI](https://github.com/mark-lvl/gitperch/actions/workflows/ci.yml/badge.svg)](https://github.com/mark-lvl/gitperch/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/mark-lvl/gitperch.svg)](https://pkg.go.dev/github.com/mark-lvl/gitperch)
@@ -17,28 +17,62 @@
 
 </div>
 
-## Why gitperch?
+gitperch is a terminal dashboard for keeping an eye on your Git repositories
+and worktrees while coding agents are busy changing them, or whenever you
+juggle more of them than you can track in your head. It shows what needs
+attention, lets you inspect what changed, safely syncs repositories and cleans
+up finished worktrees, all without visiting each directory to run
+`git status`.
 
-Agentic development spreads work out. Claude Code, Codex, Aider, Cursor and
-similar tools edit many repositories and worktrees at once, often in parallel,
-and often while you are looking at something else. Afterwards you need to know,
-fast:
+```sh
+gitperch ~/projects                   # interactive dashboard
+gitperch status ~/projects            # plain table, no TUI
+gitperch status --json ~/projects     # JSON for scripts and agents
+```
 
-- Which repositories did agents leave **dirty, conflicted or mid-operation**?
-- Which branches are **ahead, behind or diverged** from their upstream?
-- Which **linked worktrees** exist, and what state are they in?
-- What can be **safely fetched, pushed or fast-forwarded** right now?
+[Install](#installation) · [Keys](#using-the-dashboard) · [Configuration](#configuration) · [Docs](#documentation)
 
-gitperch is your perch above all of it: one keyboard-driven screen that
-discovers every repository under your project roots, ranks the ones that need
-attention, and lets you review and synchronize them without visiting each
-directory.
+## Why gitperch exists
 
-It is deliberately conservative. Agents generate a lot of change; the
-dashboard you use to review that change should never add surprises.
-gitperch is read-only by default, never force-pushes or force-removes, never
-commits, stashes or resets, only deletes worktrees and branches that are clean
-and merged, and re-validates every action right before it runs.
+Coding agents such as Claude Code, Codex, OpenCode, Aider and Cursor make it
+easy to work on several things at once. They also make it easy to lose track
+of what they left behind. After a few parallel sessions you may have
+uncommitted changes, unpushed commits, branches behind their upstream,
+half-finished merges or rebases, and old worktrees whose task ended long ago.
+
+None of that is hard to inspect one repository at a time. The hard part is
+keeping the whole picture in your head. gitperch answers questions like:
+
+- Which repositories need my attention, and what did the agents leave behind?
+- Is anything uncommitted, unpushed, behind or diverged?
+- Which worktrees are still useful, and which can go?
+- Can this repository be updated safely, and did anything change since I reviewed it?
+
+It discovers every repository and linked worktree under your project roots,
+inspects them concurrently and ranks them so conflicts and unfinished work rise
+above what is already clean. The dashboard is less a directory browser and more
+an **attention list**.
+
+## Conservative by design
+
+Repositories can change between the moment you look and the moment you act,
+especially with several terminals, editors and agents touching the same
+project. Every operation that changes state follows the same path:
+
+```text
+inspect → plan → review → revalidate → execute → refresh
+```
+
+- **Push** sends only the commit and destination you reviewed, not whatever
+  `HEAD` points to later.
+- **Pull** is fast-forward-only; it never creates a merge or rebase.
+- **Worktree cleanup** removes only clean worktrees already merged into the
+  default branch. Local changes, ignored files (such as `.env`), files hidden
+  from `git status`, operations in progress, locks and anything that changed
+  since your review all keep a worktree in place.
+- gitperch never commits, stashes, resets, rebases, force-pushes or
+  force-removes. When it cannot be confident an action is safe, it stops and
+  tells you why.
 
 ## Features
 
@@ -47,46 +81,41 @@ and merged, and re-validates every action right before it runs.
 - **Attention-first overview**: changes, untracked files, conflicts, branch,
   upstream and ahead/behind counts for every repository, sorted by what needs
   you first.
-- **Worktree inventory**: every linked worktree, including nested, outside-root
-  and stale ones, grouped under its repository.
-- **Reviewed cleanup**: prune stale worktree records and remove clean
-  worktrees already merged into the default branch, and local branches fully
-  merged into it.
+- **First-class worktrees**: every linked worktree, including nested,
+  outside-root and stale ones, grouped under its repository.
+- **Reviewed cleanup**: prune stale worktree records and remove clean, merged
+  worktrees and local branches.
 - **Repository details**: overview, changed files, recent commits and worktree
   state, plus a diff view.
 - **Safe synchronization**: fetch, push and fast-forward-only pull across a
-  selection, each with a reviewed plan, revalidation and per-repository results.
+  selection, with per-repository results.
 - **Fast navigation**: fuzzy command palette (`:` / `Ctrl+K`), filtering,
   focus mode and multi-select.
-- **Escape hatches**: open a shell or [LazyGit](https://github.com/jesseduffield/lazygit)
-  in any repository and return to a refreshed dashboard.
 - **Scriptable status**: `gitperch status` prints a plain table or versioned
   JSON for scripts, CI and agent tooling.
 - **Hardened Git execution**: no shell interpolation, bounded output and
   deadlines, no interactive credential prompts, control characters escaped and
   credentials in URLs redacted.
 
-## How it compares
+## Where gitperch fits
 
-gitperch sits between single-repository Git clients and multi-repository
-command runners: it gives you a live overview of many repositories and a small,
-guarded set of sync actions, and leaves everything else to the tools below.
+gitperch does not replace Git, lazygit or your shell. For staging, interactive
+rebases or conflict surgery it opens a shell or lazygit in the repository and
+refreshes when you return. Nor is it an agent orchestrator: it observes the Git
+state agents leave behind rather than controlling them. Use your favourite
+agent to create the work, then gitperch to answer: _what state did all of that
+leave my repositories in?_
 
 | Tool | Interface | What it is for |
 | --- | --- | --- |
-| **gitperch** | TUI + plain/JSON status | Overseeing many repositories and worktrees; fetch, push and fast-forward-only pull after review |
+| **gitperch** | TUI + plain/JSON status | Overseeing many repositories and worktrees; fetch, push, fast-forward-only pull and cleanup after review |
 | [lazygit](https://github.com/jesseduffield/lazygit) | TUI | Working inside one repository: staging, committing, rebasing |
 | [gita](https://github.com/nosarthur/gita) | CLI | Side-by-side status of registered repositories and running commands across them |
 | [myrepos](https://myrepos.branchable.com/) (`mr`) | CLI | Running commands across repositories listed in a config file, for several VCSs |
 | [multi-git-status](https://github.com/fboender/multi-git-status) | CLI | One-shot report of uncommitted, unpushed and unpulled changes under a directory |
 
-Choose gitperch when you want to see at a glance which of many repositories
-need attention, especially ones that AI agents have been working in, without
-registering each repository by hand or risking a command that rewrites history.
-It discovers repositories and linked worktrees by scanning your roots, ranks
-them by what needs you first, and deliberately cannot commit, stash, reset,
-rebase or force-push. When you need to do real work in a repository, it opens
-lazygit or a shell there and refreshes when you return.
+Unlike the multi-repository runners, gitperch needs no per-repository
+registration and understands linked worktrees.
 
 ## Installation
 
@@ -116,15 +145,8 @@ git clone https://github.com/mark-lvl/gitperch.git
 cd gitperch
 make build          # writes bin/gitperch
 ```
-## Quick start
 
-```sh
-gitperch ~/projects                   # interactive dashboard
-gitperch status ~/projects            # plain table, no TUI
-gitperch status --json ~/projects     # JSON for scripts and agents
-```
-
-Inside the dashboard:
+## Using the dashboard
 
 | Key | Action |
 | --- | --- |
@@ -134,6 +156,7 @@ Inside the dashboard:
 | `Space`, `a` | Select one / all visible |
 | `f` | Fetch selected |
 | `p` / `l` | Push / fast-forward pull (after one confirmation) |
+| `c` | Review worktree and branch cleanup |
 | `/` | Filter by name, path or branch |
 | `:` or `Ctrl+K` | Command palette |
 | `o` | Open a shell in the repository |
