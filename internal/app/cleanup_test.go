@@ -141,6 +141,26 @@ func TestCleanupMissingDefaultRefSuggestsSetHead(t *testing.T) {
 	}
 }
 
+func TestCleanupExplainsUnknownDefaultBranch(t *testing.T) {
+	repo, _ := actionTestRepoWithRemote(t)
+	actionGit(t, repo, "config", "remote.origin.followRemoteHEAD", "never")
+	actionGit(t, repo, "remote", "set-head", "origin", "--delete")
+	actionGit(t, repo, "branch", "done")
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Items) != 1 {
+		t.Fatalf("items %+v", preview.Items)
+	}
+	item := preview.Items[0]
+	if item.Kind != CleanupGroup || item.Eligible() || item.Failed() || !strings.Contains(item.Assessment.Summary(), "git remote set-head origin -a") {
+		t.Fatalf("unknown default branch: %+v", item)
+	}
+	actions.Discard(preview.ID)
+}
+
 func TestCleanupLocalDefaultWithoutRemote(t *testing.T) {
 	repo := actionTestRepo(t)
 	actionTestWrite(t, filepath.Join(repo, "f"), "x\n")
@@ -447,6 +467,52 @@ func TestCleanupDeletesBranchOfStaleWorktreeAfterPrune(t *testing.T) {
 	if out := actionGit(t, repo, "branch", "--list", "stale-br"); strings.TrimSpace(string(out)) != "" {
 		t.Fatalf("branch remains: %s", out)
 	}
+}
+
+func TestCleanupKeepsBranchOfStaleWorktreeWhenPruneIsBlocked(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	stale := filepath.Join(t.TempDir(), "stale")
+	actionGit(t, repo, "worktree", "add", "-b", "stale-br", stale)
+	os.RemoveAll(stale)
+	// A second stale record holds a commit no ref contains, so prune is refused.
+	spike := filepath.Join(t.TempDir(), "spike")
+	actionGit(t, repo, "worktree", "add", "--detach", spike)
+	actionTestWrite(t, filepath.Join(spike, "spike"), "x\n")
+	actionTestCommit(t, spike, "spike")
+	os.RemoveAll(spike)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prune := itemFor(t, preview, PruneStale, preview.Items[0].Group); prune.Eligible() {
+		t.Fatalf("prune: %+v", prune)
+	}
+	if b := branchItem(preview, "stale-br"); b == nil || b.Eligible() || !strings.Contains(b.Assessment.Summary(), "checked out in stale") {
+		t.Fatalf("branch of a stale record that stays: %+v", b)
+	}
+	actions.Discard(preview.ID)
+}
+
+func TestCleanupSkipsBranchOfStaleWorktreeWhenPruneNotChosen(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	stale := filepath.Join(t.TempDir(), "stale")
+	actionGit(t, repo, "worktree", "add", "-b", "stale-br", stale)
+	os.RemoveAll(stale)
+	actions := NewActions(gitcli.Service{}, 1)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := branchItem(preview, "stale-br")
+	if b == nil || !b.Eligible() {
+		t.Fatalf("branch of a prunable record: %+v", b)
+	}
+	results, _ := actions.ExecuteCleanup(context.Background(), preview.ID, []string{b.ID}, nil)
+	if len(results) != 1 || results[0].State != Skipped || !strings.Contains(results[0].Message, "checked out in stale") {
+		t.Fatalf("results %+v", results)
+	}
+	actionGit(t, repo, "rev-parse", "--verify", "refs/heads/stale-br")
 }
 
 func TestCleanupDefaultBranchSkippedForRemoteNameWithSlash(t *testing.T) {

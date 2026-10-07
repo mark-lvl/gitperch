@@ -42,8 +42,12 @@ type CleanupItem struct {
 func (i CleanupItem) Eligible() bool { return i.Assessment.Allowed() }
 
 // Failed reports a planning step that failed for a whole repository, such as
-// its preflight fetch; such items are never runnable.
-func (i CleanupItem) Failed() bool { return i.Kind == CleanupGroup }
+// its preflight fetch; such items are never runnable. A repository whose
+// default branch is unknown also gets a group item, but only to say why its
+// branches were not considered: that is not a failure.
+func (i CleanupItem) Failed() bool {
+	return i.Kind == CleanupGroup && !i.Assessment.Has(CleanupDefaultBranchUnknown)
+}
 
 // groupFailure reports a planning step that failed for the repository at path.
 func groupFailure(path string, code CleanupCode, text string) CleanupItem {
@@ -291,7 +295,9 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		item.ID = string(item.Kind) + "\x00" + group + "\x00" + item.Path + "\x00" + item.Branch
 		out = append(out, plannedCleanup{item: item, common: m.CommonDir})
 	}
-	if base.reason.Code == CleanupFetchFailed { // eligible prune items below do not depend on the base
+	// Without a base no branch is considered, so the review says why. Eligible
+	// prune items below do not depend on the base.
+	if base.ref == "" && base.reason.Code != "" {
 		add(CleanupItem{Kind: CleanupGroup, Path: group, Assessment: Assess(base.reason)})
 	}
 	var stale []string
@@ -313,16 +319,20 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		item.Assessment = assessWorktree(ctx, git, wt, base, nil)
 		add(item)
 	}
+	pruned := false
 	if len(stale) > 0 {
 		sort.Strings(stale)
-		add(CleanupItem{Kind: PruneStale, Path: group, Stale: stale, Assessment: assessPrune(ctx, git, path, worktrees, stale)})
+		prune := CleanupItem{Kind: PruneStale, Path: group, Stale: stale, Assessment: assessPrune(ctx, git, path, worktrees, stale)}
+		pruned = prune.Eligible()
+		add(prune)
 	}
 	if base.ref == "" {
 		return out
 	}
 	// A worktree planned for removal frees its branch, per worktree: the same
-	// branch can be checked out in several. A stale record frees it too, because
-	// prune runs first, unless it is locked (prune never removes those).
+	// branch can be checked out in several. An unlocked stale record frees it
+	// too when prune may run, because prune runs first; revalidation keeps the
+	// branch if the record is still there.
 	removed := map[string]bool{}
 	for _, p := range out {
 		if p.item.Kind == RemoveWorktree && p.item.Eligible() {
@@ -331,9 +341,10 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 	}
 	checkedOut := map[string]string{}
 	for _, wt := range worktrees {
-		if wt.Branch != "" && holdsBranch(wt) && !removed[wt.Path] {
-			checkedOut[wt.Branch] = wt.Path
+		if wt.Branch == "" || removed[wt.Path] || pruned && isStale(wt) && !wt.Locked {
+			continue
 		}
+		checkedOut[wt.Branch] = wt.Path
 	}
 	busy := operationBlocker(ctx, git, worktrees)
 	branches, err := git.LocalBranches(ctx, path)
@@ -422,11 +433,6 @@ func rescueCommand(wt gitcli.Worktree) string {
 // isStale reports a linked worktree whose record outlived its directory.
 // Planning and revalidation share it so the reviewed set compares equal.
 func isStale(wt gitcli.Worktree) bool { return wt.Prunable || missingDir(wt.Path) }
-
-// holdsBranch reports whether a worktree keeps its branch checked out. Only a
-// prunable record frees it; a locked one stays (its directory may be on a
-// drive that is not mounted) and prune never removes it.
-func holdsBranch(wt gitcli.Worktree) bool { return !isStale(wt) || wt.Locked }
 
 // operationBlocker returns why no branch may be deleted while a worktree is
 // mid rebase, bisect, merge or similar: Git then lists that worktree as
@@ -866,9 +872,11 @@ func revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) Cl
 		}
 		return changed("worktree no longer exists")
 	case DeleteBranch:
-		// update-ref does not look at worktrees, so check them here.
+		// update-ref does not look at worktrees, so check them here. Any record
+		// still naming the branch keeps it, stale ones included: prune runs
+		// first in the group, so a stale record left here was not pruned.
 		for _, wt := range worktrees {
-			if wt.Branch == item.Branch && holdsBranch(wt) {
+			if wt.Branch == item.Branch {
 				return Assess(CleanupReason{Code: CleanupCheckedOutElsewhere, Text: "checked out in " + gitcli.SafeText(filepath.Base(wt.Path))})
 			}
 		}

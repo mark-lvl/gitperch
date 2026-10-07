@@ -6,6 +6,7 @@ import (
 	"github.com/mark-lvl/gitperch/internal/discovery"
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
 	"io"
+	"slices"
 	"strings"
 	"text/tabwriter"
 )
@@ -57,6 +58,7 @@ func WriteTable(w io.Writer, rows []Row) error {
 			ahead = fmt.Sprint(s.Ahead)
 			behind = fmt.Sprint(s.Behind)
 		}
+		attention := row.Attention()
 		var markers []string
 		if s.Dirty() {
 			markers = append(markers, "dirty")
@@ -80,7 +82,9 @@ func WriteTable(w io.Writer, rows []Row) error {
 		if l := row.Lifecycle(); l != nil && (l.State == WorktreeFinished || l.State == WorktreeIdle) {
 			markers = append(markers, l.State.Label()+" worktree")
 		}
-		if s.Upstream == "" && (row.Worktree == nil || !row.Worktree.Prunable && !row.Worktree.Bare) {
+		// The same rule as the attention column: detached, unborn, failed,
+		// stale and bare rows have no branch whose upstream could be missing.
+		if slices.Contains(attention.Reasons, ReasonNoUpstream) {
 			markers = append(markers, "no upstream")
 		}
 		if s.Synchronized() {
@@ -92,7 +96,7 @@ func WriteTable(w io.Writer, rows []Row) error {
 		if s.Operation != "" {
 			markers = append(markers, "operation: "+s.Operation)
 		}
-		if _, err := fmt.Fprintf(tw, "%s / %s\t%s\tchanges:%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\n", gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), s.Changes, s.Untracked, s.Conflicts, ahead, behind, gitcli.SafeText(s.Upstream), gitcli.SafeText(strings.Join(markers, ", ")), row.Attention().Level); err != nil {
+		if _, err := fmt.Fprintf(tw, "%s / %s\t%s\tchanges:%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\n", gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), s.Changes, s.Untracked, s.Conflicts, ahead, behind, gitcli.SafeText(s.Upstream), gitcli.SafeText(strings.Join(markers, ", ")), attention.Level); err != nil {
 			return err
 		}
 	}

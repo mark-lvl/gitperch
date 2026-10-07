@@ -88,9 +88,14 @@ func attachWorktrees(ctx context.Context, rows []Row, service GitService, worker
 	if !ok || !lister.SupportsWorktreeInventory(ctx) {
 		return rows, nil // older Git: the feature is off, without warnings
 	}
+	// Every row is matched by identity, including rows whose inspection
+	// failed: they have no common directory to be grouped by, but a healthy
+	// member's listing still reports them and must not add them again.
+	byIdentity := map[string]int{}
 	groups := map[string][]int{}
 	var order []string
 	for i, row := range rows {
+		byIdentity[identity(row.Path)] = i
 		common := row.Status.CommonDir
 		if row.Status.Error != "" || common == "" {
 			continue
@@ -134,12 +139,14 @@ func attachWorktrees(ctx context.Context, rows []Row, service GitService, worker
 			warnings = append(warnings, discovery.Warning{Path: rows[groups[common][0]].Path, Message: "worktree list: " + gitcli.SafeText(errs[g].Error())})
 			continue
 		}
-		byIdentity := map[string]int{}
-		for _, i := range groups[common] {
-			byIdentity[identity(rows[i].Path)] = i
+		// A row from another repository never joins this group, even when a
+		// stale record names its path.
+		member := func(path string) (int, bool) {
+			i, ok := byIdentity[identity(path)]
+			return i, ok && (rows[i].Status.Error != "" || rows[i].Status.CommonDir == common)
 		}
 		mainPath := lists[g][0].Path
-		if i, ok := byIdentity[identity(mainPath)]; ok {
+		if i, ok := member(mainPath); ok {
 			mainPath = rows[i].Path
 		}
 		for _, wt := range lists[g] {
@@ -150,7 +157,7 @@ func attachWorktrees(ctx context.Context, rows []Row, service GitService, worker
 				wt.PrunableReason = "directory missing"
 			}
 			info := WorktreeInfo{Main: wt.Main, Linked: !wt.Main, Bare: wt.Bare, Locked: wt.Locked, LockReason: gitcli.SafeText(wt.LockReason), Prunable: wt.Prunable, PrunableReason: gitcli.SafeText(wt.PrunableReason), MainPath: mainPath}
-			if i, ok := byIdentity[identity(wt.Path)]; ok {
+			if i, ok := member(wt.Path); ok {
 				rows[i].Worktree = &info
 				continue
 			}

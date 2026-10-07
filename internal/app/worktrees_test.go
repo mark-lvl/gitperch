@@ -114,6 +114,35 @@ func TestLoadMatchesSymlinkedWorktreePaths(t *testing.T) {
 	}
 }
 
+func TestLoadListsUninspectableWorktreeOnce(t *testing.T) {
+	for _, broken := range []string{"linked", "main"} {
+		t.Run(broken, func(t *testing.T) {
+			root := t.TempDir()
+			repo := filepath.Join(root, "repo")
+			actionGit(t, root, "init", "-b", "main", repo)
+			actionGit(t, repo, "config", "user.name", "Test")
+			actionGit(t, repo, "config", "user.email", "test@example.invalid")
+			actionTestWrite(t, filepath.Join(repo, "f"), "x\n")
+			actionTestCommit(t, repo, "initial")
+			wt := filepath.Join(root, "wt")
+			actionGit(t, repo, "worktree", "add", "-b", "wt", wt)
+			index, path := filepath.Join(repo, ".git", "worktrees", "wt", "index"), wt
+			if broken == "main" {
+				index, path = filepath.Join(repo, ".git", "index"), repo
+			}
+			actionTestWrite(t, index, "not an index")
+			snapshot := loadRows(t, root)
+			if len(snapshot.Rows) != 2 {
+				t.Fatalf("rows %+v", snapshot.Rows)
+			}
+			row := rowByPath(t, snapshot.Rows, path)
+			if row.Status.Error == "" || row.Worktree == nil || row.Worktree.Main != (broken == "main") || row.Worktree.MainPath != repo {
+				t.Fatalf("broken %s row: %+v %+v", broken, row.Status, row.Worktree)
+			}
+		})
+	}
+}
+
 func TestLoadWarnsWhenWorktreeListFails(t *testing.T) {
 	repo := actionTestRepo(t)
 	actionTestWrite(t, filepath.Join(repo, "f"), "x\n")
@@ -164,6 +193,9 @@ func TestWriteTableMarksWorktreeStates(t *testing.T) {
 		{Repository: repository.Repository{Name: "stale", Path: "/x/stale"}, Worktree: &WorktreeInfo{Linked: true, Prunable: true, PrunableReason: "directory missing"}},
 		{Repository: repository.Repository{Name: "bare", Path: "/x/bare"}, Worktree: &WorktreeInfo{Main: true, Bare: true}},
 		{Repository: repository.Repository{Name: "locked", Path: "/x/locked"}, Worktree: &WorktreeInfo{Linked: true, Locked: true}},
+		{Repository: repository.Repository{Name: "detached", Path: "/x/detached"}, Status: repository.Status{Detached: true}},
+		{Repository: repository.Repository{Name: "unborn", Path: "/x/unborn"}, Status: repository.Status{Branch: "main", Unborn: true}},
+		{Repository: repository.Repository{Name: "broken", Path: "/x/broken"}, Status: repository.Status{Error: "index corrupt"}},
 	}
 	var out strings.Builder
 	if err := WriteTable(&out, rows); err != nil {
@@ -176,6 +208,6 @@ func TestWriteTableMarksWorktreeStates(t *testing.T) {
 		}
 	}
 	if strings.Count(got, "no upstream") != 1 {
-		t.Errorf("stale and bare rows must not report no upstream:\n%s", got)
+		t.Errorf("only the locked branch row may report no upstream, as Attention does:\n%s", got)
 	}
 }
