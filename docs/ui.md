@@ -152,7 +152,9 @@ automatic refresh timer, or unsafe confirmation bypass is introduced.
 
 The deterministic captures use test fixtures, rendered by the production view.
 PNG captures are rasterized from its actual ANSI output. Like terminals, the
-rasterizer draws block elements and braille as shapes rather than font glyphs:
+rasterizer draws block elements and braille as shapes rather than font glyphs.
+It also draws `⑂`, which its font (DejaVu Sans Mono) lacks and terminals take
+from a fallback font:
 
 - [Wide, 160×45](captures/workspace-160x45.png) · [text](captures/workspace-160x45.txt)
 - [Medium, 110×35](captures/workspace-110x35.png) · [text](captures/workspace-110x35.txt)

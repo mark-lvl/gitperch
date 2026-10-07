@@ -23,6 +23,9 @@ QUADRANTS = {0x2596: 'bl', 0x2597: 'br', 0x2598: 'tl', 0x2599: 'tl bl br', 0x259
              0x259B: 'tl tr bl', 0x259C: 'tl tr br', 0x259D: 'tr', 0x259E: 'tr bl', 0x259F: 'tr bl br'}
 CORNERS = {'tl': (0, 0), 'tr': (.5, 0), 'bl': (0, .5), 'br': (.5, .5)}
 BRAILLE = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (0, 3), (1, 3)]
+# DejaVu Sans Mono has no ⑂ (U+2442), which terminals take from a fallback font.
+# Drawn instead at digit height: two prongs and a bar above a centred stem.
+SHAPES = {0x2442: [(.1, .2, .3, .6), (.7, .2, .9, .6), (.1, .5, .9, .6), (.4, .6, .6, .8)]}
 
 def block_rects(ch):
     """Cell fractions (x0, y0, x1, y1) filled by a U+2580-U+259F block element."""
@@ -45,8 +48,9 @@ def block_rects(ch):
 
 def draw_glyph(draw, data, px, py, cw, ch, fg, font):
     """Terminals draw block elements and braille themselves so cells join
-    without seams; the font draws everything else."""
-    rects = block_rects(data) if len(data) == 1 else None
+    without seams; SHAPES covers glyphs the font lacks. The font draws
+    everything else."""
+    rects = (block_rects(data) or SHAPES.get(ord(data))) if len(data) == 1 else None
     if rects:
         for x0, y0, x1, y1 in rects:
             draw.rectangle((px+round(x0*cw), py+round(y0*ch), px+round(x1*cw)-1, py+round(y1*ch)-1), fill=fg)
