@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-07
+
 ### Added
 
 - `gitperch status --json` reports an `attention` object per repository with a
@@ -46,7 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   even at the same commit, and asks you to review again. Worktree reasons
   read like attention reasons: `dirty (3 files)` is now
   `2 uncommitted files; 1 untracked file`.
-
 - A new logo: a songbird perched on a branch of commits that forks. The
   README, icon and the mark the dashboard draws while the first scan runs and
   when no repositories are found all use it. The original artwork is
@@ -184,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instructions (`AGENTS.md`), issue and pull request templates, and Dependabot
   configuration.
 
-[Unreleased]: https://github.com/mark-lvl/gitperch/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mark-lvl/gitperch/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/mark-lvl/gitperch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mark-lvl/gitperch/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mark-lvl/gitperch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mark-lvl/gitperch/releases/tag/v0.1.0
