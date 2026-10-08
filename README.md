@@ -15,7 +15,7 @@ _gitperch doesn't manage your coding agents. It manages the Git state they — o
 [![Go Reference](https://pkg.go.dev/badge/github.com/mark-lvl/gitperch.svg)](https://pkg.go.dev/github.com/mark-lvl/gitperch)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-![gitperch workspace view](docs/captures/workspace-110x35.png)
+![gitperch demo: the dashboard lists repositories and agent worktrees by status, then shows a diff, a fast-forward pull, a push and a reviewed worktree cleanup](docs/assets/demo.gif)
 
 </div>
 
