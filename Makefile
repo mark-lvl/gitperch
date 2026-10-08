@@ -17,7 +17,8 @@ build:
 	$(GO) build -ldflags "-X main.version=$(VERSION)" -o bin/gitperch ./cmd/gitperch
 install-dev:
 	bash scripts/install-dev.sh
-# Linux release archives and checksums.txt under dist/, as published on GitHub.
+# Linux and macOS release archives, install.sh and checksums.txt under dist/,
+# as published on GitHub.
 dist:
 	GO=$(GO) bash scripts/build-release.sh $(VERSION)
 # Mirrors CI.

@@ -1,8 +1,8 @@
-# WSL2 dashboard smoke check
+# Dashboard smoke check
 
-Run in a WSL2 terminal after `make build`. Use the local demo for every
-mutation check; it creates disposable worktrees and a bare remote under `/tmp`
-and performs no network access.
+Run in a real terminal on Linux, WSL2 or macOS after `make build`. Use the
+local demo for every mutation check; it creates disposable worktrees and a bare
+remote under `$TMPDIR` (or `/tmp`) and performs no network access.
 
 1. Create and open the demo:
 
@@ -86,7 +86,7 @@ and performs no network access.
 14. Redirect default-command output to a file and confirm it explains `status`.
     Run `bin/gitperch status --json .` redirected and confirm valid JSON instead.
 
-Record exact commands, kernel/terminal context, results and untested behavior
+Record exact commands, OS/terminal context, results and untested behavior
 in the implementation log when asked to update it; a pseudo-terminal run is
-distinct from a Windows Terminal check. Do not describe an unperformed manual
-check as passed.
+distinct from a check in a terminal emulator such as Windows Terminal, macOS
+Terminal or iTerm2. Do not describe an unperformed manual check as passed.
