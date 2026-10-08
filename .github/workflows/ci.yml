@@ -26,9 +26,11 @@ jobs:
       - name: Formatting
         if: runner.os == 'Linux'
         run: test -z "$(gofmt -l .)"
-      - name: Shellcheck installer
+      - name: Shellcheck
         if: runner.os == 'Linux'
-        run: shellcheck --shell=sh scripts/install.sh
+        run: |
+          shellcheck --shell=sh scripts/install.sh
+          shellcheck scripts/smoke-release.sh
       - name: Test
         run: go test ./...
       - name: Race
@@ -37,3 +39,8 @@ jobs:
         run: go vet ./...
       - name: Build
         run: go build ./cmd/gitperch
+
+  package:
+    uses: ./.github/workflows/package.yml
+    with:
+      version: 0.0.0-ci

@@ -67,11 +67,30 @@ The release workflow then:
 - copies `scripts/install.sh` to the release as `install.sh`, which
   `releases/latest/download/install.sh` serves to the one-line installer, and
   writes `checksums.txt` (SHA-256) for the archives and the script;
-- creates the GitHub release `vX.Y.Z` with the changelog section as its notes.
+- smoke-tests those exact files on `ubuntu-latest`, `macos-latest` (Apple
+  Silicon) and `macos-15-intel` with `scripts/smoke-release.sh`: it installs
+  them with the release's `install.sh` from a local copy of the release
+  layout, checks that the binary is native and reports the tag's version, runs
+  `--help`, then runs `status` and `status --json` against
+  [`scripts/demo.sh`](development.md#demo-workspace) and compares every
+  scenario with the expected result;
+- creates the GitHub release `vX.Y.Z` with the changelog section as its notes,
+  uploading the files that passed the smoke test.
+
+CI runs the same build and smoke test with the placeholder version `0.0.0-ci`
+on every push and pull request, so packaging problems show up before a tag.
 
 Archives are reproducible: rebuilding a tag with the same Go version gives the
 same checksums. Build them locally with `make dist` (version from the current
 tag) or `make dist VERSION=0.2.0`; this needs GNU tar, so run it on Linux.
+`make dist` replaces `dist/`. Smoke-test the result with:
+
+```sh
+scripts/smoke-release.sh dist 0.2.0
+```
+
+It needs `curl`, `jq` and `file`, uses no network, and ignores your Git and
+gitperch configuration.
 
 The installer finds the latest version from the file names in
 `releases/latest/download/checksums.txt`, so keep the archive naming above and

@@ -1,0 +1,52 @@
+name: Package
+
+# Builds the release archives once, then installs them with the release's
+# install.sh on each supported platform and runs the installed binary against
+# scripts/demo.sh. CI calls this with a placeholder version; the release
+# workflow calls it with the tag's version and publishes the tested files.
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build archives
+        env:
+          VERSION: ${{ inputs.version }}
+        run: scripts/build-release.sh "$VERSION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - name: Install and run the release
+        env:
+          VERSION: ${{ inputs.version }}
+        run: scripts/smoke-release.sh dist "$VERSION"
