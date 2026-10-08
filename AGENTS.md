@@ -34,6 +34,6 @@ go run ./cmd/gitperch status --json .
 - After TUI changes, update render captures as described in
   `docs/ui.md#render-captures-and-validation`.
 - Add an entry under `Unreleased` in `CHANGELOG.md` for user-visible changes.
-- Do not bump dependencies, create releases or tags, push, or change the
-  license unless asked. Releases follow `docs/releasing.md`.
+- Do not bump Go module dependencies, create releases or tags, push, or change
+  the license unless asked. Releases follow `docs/releasing.md`.
 - Use Conventional Commit messages.
