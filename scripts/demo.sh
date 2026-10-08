@@ -4,6 +4,8 @@ set -euo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 demo_root=$(mktemp -d "${TMPDIR:-/tmp}/gitperch-demo.XXXXXX")
+# gitperch skips roots behind symlinks, such as macOS's /var -> /private/var.
+demo_root=$(cd -- "$demo_root" && pwd -P)
 # Remove a half-built demo on failure; success keeps it for inspection.
 trap 'rm -rf -- "$demo_root"' EXIT
 mkdir -p "$demo_root/remotes" "$demo_root/workspace"

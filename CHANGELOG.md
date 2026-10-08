@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `scripts/demo.sh` prints a path without symlinks, so `gitperch status` lists
+  the demo repositories on macOS, where the temporary directory sits under the
+  `/var` -> `/private/var` symlink.
+
 ## [0.4.0] - 2026-10-07
 
 ### Added
