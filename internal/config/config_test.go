@@ -214,14 +214,14 @@ func TestLoadGitHubSettings(t *testing.T) {
 	if err != nil || !cfg.GitHub.Enabled || len(cfg.GitHub.Hosts) != 0 {
 		t.Fatalf("defaults: %+v, %v", cfg.GitHub, err)
 	}
-	cfg, err = Load(writeConfig(t, "[github]\nenabled = false\nhosts = [\"GHE.Example.com\", \"git.corp.example.\"]\n"), true)
+	cfg, err = Load(writeConfig(t, "[github]\nenabled = false\nhosts = [\"GHE.Example.com\", \"git.corp.example.\", \"ghe.example.com\"]\n"), true)
 	if err != nil || cfg.GitHub.Enabled || strings.Join(cfg.GitHub.Hosts, ",") != "ghe.example.com,git.corp.example" {
 		t.Fatalf("explicit: %+v, %v", cfg.GitHub, err)
 	}
 	if cfg, err := Load(writeConfig(t, "[github]\nhosts = []\n"), true); err != nil || !cfg.GitHub.Enabled {
 		t.Fatalf("enabled stays the default: %+v, %v", cfg.GitHub, err)
 	}
-	for _, host := range []string{"https://ghe.example.com", "ghe.example.com/team", "ghe.example.com:8443", " ", "", "-ghe.example.com", "ghe..example.com", "ghe example.com"} {
+	for _, host := range []string{"https://ghe.example.com", "ghe.example.com/team", "ghe.example.com:8443", " ", "", "-ghe.example.com", "ghe..example.com", "ghe example.com", "\u212aghe.example.com", strings.Repeat("a", 64) + ".example.com"} {
 		if _, err := Load(writeConfig(t, "[github]\nhosts = [\""+host+"\"]\n"), true); err == nil || !strings.Contains(err.Error(), "github.hosts entry") {
 			t.Errorf("host %q: %v", host, err)
 		}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -59,8 +60,9 @@ type GitHub struct {
 	Hosts []string
 }
 
-// hostName is a bare DNS name: no scheme, port, path or whitespace.
-var hostName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$`)
+// hostName is a bare ASCII DNS name with labels of at most 63 characters: no
+// scheme, port, path or whitespace.
+var hostName = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 
 // Workspace defines discovery settings for a group of roots.
 type Workspace struct {
@@ -138,11 +140,15 @@ func Load(path string, explicit bool) (Config, error) {
 			cfg.GitHub.Enabled = *raw.GitHub.Enabled
 		}
 		for _, host := range raw.GitHub.Hosts {
-			name := strings.ToLower(strings.TrimSuffix(host, "."))
+			// Validate before lower-casing: ToLower maps some non-ASCII
+			// letters, such as the Kelvin sign, to ASCII ones.
+			name := strings.TrimSuffix(host, ".")
 			if len(name) > 253 || !hostName.MatchString(name) {
 				return Config{}, fmt.Errorf("github.hosts entry %q must be a host name such as github.example.com", host)
 			}
-			cfg.GitHub.Hosts = append(cfg.GitHub.Hosts, name)
+			if name = strings.ToLower(name); !slices.Contains(cfg.GitHub.Hosts, name) {
+				cfg.GitHub.Hosts = append(cfg.GitHub.Hosts, name)
+			}
 		}
 	}
 	if raw.DefaultWorkspace != nil {
