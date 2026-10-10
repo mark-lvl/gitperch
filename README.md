@@ -79,7 +79,8 @@ works less like a directory browser and more like an **attention list**.
   JSON for scripts, CI and agent tooling.
 - **Pull requests** (optional, with [gh](https://cli.github.com)): each
   branch's pull request, review and CI checks in the dashboard and in
-  `gitperch status --github`.
+  `gitperch status --github`. Clean up also recognizes squash- and
+  rebase-merged branches.
 
 ## Conservative by design
 
@@ -95,9 +96,10 @@ inspect → plan → review → revalidate → execute → refresh
   `HEAD` points to later.
 - **Pull** is fast-forward-only; it never creates a merge or rebase.
 - **Worktree cleanup** removes only clean worktrees already merged into the
-  default branch. Local changes, ignored files (such as `.env`), files hidden
-  from `git status`, operations in progress, locks and anything that changed
-  since your review all keep a worktree in place.
+  default branch, by Git or, with gh, through a pull request whose head is
+  exactly the local commit. Local changes, ignored files (such as `.env`),
+  files hidden from `git status`, operations in progress, locks and anything
+  that changed since your review all keep a worktree in place.
 - **Git runs hardened**: no shell, deadlines, bounded output, no credential
   prompts; control characters are escaped and URL credentials redacted.
 

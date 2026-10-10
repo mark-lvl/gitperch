@@ -249,7 +249,7 @@ Items that are kept stay listed below with a status and every reason found:
 | --- | --- |
 | `blocked` | Running it would lose work or disturb Git: changes, untracked, ignored or hidden files, conflicts, an operation in progress, a lock, unpushed or diverged commits, a commit no ref reaches, a branch still checked out, or state that changed since review |
 | `unknown` | A check could not be made, such as the default branch or a merge check, so safety is not established |
-| `review` | Nothing at risk was found, but Git cannot show the work is finished: not merged into the default branch (squash and rebase merges look like this), no upstream, or an upstream that is gone |
+| `review` | Nothing at risk was found, but Git cannot show the work is finished: not merged into the default branch (squash and rebase merges look like this unless gh shows them), no upstream, or an upstream that is gone |
 | `failed` | A step for the whole repository failed, such as the preflight fetch |
 
 Only items whose every check passed can be ticked; gitperch never runs a
@@ -263,8 +263,8 @@ results.
 | Item | Removed when | Command |
 | --- | --- | --- |
 | Stale worktree records (one item per repository) | At least one record is stale (directory missing) and not locked, and every such record's HEAD commit is reachable from a branch, remote-tracking branch or tag | `git worktree prune` |
-| Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, has no files marked assume-unchanged or (present) skip-worktree, and its HEAD is reachable from the default branch | `git worktree remove <path>` |
-| Local branch | Its tip is reachable from the default ref, it is not the default branch, and no remaining worktree has it checked out | `git update-ref --no-deref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
+| Linked worktree | It exists, is not the main worktree, is not locked, has no changes, untracked files or conflicts, has no operation in progress, contains no ignored files, has no files marked assume-unchanged or (present) skip-worktree, and its HEAD is reachable from the default branch or GitHub merged its pull request with exactly that HEAD | `git worktree remove <path>` |
+| Local branch | Its tip is reachable from the default ref or GitHub merged its pull request with exactly that tip, it is not the default branch, and no remaining worktree has it checked out | `git update-ref --no-deref -d refs/heads/<name> <commit>`, then `git config --local --remove-section branch.<name>` |
 
 Reasons a worktree is kept include `3 uncommitted files`, `1 untracked file`,
 `locked: agent session`, `4 ignored file(s) (.env, node_modules/, …)`,
@@ -298,8 +298,15 @@ files another program writes in the instant between that check and
 `git worktree remove` cannot be protected.
 
 "Merged" means the worktree's HEAD is reachable from `refs/remotes/<remote>/HEAD`
-after the fresh fetch. There is no squash or rebase-merge detection: a branch
-merged that way shows as not merged and is kept. A repository without a remote
+after the fresh fetch. Git cannot see squash or rebase merges. With gh
+([GitHub pull requests](#github-pull-requests)), the review also asks GitHub,
+never from the cache, about each unmerged branch with an upstream on GitHub:
+a pull request merged into its repository's default branch whose head commit
+is exactly the branch tip or the worktree's HEAD counts as merged, shown as
+`merged via PR #42 into main on GitHub`. Every other check still applies. A
+pull request still open, merged at another commit or into another branch, or
+closed keeps the item for review with that reason, as does a failed GitHub
+check. Without gh, such merges show as not merged and are kept. A repository without a remote
 uses local `main`, else `master`, labelled "local default". When the remote's
 default branch is unknown, no worktree in the repository is eligible for
 removal and no branch is considered; the review shows the reason as a kept
@@ -336,6 +343,12 @@ moved since, it is skipped and nothing is lost. Afterwards the branch's
 branch leaves a restore command in Diagnostics (`d`) under Batch results, for
 example `git branch feat/old-login 9f3c2a7d41b86e05c1d2f3a4b5c6d7e8f9a0b1c2`;
 the status line points to it with "d restore commands".
+A branch deleted on GitHub's evidence alone has commits no other ref reaches,
+which `git gc` may eventually drop; its restore command adds a fallback that
+fetches them from the pull request, for example
+`git branch feat/x <commit> || git fetch origin 'refs/pull/42/head:refs/heads/feat/x'`.
+For a fork's pull request into its parent, the fallback fetches from the
+parent's URL.
 The same commands, naming the repository (`git -C <repository> branch …`) so
 they work from any directory, are appended to
 `$XDG_STATE_HOME/gitperch/cleanup.log` (by default
@@ -487,6 +500,7 @@ The dashboard does not stage, commit, stash, reset, clean, rebase, resolve
 conflicts, create branches, configure upstreams, force push, or create, merge
 or comment on pull requests. It does not
 force-remove worktrees or delete unmerged work; the only branches it deletes
-are fully merged ones, after review. It does not support triangular push workflows, multiple push URLs, arbitrary push
+are fully merged ones, by Git or through a GitHub pull request with exactly
+their commit, after review. It does not support triangular push workflows, multiple push URLs, arbitrary push
 refspecs, or headless bulk mutation. See [plan.md](plan.md) for the full v0.1
 scope and action policy.

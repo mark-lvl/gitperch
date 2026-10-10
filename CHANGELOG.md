@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `✓ finished?` after a squash or rebase merge, other branches show
   `✓ merged #42` and the `pr_merged` attention reason, and lifecycle JSON
   gains the `merged_pull_request` signal.
+- Clean up removes squash- and rebase-merged worktrees and branches when a
+  fresh GitHub check shows their pull request merged into the default branch
+  with exactly their commit; every other check still applies. Such a branch's
+  restore command falls back to fetching GitHub's `refs/pull/<N>/head`. Pull
+  requests that prove nothing (still open, merged at another commit or into
+  another branch, closed) and failed checks are listed as review reasons.
 
 ## [0.4.1-rc.1] - 2026-10-08
 

@@ -44,6 +44,7 @@ func runTUI(ctx context.Context, cfg config.Config, ws config.Workspace, noColor
 	// Without gh, Git 2.36 or [github] enabled, the dashboard never runs gh.
 	if gh, _, err := newGitHub(ctx, cfg, read); err == nil {
 		model.EnableGitHub(gh)
+		actions.SetGitHub(gh)
 	}
 	model.Configure(strings.Join(ws.Paths, ", "), cfg.UI.Icons, cfg.UI.DefaultFocus)
 	model.SetAutoRefresh(time.Duration(cfg.UI.RefreshSeconds) * time.Second)
