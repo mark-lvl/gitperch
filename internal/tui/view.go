@@ -81,6 +81,9 @@ func (m *Model) layout() dashboardLayout {
 				}
 			}
 			desired = max(6, count+5)
+			if hasPullRequestLine(*row) {
+				desired++
+			}
 		}
 		// The card grows into rows the list does not need, keeping a margin
 		// below the list; a long list still leaves it a third of the screen.
@@ -167,6 +170,9 @@ func (m *Model) summaryLineAt(w int) string {
 		right += " " + m.chip(fmt.Sprintf("! %d attention", attention), color)
 	}
 	activity := ""
+	if m.githubPending > 0 {
+		activity = "checking GitHub"
+	}
 	if m.refreshing() {
 		activity = "refreshing"
 	}
@@ -338,7 +344,7 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 	if w := row.Worktree; w != nil && w.Prunable {
 		return "◌ stale · directory missing", amber
 	}
-	state := lifecycleState(row)
+	state, open := lifecycleState(row), openPullRequest(row)
 	switch {
 	case s.Error != "":
 		return icons.failed + " failed", danger
@@ -374,6 +380,12 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 		return fmt.Sprintf("%s %d %s", icons.ahead, s.Ahead, noun), accent
 	case s.Behind > 0:
 		return fmt.Sprintf("%s %d behind", icons.behind, s.Behind), amber
+	case open != nil && open.Checks == app.ChecksFailing:
+		return fmt.Sprintf("%s checks #%d", icons.failed, open.Number), amber
+	case open != nil && open.Review == app.ReviewChangesRequested:
+		return fmt.Sprintf("! changes #%d", open.Number), amber
+	case open != nil:
+		return fmt.Sprintf("%s PR #%d", icons.clean, open.Number), success
 	default:
 		return icons.clean + " clean", success
 	}
@@ -570,7 +582,7 @@ func syncLabel(row app.Row) (string, string) {
 }
 
 func nextStep(row app.Row) string {
-	s := row.Status
+	s, open := row.Status, openPullRequest(row)
 	switch {
 	case s.Error != "":
 		return "Status unavailable. Open diagnostics with d; refresh with r after resolving the error."
@@ -602,6 +614,10 @@ func nextStep(row app.Row) string {
 		return "Press p to review a push. Only committed changes are included."
 	case s.Dirty():
 		return "Review local changes in your shell or LazyGit. Tracking refs are up to date."
+	case open != nil && open.Checks == app.ChecksFailing:
+		return fmt.Sprintf("PR #%d checks are failing on GitHub.", open.Number)
+	case open != nil && open.Review == app.ReviewChangesRequested:
+		return fmt.Sprintf("Reviewers requested changes on PR #%d.", open.Number)
 	default:
 		return "Worktree is clean and locally known tracking refs are up to date. Select and fetch to check the remote."
 	}

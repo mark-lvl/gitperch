@@ -135,6 +135,7 @@ func (m *Model) actionMessage(msg tea.Msg) (bool, tea.Cmd) {
 			m.message += " · " + msg.err.Error()
 		}
 		m.preview = nil
+		m.forceGitHub() // a push can open or update a pull request's checks
 		return true, m.refresh()
 	}
 	return false, nil

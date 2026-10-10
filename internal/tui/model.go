@@ -96,6 +96,11 @@ type Model struct {
 	// refreshInterrupted records that an action cancelled an in-flight load,
 	// which must resume if the action ends without a batch to refresh after.
 	refreshInterrupted bool
+	github             *app.GitHub // nil: no pull request lookups
+	githubCtx          context.Context
+	githubCancel       context.CancelFunc
+	githubPending      int  // lookups in flight
+	githubForce        bool // the next snapshot rechecks GitHub
 }
 
 type snapshotMsg struct {
@@ -235,7 +240,7 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		}
 		// Every busy state starts through Update, so one check here keeps the
 		// spinner going without each start site scheduling it.
-		if (m.busy() || m.refreshing()) && !m.spinning && !m.closing {
+		if (m.busy() || m.refreshing() || m.githubPending > 0) && !m.spinning && !m.closing {
 			cmd = tea.Batch(cmd, m.spin())
 		}
 	}()
@@ -287,11 +292,16 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		} else {
 			m.loadErr = ""
 		}
-		next := m.scheduleAutoRefresh()
+		next := tea.Batch(m.scheduleAutoRefresh(), m.githubLookups())
 		if !m.ticking && !m.closing {
 			next = tea.Batch(next, m.tick())
 		}
 		return m, next
+	case githubMsg:
+		m.githubPending = max(0, m.githubPending-1)
+		if m.github != nil && !m.closing {
+			m.applyGitHub()
+		}
 	case autoRefreshMsg:
 		if msg.generation != m.autoGeneration || m.closing {
 			return m, nil
@@ -306,6 +316,7 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		} else {
 			m.message = "Child process finished"
 		}
+		m.forceGitHub()
 		return m, m.refresh()
 	case clockMsg:
 		if m.closing {
@@ -314,7 +325,7 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 		return m, m.tick()
 	case spinnerMsg:
 		m.spinning = false
-		if !(m.busy() || m.refreshing()) || m.closing {
+		if !(m.busy() || m.refreshing() || m.githubPending > 0) || m.closing {
 			m.spinnerFrame = 0
 			return m, nil
 		}
@@ -498,6 +509,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		case "g":
 			return m.launchLazyGit()
 		case "r":
+			m.forceGitHub()
 			return m.refresh()
 		case "d":
 			m.detailTab = 1
@@ -605,6 +617,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.highlight, m.scroll = 0, 0
 	case "r":
 		m.message = ""
+		m.forceGitHub()
 		return m.refresh()
 	case "tab", "shift+tab":
 		return m.executeCommand("focus")

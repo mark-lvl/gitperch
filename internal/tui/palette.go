@@ -151,6 +151,7 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 	case "lazygit":
 		return m.launchLazyGit()
 	case "refresh":
+		m.forceGitHub()
 		return m.refresh()
 	case "help":
 		m.help = true

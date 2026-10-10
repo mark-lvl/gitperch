@@ -121,6 +121,7 @@ func (m *Model) repositoryDetails() (lines []string, patchAt int) {
 	}
 	switch m.detailTab {
 	case 0:
+		lines = append(lines, m.pullRequestLines(*row)...)
 		appendFiles(4)
 		appendCommits(3)
 	case 1:
@@ -345,5 +346,8 @@ func (m *Model) closeReads() {
 	}
 	if m.patchCancel != nil {
 		m.patchCancel()
+	}
+	if m.githubCancel != nil {
+		m.githubCancel()
 	}
 }

@@ -34,7 +34,11 @@ func (m *Model) selectedPreview(w, h int) []string {
 	if branchWidth > 3 {
 		header += "  " + m.style(branch, branchColor, false)
 	}
-	lines := []string{m.between(header, age, inner), m.previewHint(*row)}
+	lines := []string{m.between(header, age, inner)}
+	if pullRequestLineRows(*row, h) > 0 {
+		lines = append(lines, m.pullRequestLine(*row, inner))
+	}
+	lines = append(lines, m.previewHint(*row))
 	result, loaded := m.detailCache[row.Path]
 	split := inner >= 112 && loaded && len(result.data.Commits) > 0
 	leftWidth := inner
@@ -55,7 +59,7 @@ func (m *Model) selectedPreview(w, h int) []string {
 		head = cell(head, leftWidth) + "   " + m.style("Recent commits", muted, false)
 	}
 	lines = append(lines, head)
-	available := previewFileRows(h)
+	available := m.previewRows(*row, h)
 	fileRows := []string{}
 	switch {
 	case row.Status.Error != "":
@@ -145,7 +149,23 @@ func (m *Model) maxContextOffset() int {
 	if m.notice() != "" {
 		height--
 	}
-	return max(0, len(data.data.Files)-previewFileRows(height))
+	return max(0, len(data.data.Files)-m.previewRows(*row, height))
+}
+
+// previewRows is the room for changed files in row's card of height h, less
+// the pull request line when the card shows one.
+func (m *Model) previewRows(row app.Row, h int) int {
+	return previewFileRows(h) - pullRequestLineRows(row, h)
+}
+
+// pullRequestLineRows is 1 when row's card of height h shows its pull request
+// line, which needs a row of its own and still leaves one for a changed file;
+// shorter cards drop it before any file.
+func pullRequestLineRows(row app.Row, h int) int {
+	if hasPullRequestLine(row) && h >= 7 {
+		return 1
+	}
+	return 0
 }
 
 // previewFileRows is the room for changed files inside a card of height h:
