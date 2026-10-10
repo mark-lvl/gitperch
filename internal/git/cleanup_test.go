@@ -160,11 +160,11 @@ func TestLocalBranches(t *testing.T) {
 	if len(got) != 3 || !objectID(byName["plain"].OID) || byName["plain"].Upstream != "" || !byName["tracked"].Gone || byName["main"].Gone {
 		t.Fatalf("branches: %+v", got)
 	}
-	// The upstream's remote and branch come from configuration, so a gone
-	// upstream still names them.
 	if b := byName["main"]; b.Remote != "origin" || b.RemoteRef != "refs/heads/main" {
 		t.Fatalf("live upstream: %+v", b)
 	}
+	// The upstream's remote and branch come from configuration, so a gone
+	// upstream still names them.
 	if b := byName["tracked"]; b.Remote != "origin" || b.RemoteRef != "refs/heads/tracked" {
 		t.Fatalf("gone upstream: %+v", b)
 	}

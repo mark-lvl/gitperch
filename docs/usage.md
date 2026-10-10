@@ -10,16 +10,18 @@ safety rules behind each Git action. For key bindings and layouts see the
 go run ./cmd/gitperch status .
 go run ./cmd/gitperch status --max-depth 4 /path/to/projects
 go run ./cmd/gitperch status --json /path/to/projects
+go run ./cmd/gitperch status --github /path/to/projects
 ```
 
-The table shows independent changes, untracked entries, conflicts, branch, upstream,
-and locally known ahead/behind counts. `?` means no valid comparison is available;
-it never means synchronized. `changes:N` counts tracked status entries once even
-when both the index and worktree changed. Status performs no remote fetch and
-uses Git's no-optional-locks mode; `--github` adds pull request state (see
-[GitHub pull requests](#github-pull-requests)). JSON schema version 1 has deterministic repository
-ordering, raw path identity, inspection timestamps, and per-repository errors.
-Terminal output escapes control characters and redacts credentials in URLs.
+The table shows independent changes, untracked entries, conflicts, branch,
+upstream, and locally known ahead/behind counts. `?` means no valid comparison
+is available; it never means synchronized. `changes:N` counts tracked status
+entries once even when both the index and worktree changed. Status performs no
+remote fetch and uses Git's no-optional-locks mode; `--github` adds pull request
+state (see [GitHub pull requests](#github-pull-requests)). JSON schema version 1
+has deterministic repository ordering, raw path identity, inspection timestamps,
+and per-repository errors. Terminal output escapes control characters and
+redacts credentials in URLs.
 
 ### Attention
 
@@ -34,15 +36,15 @@ worktrees of one repository are judged independently.
 | medium | `behind_upstream`, `no_upstream`, `tracking_unknown` (the upstream's local tracking ref is missing), `no_commits`, `stale_worktree`, `worktree_finished` and `worktree_idle` (a linked worktree's [lifecycle](#worktree-lifecycle)), and with [GitHub pull requests](#github-pull-requests) `pr_checks_failing` and `pr_changes_requested` (the branch's open pull request), and `pr_merged` (its pull request merged with exactly HEAD while the branch is still checked out) |
 | low | Nothing to do: clean and synchronized, a detached HEAD a ref contains, a locked or bare worktree |
 
-The level is the most severe reason. Levels above low count as needing
-attention in the dashboard header, Focus and collapsed-group badges; attention
-order (`s`) sorts by level, then name and path. The table's `ATTENTION` column
-and each JSON repository's `attention` object (`{"level": "high", "reasons":
+The level is the most severe reason. Levels above low count as needing attention
+in the dashboard header, Focus and collapsed-group badges; attention order (`s`)
+sorts by level, then name and path. The table's `ATTENTION` column and each JSON
+repository's `attention` object (`{"level": "high", "reasons":
 ["uncommitted_changes", "unpushed_commits"]}`, reasons most severe first and
 `[]` at low) carry the same result. Attention describes Git state, plus the
-branch's pull request when gh is available; it does not
-decide what to do, and age alone never raises it: only a clean linked
-worktree with nothing unfinished can become `worktree_idle`.
+branch's pull request when gh is available; it does not decide what to do, and
+age alone never raises it: only a clean linked worktree with nothing unfinished
+can become `worktree_idle`.
 
 Absolute paths distinguish duplicate names. Root depth is zero. Scanning stops
 at a repository; explicitly supplied nested repositories are still eligible.
@@ -119,12 +121,13 @@ commits. Narrower terminals stack content vertically. The compact frame follows
 the content, and the command palette floats over the workspace. Short
 terminals hide the preview first. The recommended minimum is 60×12.
 
-Use arrows/j/k to navigate, Enter for repository details, `d` for changes,
-`o` for a shell, and `b` to open the branch's pull request (or GitHub
-repository) in the browser through gh. Details have Overview, Changes, Commits, and Worktree sections;
-Tab switches sections and arrows/PgUp/PgDn scroll. `:` or Ctrl+K opens the fuzzy
-action palette; arrows choose, Enter executes, and Esc closes it. `/` filters by
-name/path/branch with arrow navigation and Enter to open a result. `?` opens help.
+Use arrows/j/k to navigate, Enter for repository details, `d` for changes, `o`
+for a shell, and `b` to open the branch's pull request (or GitHub repository) in
+the browser through gh. Details have Overview, Changes, Commits, and Worktree
+sections; Tab switches sections and arrows/PgUp/PgDn scroll. `:` or Ctrl+K opens
+the fuzzy action palette; arrows choose, Enter executes, and Esc closes it. `/`
+filters by name/path/branch with arrow navigation and Enter to open a result.
+`?` opens help.
 
 Space selects repositories; `a` toggles all visible rows. `c` reviews worktree cleanup. `p`/`l` push or
 fast-forward pull the selected set, or the highlighted repository when no
@@ -203,16 +206,16 @@ fresh fetch. The main worktree, stale records and bare repositories have none.
 | `idle` | `idle 21d` | Clean, nothing unpushed, not shown merged, and no HEAD activity for 14 days |
 | `unknown` | `✓ clean` | Clean, but the signals point neither way |
 
-"Activity" is when HEAD last moved in that worktree (a commit, checkout, pull
-or reset), read from its HEAD reflog; gitperch does not track creation time or
-who made a change. The default branch is chosen as Clean up chooses it, but from
+"Activity" is when HEAD last moved in that worktree (a commit, checkout, pull or
+reset), read from its HEAD reflog; gitperch does not track creation time or who
+made a change. The default branch is chosen as Clean up chooses it, but from
 local refs without fetching, so a merge the local refs have not seen, and any
 squash or rebase merge, reads as not merged, unless gh shows the branch's pull
 request merged into the default branch with exactly HEAD as its head (signal
-`merged_pull_request`). That costs one lookup per
-repository with linked worktrees and one `git merge-base --is-ancestor` per
-linked worktree on each refresh. A worktree created from the default branch
-looks merged at first, which is why recent activity keeps it `active`.
+`merged_pull_request`). That costs one lookup per repository with linked
+worktrees and one `git merge-base --is-ancestor` per linked worktree on each
+refresh. A worktree created from the default branch looks merged at first, which
+is why recent activity keeps it `active`.
 
 `likely_finished` and `idle` add the medium attention reasons
 `worktree_finished` and `worktree_idle`, so they rank below unfinished work and
@@ -228,8 +231,9 @@ without one:
 Signals, in this order: `inspection_failed`, `conflicts`,
 `operation_in_progress`, `locked`, `uncommitted_changes`, `untracked_files`,
 `diverged`, `unpushed_commits`, `detached_commits`, `no_commits`, `clean`,
-`nothing_to_push`, `no_upstream`, `merged`, `merged_pull_request`, `not_merged`, `merge_unknown`, then
-one of `recent_activity`, `inactive` or `activity_unknown`.
+`nothing_to_push`, `no_upstream`, `merged`, `merged_pull_request`, `not_merged`,
+`merge_unknown`, then one of `recent_activity`, `inactive` or
+`activity_unknown`.
 
 ## Cleaning up worktrees and branches
 
@@ -298,34 +302,35 @@ worktree. gitperch checks for ignored files immediately before removal, but
 files another program writes in the instant between that check and
 `git worktree remove` cannot be protected.
 
-"Merged" means the worktree's HEAD is reachable from `refs/remotes/<remote>/HEAD`
-after the fresh fetch. Git cannot see squash or rebase merges. With gh
-([GitHub pull requests](#github-pull-requests)), the review also asks GitHub,
-never from the cache, about each unmerged branch with an upstream on GitHub:
-a pull request merged into its repository's default branch whose head commit
-is exactly the branch tip or the worktree's HEAD counts as merged, shown as
-`merged via PR #42 into main on GitHub`. Every other check still applies. A
-worktree whose pull request is still open, merged at another commit or into
-another branch, or closed is kept for review with that reason, as is one
-whose GitHub check failed; branches get these reasons only when listed as
-described under Branches. Without gh, such merges show as not merged and are
-kept. A repository without a remote uses local `main`, else `master`, labelled
-"local default". When the remote's default branch is unknown, no worktree in the repository is eligible for
-removal and no branch is considered; the review shows the reason as a kept
-item, and stale records can still be pruned. Run
+"Merged" means the worktree's HEAD is reachable from
+`refs/remotes/<remote>/HEAD` after the fresh fetch. Git cannot see squash or
+rebase merges. With gh ([GitHub pull requests](#github-pull-requests)), the
+review also asks GitHub, never from the cache, about each unmerged branch with
+an upstream on GitHub: a pull request merged into its repository's default
+branch whose head commit is exactly the branch tip or the worktree's HEAD counts
+as merged, shown as `merged via PR #42 into main on GitHub`. Every other check
+still applies. A worktree whose pull request is still open, merged at another
+commit or into another branch, or closed is kept for review with that reason, as
+is one whose GitHub check failed; branches get these reasons only when listed as
+described under Branches. A worktree with a detached HEAD is never judged by a
+pull request. Without gh, such merges show as not merged and are kept. A
+repository without a remote uses local `main`, else `master`, labelled "local
+default". When the remote's default branch is unknown, no worktree in the
+repository is eligible for removal and no branch is considered; the review shows
+the reason as a kept item, and stale records can still be pruned. Run
 `git remote set-head <remote> -a` yourself, because gitperch never sets it. A
 failed fetch likewise makes no worktree eligible for removal, and the error is
 shown among the kept items; stale records can still be pruned.
 
 ### Branches
 
-Local branches are reviewed in the same list, one item per branch with its
-short commit. A branch is eligible when its tip is reachable from the default
-ref (`refs/remotes/<remote>/HEAD` after the fetch, or local `main`/`master`
-without a remote) or, with gh, GitHub merged its pull request into the default
-branch with exactly this tip, it is not the default branch itself, it is not a symbolic ref (an alias such
-as `master` pointing at `main` is never listed), and no remaining worktree has
-it checked out.
+Local branches are reviewed in the same list, one item per branch with its short
+commit. A branch is eligible when its tip is reachable from the default ref
+(`refs/remotes/<remote>/HEAD` after the fetch, or local `main`/`master` without
+a remote) or, with gh, GitHub merged its pull request into the default branch
+with exactly this tip, it is not the default branch itself, it is not a symbolic
+ref (an alias such as `master` pointing at `main` is never listed), and no
+remaining worktree has it checked out.
 
 - A worktree holds its branch. A stale record (directory missing) frees it
   only when the stale records can be pruned, because pruning runs first; if
@@ -505,10 +510,10 @@ appears as a per-repository action failure. Git hooks and helpers run with your
 normal user permissions; gitperch is not a sandbox for untrusted repositories.
 
 The dashboard does not stage, commit, stash, reset, clean, rebase, resolve
-conflicts, create branches, configure upstreams, force push, or create, merge
-or comment on pull requests. It does not
-force-remove worktrees or delete unmerged work; the only branches it deletes
-are fully merged ones, by Git or through a GitHub pull request with exactly
-their commit, after review. It does not support triangular push workflows, multiple push URLs, arbitrary push
-refspecs, or headless bulk mutation. See [plan.md](plan.md) for the full v0.1
-scope and action policy.
+conflicts, create branches, configure upstreams, force push, or create, merge or
+comment on pull requests. It does not force-remove worktrees or delete unmerged
+work; the only branches it deletes are fully merged ones, by Git or through a
+GitHub pull request with exactly their commit, after review. It does not support
+triangular push workflows, multiple push URLs, arbitrary push refspecs, or
+headless bulk mutation. See [plan.md](plan.md) for the full v0.1 scope and
+action policy.

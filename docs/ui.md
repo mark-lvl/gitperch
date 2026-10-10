@@ -82,13 +82,13 @@ branch whose Git state is otherwise quiet shows its pull request in the status
 column: `× checks #42` and `! changes #42` in amber, and `✓ PR #42` for an open
 pull request with nothing to do. `✓ merged #42` marks a branch whose pull
 request was merged with exactly its HEAD, which also explains a remote branch
-GitHub deleted; a linked worktree like that reads `✓ finished?` once quiet.
-The preview card adds a line under its header,
-such as `PR #42 · open · checks failing · changes requested · 3h ago`, and drops
-it before any changed file when the card is at its smallest. The details
-Overview has a Pull request section with the title, `base ← head`, checks,
-review, URL, up to three earlier pull requests of the branch and when GitHub
-was asked. While lookups run, the header shows `checking GitHub`.
+GitHub deleted; a linked worktree like that reads `✓ finished?` once quiet. The
+preview card adds a line under its header, such as
+`PR #42 · open · checks failing · changes requested · 3h ago`, and drops it
+before any changed file when the card is at its smallest. The details Overview
+has a Pull request section with the title, `base ← head`, checks, review, URL,
+up to three earlier pull requests of the branch and when GitHub was asked. While
+lookups run, the header shows `checking GitHub`.
 
 ## Worktrees in the list
 
@@ -205,16 +205,18 @@ application dependencies.
 
 ## Deliberately unavailable
 
-Agents, semantic agent messages/waiting states, tests and tasks have
-no real backend integration here, so no fabricated counters, columns, tabs or
-buttons appear. Pull requests come only from gh and are read-only: gitperch
-never creates, merges or comments on them. The reference mockup's AGENT column, agent badge and Agent tab,
-Commit, Create pull request, Sync all and Start agent are therefore absent, and `a`
-and `s` keep their existing select-all and sort bindings. The detail-loader and command registry are the seams for later
-integration. Stage/commit/conflict resolution are available through the real shell
-or optional LazyGit, not new embedded mutation workflows. Line counts are fetched
-only for the highlighted repository; the table retains existing cheap Git status
-and tracking data. No unsupported editor-launch configuration is guessed.
+Agents, semantic agent messages/waiting states, tests and tasks have no real
+backend integration here, so no fabricated counters, columns, tabs or buttons
+appear. Pull requests come only from gh and are read-only: gitperch never
+creates, merges or comments on them. The reference mockup's AGENT column, agent
+badge and Agent tab, Commit, Create pull request, Sync all and Start agent are
+therefore absent, and `a` and `s` keep their existing select-all and sort
+bindings. The detail-loader and command registry are the seams for later
+integration. Stage/commit/conflict resolution are available through the real
+shell or optional LazyGit, not new embedded mutation workflows. Line counts are
+fetched only for the highlighted repository; the table retains existing cheap
+Git status and tracking data. No unsupported editor-launch configuration is
+guessed.
 
 Terminal snapshots and a local PTY check do not establish Windows Terminal or
 specific Nerd Font compatibility; the [manual smoke guide](tui-smoke.md) remains a
