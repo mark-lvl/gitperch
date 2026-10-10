@@ -160,6 +160,32 @@ func TestLocalBranches(t *testing.T) {
 	if len(got) != 3 || !objectID(byName["plain"].OID) || byName["plain"].Upstream != "" || !byName["tracked"].Gone || byName["main"].Gone {
 		t.Fatalf("branches: %+v", got)
 	}
+	// The upstream's remote and branch come from configuration, so a gone
+	// upstream still names them.
+	if b := byName["main"]; b.Remote != "origin" || b.RemoteRef != "refs/heads/main" {
+		t.Fatalf("live upstream: %+v", b)
+	}
+	if b := byName["tracked"]; b.Remote != "origin" || b.RemoteRef != "refs/heads/tracked" {
+		t.Fatalf("gone upstream: %+v", b)
+	}
+	if b := byName["plain"]; b.Remote != "" || b.RemoteRef != "" {
+		t.Fatalf("no upstream: %+v", b)
+	}
+}
+
+func TestRemoteURLAppliesInsteadOf(t *testing.T) {
+	repo := disposable(t)
+	gitCmd(t, repo, "config", "url.https://github.com/.insteadOf", "gh:")
+	gitCmd(t, repo, "remote", "add", "origin", "gh:acme/widgets.git")
+	r := Runner{}
+	if url, err := r.RemoteURL(context.Background(), repo, "origin"); err != nil || url != "https://github.com/acme/widgets.git" {
+		t.Fatalf("url %q, %v", url, err)
+	}
+	for _, remote := range []string{"", "--upload-pack=x", "two words", "missing"} {
+		if _, err := r.RemoteURL(context.Background(), repo, remote); err == nil {
+			t.Errorf("remote %q accepted", remote)
+		}
+	}
 }
 
 func TestDeleteBranchComparesAndCleansConfig(t *testing.T) {

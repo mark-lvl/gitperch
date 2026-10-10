@@ -211,6 +211,23 @@ func (r Runner) ResolveRemote(ctx context.Context, path string, m Metadata, remo
 	return FetchTarget{Remote: remote, URL: url}, nil
 }
 
+// RemoteURL is a remote's URL with insteadOf rewrites applied. It reads
+// configuration only and never contacts the remote.
+func (r Runner) RemoteURL(ctx context.Context, path, remote string) (string, error) {
+	if remote == "" || strings.HasPrefix(remote, "-") || strings.ContainsAny(remote, " \t\r\n\x00") {
+		return "", fmt.Errorf("invalid remote")
+	}
+	out, err := r.Run(ctx, path, "remote", "get-url", remote)
+	if err != nil {
+		return "", err
+	}
+	url := strings.TrimSuffix(string(out.Stdout), "\n")
+	if url == "" || strings.Contains(url, "\n") {
+		return "", fmt.Errorf("missing remote URL")
+	}
+	return url, nil
+}
+
 func (r Runner) configBool(ctx context.Context, path string, m Metadata, key string) (bool, error) {
 	if len(m.Values(key)) == 0 {
 		return false, nil

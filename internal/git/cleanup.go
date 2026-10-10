@@ -134,10 +134,14 @@ type Branch struct {
 	Upstream string // e.g. refs/remotes/origin/x; "" when none
 	Gone     bool   // upstream configured but its tracking ref is missing
 	Symref   string // target of a symbolic ref such as refs/heads/master -> refs/heads/main; "" for a normal branch
+	// Remote and RemoteRef name the upstream's remote and its branch there,
+	// such as origin and refs/heads/x. Both come from the branch's
+	// configuration, so they survive a deleted remote branch; "" without one.
+	Remote, RemoteRef string
 }
 
 func (r Runner) LocalBranches(ctx context.Context, path string) ([]Branch, error) {
-	out, err := r.Run(ctx, path, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(upstream)%00%(upstream:track)%00%(symref)", "refs/heads")
+	out, err := r.Run(ctx, path, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(upstream)%00%(upstream:track)%00%(symref)%00%(upstream:remotename)%00%(upstream:remoteref)", "refs/heads")
 	if err != nil {
 		return nil, err
 	}
@@ -148,10 +152,10 @@ func (r Runner) LocalBranches(ctx context.Context, path string) ([]Branch, error
 		}
 		fields := strings.Split(line, "\x00")
 		name, ok := strings.CutPrefix(fields[0], "refs/heads/")
-		if len(fields) != 5 || !ok || name == "" || !objectID(fields[1]) {
+		if len(fields) != 7 || !ok || name == "" || !objectID(fields[1]) {
 			return nil, fmt.Errorf("malformed branch list")
 		}
-		branches = append(branches, Branch{Name: name, OID: fields[1], Upstream: fields[2], Gone: fields[3] == "[gone]", Symref: fields[4]})
+		branches = append(branches, Branch{Name: name, OID: fields[1], Upstream: fields[2], Gone: fields[3] == "[gone]", Symref: fields[4], Remote: fields[5], RemoteRef: fields[6]})
 	}
 	return branches, nil
 }

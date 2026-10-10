@@ -181,3 +181,27 @@ func TestWorktreesReadOnly(t *testing.T) {
 		t.Fatalf("listing worktrees pruned administrative files: before %d, after %d, %v", len(before), len(after), err)
 	}
 }
+
+func TestBranchAndRemoteReadsLeaveConfigUnchanged(t *testing.T) {
+	d := disposable(t)
+	write(t, filepath.Join(d, "tracked"), "committed\n")
+	commit(t, d)
+	gitCmd(t, d, "remote", "add", "origin", "https://github.com/acme/widgets.git")
+	gitCmd(t, d, "config", "branch.main.remote", "origin")
+	gitCmd(t, d, "config", "branch.main.merge", "refs/heads/main")
+	config := filepath.Join(d, ".git", "config")
+	before, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Runner{}
+	if _, err := r.LocalBranches(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RemoteURL(context.Background(), d, "origin"); err != nil {
+		t.Fatal(err)
+	}
+	if after, err := os.ReadFile(config); err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("configuration changed: %v", err)
+	}
+}

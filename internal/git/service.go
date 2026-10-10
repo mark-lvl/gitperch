@@ -78,6 +78,9 @@ func (s Service) RemoveWorktree(ctx context.Context, path, worktree string) erro
 func (s Service) LocalBranches(ctx context.Context, path string) ([]Branch, error) {
 	return s.Read.LocalBranches(ctx, path)
 }
+func (s Service) RemoteURL(ctx context.Context, path, remote string) (string, error) {
+	return s.Read.RemoteURL(ctx, path, remote)
+}
 func (s Service) DeleteBranch(ctx context.Context, path, name, oid string) error {
 	return s.Write.DeleteBranch(ctx, path, name, oid)
 }
