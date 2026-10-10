@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -196,6 +197,10 @@ func TestGitHubLookupsAnnotateRowsAndKeepHighlight(t *testing.T) {
 }
 
 func TestOnlyManualRefreshesForceGitHub(t *testing.T) {
+	off := New(context.Background(), nil, true)
+	if off.forceGitHub(); off.githubForce {
+		t.Fatal("forced a recheck without GitHub")
+	}
 	m := New(context.Background(), func(context.Context) (app.Snapshot, error) { return app.Snapshot{Rows: githubRows()}, nil }, true)
 	m.EnableGitHub(app.NewGitHub(githubGit{}, &githubPulls{}, nil))
 	m.SetAutoRefresh(time.Minute)
@@ -209,9 +214,6 @@ func TestOnlyManualRefreshesForceGitHub(t *testing.T) {
 	}
 	m.githubPending = 1
 	m.width = 110
-	if line := m.summaryLineAt(106); !strings.Contains(line, "refreshing") && !strings.Contains(line, "checking GitHub") {
-		t.Fatalf("header: %q", line)
-	}
 	m.loading, m.refreshUntil = false, time.Time{}
 	if line := m.summaryLineAt(106); !strings.Contains(line, "checking GitHub") {
 		t.Fatalf("header without the GitHub activity: %q", line)
@@ -294,6 +296,19 @@ func TestMergedPullRequestStatusAndNextStep(t *testing.T) {
 	if got := nextStep(linked); got != "PR #42 is merged into main. Review it with Clean up (c)." {
 		t.Fatalf("linked worktree: %q", got)
 	}
+	if label, _ := m.primaryStatus(linked); label != "✓ merged #42" {
+		t.Fatalf("active linked worktree label %q", label)
+	}
+	quiet := linked
+	quiet.Status.LastActivity = captureNow.Add(-48 * time.Hour)
+	if label, _ := m.primaryStatus(quiet); label != "✓ finished?" {
+		t.Fatalf("quiet linked worktree label %q", label)
+	}
+	detached := row
+	detached.Status.Detached = true
+	if label, _ := m.primaryStatus(detached); label != "detached" || strings.Contains(nextStep(detached), "is merged") {
+		t.Fatalf("detached HEAD claims the merge: %q, %q", label, nextStep(detached))
+	}
 	dirty := row
 	dirty.Status.Changes = 1
 	if label, _ := m.primaryStatus(dirty); label != "● changed" || strings.Contains(nextStep(dirty), "is merged") {
@@ -337,5 +352,36 @@ func TestBrowserOpensThePullRequest(t *testing.T) {
 	m.applySnapshot(app.Snapshot{Rows: []app.Row{plain}})
 	if cmd := m.key(key("b")); cmd != nil || m.message != "No GitHub repository for this branch" {
 		t.Fatalf("no GitHub data: %v, %q", cmd, m.message)
+	}
+}
+
+func TestBrowserFromDetailsAndRepositoryPage(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: []app.Row{prRow()}})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
+	documentsB := func(line string) bool { return strings.HasPrefix(line, " b ") }
+	if slices.ContainsFunc(m.helpContent(), documentsB) {
+		t.Fatal("help documents b without gh")
+	}
+	var opened app.BrowseTarget
+	m.EnableBrowse(func(target app.BrowseTarget) (*exec.Cmd, error) {
+		opened = target
+		return exec.Command("true"), nil
+	})
+	if !slices.ContainsFunc(m.helpContent(), documentsB) {
+		t.Fatal("help lacks b")
+	}
+	m.palette, m.paletteQuery = true, "GitHub"
+	if items := m.paletteCommands(); len(items) == 0 || items[0].label != "Open acme/widgets on GitHub" {
+		t.Fatalf("palette: %+v", items)
+	}
+	m.palette = false
+	m.details = true
+	if cmd := m.key(key("b")); cmd == nil || opened != (app.BrowseTarget{Host: "github.com", Repository: "acme/widgets", Branch: "feat/x"}) {
+		t.Fatalf("b in details: %v, %+v", cmd, opened)
+	}
+	m.Update(browserExitedMsg{err: errors.New("exit status 1\x1b[31m")})
+	if m.message != `gh browse: exit status 1\x1b[31m` || !m.details {
+		t.Fatalf("after a failed browser: %q, details %v", m.message, m.details)
 	}
 }

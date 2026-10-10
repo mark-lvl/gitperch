@@ -231,10 +231,15 @@ func TestAttentionFromOpenPullRequest(t *testing.T) {
 		{"waiting for review", withPR(PullRequest{Number: 42, State: PullRequestOpen, Review: ReviewRequired, Checks: ChecksPending}), Low, nil, nil},
 		{"failing checks on a closed pull request", withPR(PullRequest{Number: 42, State: PullRequestClosed, Checks: ChecksFailing}), Low, nil, nil},
 		{"without GitHub data", Row{Status: tracking(0, 0)}, Low, nil, nil},
+		{"failed recheck keeps the earlier failing checks", func() Row {
+			r := withPR(PullRequest{Number: 42, State: PullRequestOpen, Checks: ChecksFailing})
+			r.GitHub.Error = "gh is not logged in"
+			return r
+		}(), Medium, []Reason{ReasonPRChecksFailing}, []string{"PR #42 checks failing"}},
 	}
 	for _, tc := range cases {
 		a := tc.row.Attention()
-		if a.Level != tc.level || !slices.Equal(a.Reasons, tc.reasons) && (len(a.Reasons) != 0 || len(tc.reasons) != 0) {
+		if a.Level != tc.level || !slices.Equal(a.Reasons, tc.reasons) {
 			t.Errorf("%s: %+v, want %s %v", tc.name, a, tc.level, tc.reasons)
 			continue
 		}

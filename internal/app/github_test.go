@@ -344,7 +344,8 @@ func TestMergedPullRequestNeedsTheCheckedOutHead(t *testing.T) {
 		t.Fatalf("merged: %+v", pr)
 	}
 	for name, edit := range map[string]func(*Row){
-		"detached":    func(r *Row) { r.Status.Detached, r.Status.Branch = true, "" },
+		"detached":    func(r *Row) { r.Status.Detached = true },
+		"no branch":   func(r *Row) { r.Status.Branch = "" },
 		"unborn":      func(r *Row) { r.Status.Unborn = true },
 		"moved on":    func(r *Row) { r.Status.HeadOID = strings.Repeat("b", 40) },
 		"no data":     func(r *Row) { r.GitHub = nil },

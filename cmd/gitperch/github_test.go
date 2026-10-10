@@ -89,6 +89,25 @@ func TestStatusGitHubAddsPullRequests(t *testing.T) {
 	}
 }
 
+func TestStatusWithoutGitHubNeverStartsGh(t *testing.T) {
+	root := githubWorkspace(t)
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "ran")
+	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	for _, args := range [][]string{{"status", root}, {"status", "--json", root}} {
+		var out, errOut bytes.Buffer
+		if code := run(args, &out, &errOut); code != 0 {
+			t.Fatalf("%v: exit %d: %s", args, code, &errOut)
+		}
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("status without --github started gh: %v", err)
+	}
+}
+
 func reasonNames(reasons []app.Reason) []string {
 	var names []string
 	for _, r := range reasons {
