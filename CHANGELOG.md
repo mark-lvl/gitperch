@@ -29,9 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clean up removes squash- and rebase-merged worktrees and branches when a
   fresh GitHub check shows their pull request merged into the default branch
   with exactly their commit; every other check still applies. Such a branch's
-  restore command falls back to fetching GitHub's `refs/pull/<N>/head`. Pull
-  requests that prove nothing (still open, merged at another commit or into
-  another branch, closed) and failed checks are listed as review reasons.
+  restore command falls back to fetching GitHub's `refs/pull/<N>/head`. For
+  worktrees, and for branches Clean up already lists, a pull request that
+  proves nothing (still open, merged at another commit or into another
+  branch, closed) or a failed check is added as a review reason.
 
 ## [0.4.1-rc.1] - 2026-10-08
 

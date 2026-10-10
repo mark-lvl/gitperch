@@ -304,11 +304,12 @@ never from the cache, about each unmerged branch with an upstream on GitHub:
 a pull request merged into its repository's default branch whose head commit
 is exactly the branch tip or the worktree's HEAD counts as merged, shown as
 `merged via PR #42 into main on GitHub`. Every other check still applies. A
-pull request still open, merged at another commit or into another branch, or
-closed keeps the item for review with that reason, as does a failed GitHub
-check. Without gh, such merges show as not merged and are kept. A repository without a remote
-uses local `main`, else `master`, labelled "local default". When the remote's
-default branch is unknown, no worktree in the repository is eligible for
+worktree whose pull request is still open, merged at another commit or into
+another branch, or closed is kept for review with that reason, as is one
+whose GitHub check failed; branches get these reasons only when listed as
+described under Branches. Without gh, such merges show as not merged and are
+kept. A repository without a remote uses local `main`, else `master`, labelled
+"local default". When the remote's default branch is unknown, no worktree in the repository is eligible for
 removal and no branch is considered; the review shows the reason as a kept
 item, and stale records can still be pruned. Run
 `git remote set-head <remote> -a` yourself, because gitperch never sets it. A
@@ -320,7 +321,8 @@ shown among the kept items; stale records can still be pruned.
 Local branches are reviewed in the same list, one item per branch with its
 short commit. A branch is eligible when its tip is reachable from the default
 ref (`refs/remotes/<remote>/HEAD` after the fetch, or local `main`/`master`
-without a remote), it is not the default branch itself, it is not a symbolic ref (an alias such
+without a remote) or, with gh, GitHub merged its pull request into the default
+branch with exactly this tip, it is not the default branch itself, it is not a symbolic ref (an alias such
 as `master` pointing at `main` is never listed), and no remaining worktree has
 it checked out.
 
@@ -333,9 +335,14 @@ it checked out.
 - While any worktree in the repository has an operation in progress (rebase,
   merge, cherry-pick, revert, bisect) or cannot be inspected, merged branches
   are still listed but none is eligible.
-- An unmerged branch whose upstream is gone is kept with
-  "upstream gone but not merged into ... — squash merge?", since a squash or
-  rebase merge cannot be detected. Other unmerged branches are not listed.
+- An unmerged branch whose upstream is gone and that GitHub does not prove
+  merged is kept with "upstream gone but not merged into ... — squash
+  merge?", followed by GitHub's reason when there is one (a failed check, a
+  pull request still open or closed). Without gh a squash or rebase merge
+  cannot be detected.
+- A branch whose pull request GitHub merged at another commit or into another
+  branch is kept as "not merged" with that reason.
+- Other unmerged branches are not listed.
 
 Deletion is a compare-and-delete at the commit you reviewed: if the branch has
 moved since, it is skipped and nothing is lost. Afterwards the branch's
