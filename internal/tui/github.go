@@ -24,7 +24,7 @@ func (m *Model) EnableGitHub(g *app.GitHub) {
 
 // forceGitHub makes the next snapshot recheck GitHub, at most every
 // app.GitHubMinGap; automatic refresh never calls it.
-func (m *Model) forceGitHub() { m.githubForce = true }
+func (m *Model) forceGitHub() { m.githubForce = m.github != nil }
 
 // githubLookups copies cached results onto the rows and starts the lookups
 // that are due; each reports back with a githubMsg.

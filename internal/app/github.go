@@ -370,8 +370,10 @@ func (g *GitHub) Lookup(ctx context.Context, group []Row) {
 	case <-ctx.Done():
 		return
 	}
-	results := g.lookup(ctx, group)
-	<-g.slots
+	results := func() map[string]*GitHubInfo {
+		defer func() { <-g.slots }()
+		return g.lookup(ctx, group)
+	}()
 	if ctx.Err() != nil {
 		return
 	}
