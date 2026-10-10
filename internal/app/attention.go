@@ -77,6 +77,10 @@ const (
 	// worktree's Lifecycle: worth a review, nothing at risk.
 	ReasonWorktreeFinished Reason = "worktree_finished"
 	ReasonWorktreeIdle     Reason = "worktree_idle"
+	// ReasonPRChecksFailing and ReasonPRChangesRequested come from the
+	// branch's open pull request on GitHub (Row.GitHub): someone has to act.
+	ReasonPRChecksFailing    Reason = "pr_checks_failing"
+	ReasonPRChangesRequested Reason = "pr_changes_requested"
 )
 
 // reasonOrder lists reasons from most to least severe; Attention.Reasons
@@ -84,7 +88,7 @@ const (
 var reasonOrder = []Reason{
 	ReasonActionFailed, ReasonInspectionFailed, ReasonConflicts, ReasonOperation,
 	ReasonDiverged, ReasonUncommitted, ReasonUntracked, ReasonUnpushed, ReasonDetachedCommits,
-	ReasonBehind, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree,
+	ReasonBehind, ReasonPRChecksFailing, ReasonPRChangesRequested, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree,
 	ReasonWorktreeFinished, ReasonWorktreeIdle,
 }
 
@@ -95,7 +99,7 @@ func (r Reason) Level() Level {
 		return Critical
 	case ReasonDiverged, ReasonUncommitted, ReasonUntracked, ReasonUnpushed, ReasonDetachedCommits:
 		return High
-	case ReasonBehind, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree, ReasonWorktreeFinished, ReasonWorktreeIdle:
+	case ReasonBehind, ReasonPRChecksFailing, ReasonPRChangesRequested, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree, ReasonWorktreeFinished, ReasonWorktreeIdle:
 		return Medium
 	}
 	return Low
@@ -173,6 +177,14 @@ func (r Row) Attention() Attention {
 	case s.Behind > 0:
 		a = a.With(ReasonBehind)
 	}
+	if pr := r.CurrentPullRequest(); pr != nil && pr.State == PullRequestOpen {
+		if pr.Checks == ChecksFailing {
+			a = a.With(ReasonPRChecksFailing)
+		}
+		if pr.Review == ReviewChangesRequested {
+			a = a.With(ReasonPRChangesRequested)
+		}
+	}
 	// Lifecycle reads the same facts, never attention, so the two cannot loop.
 	if l := r.Lifecycle(); l != nil {
 		switch l.State {
@@ -228,8 +240,20 @@ func (r Row) Describe(reason Reason) string {
 	case ReasonWorktreeIdle:
 		idle, _ := r.Inactivity()
 		return "linked worktree idle: no HEAD activity for " + span(idle)
+	case ReasonPRChecksFailing:
+		return pullRequestName(r.CurrentPullRequest()) + " checks failing"
+	case ReasonPRChangesRequested:
+		return pullRequestName(r.CurrentPullRequest()) + ": changes requested"
 	}
 	return gitcli.SafeText(string(reason))
+}
+
+// pullRequestName is "PR #42", or "the pull request" without one.
+func pullRequestName(pr *PullRequest) string {
+	if pr == nil {
+		return "the pull request"
+	}
+	return fmt.Sprintf("PR #%d", pr.Number)
 }
 
 func count(n int, noun string) string {

@@ -207,3 +207,41 @@ func TestAttentionFromRealGitState(t *testing.T) {
 		}
 	}
 }
+
+func TestAttentionFromOpenPullRequest(t *testing.T) {
+	withPR := func(prs ...PullRequest) Row {
+		return Row{Status: tracking(0, 0), GitHub: &GitHubInfo{Host: "github.com", Repository: "acme/widgets", Branch: "main", PullRequests: prs}}
+	}
+	cases := []struct {
+		name     string
+		row      Row
+		level    Level
+		reasons  []Reason
+		describe []string
+	}{
+		{"failing checks", withPR(PullRequest{Number: 42, State: PullRequestOpen, Checks: ChecksFailing}), Medium,
+			[]Reason{ReasonPRChecksFailing}, []string{"PR #42 checks failing"}},
+		{"changes requested", withPR(PullRequest{Number: 42, State: PullRequestOpen, Review: ReviewChangesRequested, Checks: ChecksPassing}), Medium,
+			[]Reason{ReasonPRChangesRequested}, []string{"PR #42: changes requested"}},
+		{"both, after behind", func() Row {
+			r := withPR(PullRequest{Number: 7, State: PullRequestOpen, Draft: true, Review: ReviewChangesRequested, Checks: ChecksFailing})
+			r.Status.Behind = 2
+			return r
+		}(), Medium, []Reason{ReasonBehind, ReasonPRChecksFailing, ReasonPRChangesRequested}, []string{1: "PR #7 checks failing", 2: "PR #7: changes requested"}},
+		{"waiting for review", withPR(PullRequest{Number: 42, State: PullRequestOpen, Review: ReviewRequired, Checks: ChecksPending}), Low, nil, nil},
+		{"failing checks on a closed pull request", withPR(PullRequest{Number: 42, State: PullRequestClosed, Checks: ChecksFailing}), Low, nil, nil},
+		{"without GitHub data", Row{Status: tracking(0, 0)}, Low, nil, nil},
+	}
+	for _, tc := range cases {
+		a := tc.row.Attention()
+		if a.Level != tc.level || !slices.Equal(a.Reasons, tc.reasons) && (len(a.Reasons) != 0 || len(tc.reasons) != 0) {
+			t.Errorf("%s: %+v, want %s %v", tc.name, a, tc.level, tc.reasons)
+			continue
+		}
+		for i, want := range tc.describe {
+			if want != "" && tc.row.Describe(a.Reasons[i]) != want {
+				t.Errorf("%s: describe %q, want %q", tc.name, tc.row.Describe(a.Reasons[i]), want)
+			}
+		}
+	}
+}
