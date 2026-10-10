@@ -107,6 +107,11 @@ type MergeVerdict struct {
 	PullRequest *PullRequest
 	Proven      bool
 	Note        string
+	// Failed reports that gh could not answer; Note says why.
+	Failed bool
+	// RestoreFrom is where a proven branch's commits can be fetched again
+	// once deleted; see restoreSource.
+	RestoreFrom string
 }
 
 // mergeVerdict decides in this order: an open pull request (unproven: work
@@ -125,7 +130,7 @@ func mergeVerdict(prs []PullRequest, tip string) MergeVerdict {
 		return MergeVerdict{PullRequest: pr, Note: fmt.Sprintf("PR #%d is still open", pr.Number)}
 	}
 	if pr := find(func(p PullRequest) bool {
-		return p.State == PullRequestMerged && p.IntoDefaultBranch && p.HeadOID == tip
+		return p.State == PullRequestMerged && p.IntoDefaultBranch && tip != "" && p.HeadOID == tip
 	}); pr != nil {
 		return MergeVerdict{PullRequest: pr, Proven: true}
 	}
@@ -154,6 +159,59 @@ func (r Row) MergedPullRequest() *PullRequest {
 		return v.PullRequest
 	}
 	return nil
+}
+
+// MergeEvidence asks GitHub now, bypassing the cache, for a verdict on each
+// branch whose upstream is on GitHub. A failed lookup gives that repository's
+// branches Failed verdicts; branches without pull requests get none.
+func (g *GitHub) MergeEvidence(ctx context.Context, path string, branches []gitcli.Branch) map[string]MergeVerdict {
+	verdicts := map[string]MergeVerdict{}
+	targets := g.targets(ctx, path, branches)
+	heads := map[github.Repo][]string{}
+	for _, t := range targets {
+		heads[t.repo] = append(heads[t.repo], t.head)
+	}
+	if len(heads) == 0 {
+		return verdicts
+	}
+	select {
+	case g.slots <- struct{}{}:
+	case <-ctx.Done():
+		return verdicts
+	}
+	defer func() { <-g.slots }()
+	answers := g.queryAll(ctx, heads)
+	for _, b := range branches {
+		t, ok := targets[b.Name]
+		if !ok {
+			continue
+		}
+		a := answers[t.repo]
+		if a.err != nil {
+			verdicts[b.Name] = MergeVerdict{Failed: true, Note: githubError(t.repo, a.err)}
+			continue
+		}
+		v := mergeVerdict(a.prs[t.head], b.OID)
+		if v.PullRequest == nil {
+			continue
+		}
+		if v.Proven {
+			v.RestoreFrom = restoreSource(t.remote, a.name, *v.PullRequest)
+		}
+		verdicts[b.Name] = v
+	}
+	return verdicts
+}
+
+// restoreSource is where a deleted squash-merged branch's commits can be
+// fetched again from GitHub's pull request ref: the upstream remote when the
+// pull request lives in its repository, else the base repository's URL, as
+// for a fork's pull request into its parent.
+func restoreSource(remote, repository string, pr PullRequest) string {
+	if strings.EqualFold(pr.BaseRepository, repository) {
+		return remote
+	}
+	return strings.TrimSuffix(pr.URL, fmt.Sprintf("/pull/%d", pr.Number))
 }
 
 // GitHub lookup cadence; see GitHub.Due.

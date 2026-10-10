@@ -49,11 +49,19 @@ const (
 	CleanupNoHiddenChanges  CleanupCode = "no_hidden_changes"
 	CleanupMerged           CleanupCode = "merged"
 	CleanupDirectoryMissing CleanupCode = "directory_missing"
+	// CleanupMergedPullRequest: GitHub merged a pull request into the default
+	// branch whose head is exactly the item's commit; see mergeVerdict.
+	CleanupMergedPullRequest CleanupCode = "merged_pull_request"
 
 	// Facts that need the user's own review.
 	CleanupNotMerged    CleanupCode = "not_merged"
 	CleanupUpstreamGone CleanupCode = "upstream_gone"
 	CleanupNoUpstream   CleanupCode = "no_upstream"
+	// CleanupPullRequestUnproven: the branch's pull request does not prove it
+	// merged, such as one still open or merged at an older commit.
+	CleanupPullRequestUnproven CleanupCode = "pull_request_unproven"
+	// CleanupGitHubCheckFailed: gh could not answer; Git alone decides.
+	CleanupGitHubCheckFailed CleanupCode = "github_check_failed"
 
 	// Checks that could not be made.
 	CleanupInspectionFailed     CleanupCode = "inspection_failed"
@@ -82,9 +90,9 @@ const (
 // directory is missing stays blocked through its lock.
 func (c CleanupCode) Status() CleanupStatus {
 	switch c {
-	case CleanupClean, CleanupNoIgnoredFiles, CleanupNoHiddenChanges, CleanupMerged, CleanupDirectoryMissing:
+	case CleanupClean, CleanupNoIgnoredFiles, CleanupNoHiddenChanges, CleanupMerged, CleanupDirectoryMissing, CleanupMergedPullRequest:
 		return CleanupAllowed
-	case CleanupNotMerged, CleanupUpstreamGone, CleanupNoUpstream:
+	case CleanupNotMerged, CleanupUpstreamGone, CleanupNoUpstream, CleanupPullRequestUnproven, CleanupGitHubCheckFailed:
 		return CleanupNeedsReview
 	case CleanupInspectionFailed, CleanupCheckFailed, CleanupFetchFailed, CleanupDefaultBranchUnknown:
 		return CleanupUnknown

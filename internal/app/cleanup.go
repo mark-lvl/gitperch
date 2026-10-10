@@ -36,6 +36,11 @@ type CleanupItem struct {
 	Base       string   // e.g. refs/remotes/origin/main
 	BaseName   string   // e.g. origin/main, or "main (local default)"
 	Assessment CleanupAssessment
+	// PullRequest is GitHub's evidence when the item is allowed because a
+	// pull request merged it; nil otherwise. RestoreFrom is where a deleted
+	// branch's commits can then be fetched again.
+	PullRequest *PullRequest
+	RestoreFrom string
 }
 
 // Eligible reports whether the item may run: every check passed.
@@ -81,6 +86,20 @@ type CleanupGit interface {
 
 var ErrCleanupUnsupported = errors.New("worktree cleanup needs Git 2.36 or newer")
 
+// SetGitHub lets Clean up accept GitHub's evidence that a pull request merged
+// a branch Git cannot show merged (squash and rebase merges); nil turns it off.
+func (a *Actions) SetGitHub(g *GitHub) {
+	a.mu.Lock()
+	a.github = g
+	a.mu.Unlock()
+}
+
+func (a *Actions) gitHub() *GitHub {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.github
+}
+
 // CleanupSupported lets the TUI hide Clean up on older Git.
 func (a *Actions) CleanupSupported(ctx context.Context) bool {
 	git, ok := a.service.(CleanupGit)
@@ -96,6 +115,14 @@ type cleanupBase struct {
 	ref, name string
 	reason    CleanupReason // why ref is empty
 	branch    string        // raw default branch name, never shown; skipped when deleting branches
+	// verdicts holds GitHub's merge evidence by branch name; nil without gh.
+	verdicts map[string]MergeVerdict
+}
+
+// mergeCheck is one branch's ancestry check against the default ref.
+type mergeCheck struct {
+	merged bool
+	err    error
 }
 
 func kindOrder(k CleanupKind) int {
@@ -209,6 +236,10 @@ func (a *Actions) PlanCleanup(ctx context.Context, paths []string) (CleanupPrevi
 		preview.Items[i] = p.item
 		preview.Items[i].Stale = slices.Clone(p.item.Stale)
 		preview.Items[i].Assessment.Reasons = slices.Clone(p.item.Assessment.Reasons)
+		if pr := p.item.PullRequest; pr != nil {
+			copied := *pr
+			preview.Items[i].PullRequest = &copied
+		}
 	}
 	return preview, nil
 }
@@ -300,6 +331,28 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 	if base.ref == "" && base.reason.Code != "" {
 		add(CleanupItem{Kind: CleanupGroup, Path: group, Assessment: Assess(base.reason)})
 	}
+	// Branches are read before worktrees, so one GitHub question about every
+	// unmerged branch with an upstream serves both.
+	var branches []gitcli.Branch
+	var branchErr error
+	ancestry := map[string]mergeCheck{}
+	if base.ref != "" {
+		branches, branchErr = git.LocalBranches(ctx, path)
+		var candidates []gitcli.Branch
+		for _, b := range branches {
+			if b.Name == base.branch || b.Symref != "" {
+				continue // the default branch, or an alias whose deletion Git must never follow
+			}
+			merged, err := git.IsAncestor(ctx, path, b.OID, base.ref)
+			ancestry[b.Name] = mergeCheck{merged, err}
+			if err == nil && !merged && b.Remote != "" {
+				candidates = append(candidates, b)
+			}
+		}
+		if gh := a.gitHub(); gh != nil && len(candidates) > 0 {
+			base.verdicts = gh.MergeEvidence(ctx, path, candidates)
+		}
+	}
 	var stale []string
 	for _, wt := range worktrees {
 		if wt.Main {
@@ -317,6 +370,9 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		}
 		item := CleanupItem{Kind: RemoveWorktree, Path: wt.Path, Branch: wt.Branch, OID: wt.HeadOID}
 		item.Assessment = assessWorktree(ctx, git, wt, base, nil)
+		if item.Assessment.Has(CleanupMergedPullRequest) {
+			item.PullRequest = base.verdicts[wt.Branch].PullRequest
+		}
 		add(item)
 	}
 	pruned := false
@@ -347,36 +403,63 @@ func (a *Actions) planCleanupGroup(ctx context.Context, git CleanupGit, path str
 		checkedOut[wt.Branch] = wt.Path
 	}
 	busy := operationBlocker(ctx, git, worktrees)
-	branches, err := git.LocalBranches(ctx, path)
-	if err != nil {
-		add(CleanupItem{Kind: CleanupGroup, Path: group, Assessment: Assess(CleanupReason{Code: CleanupCheckFailed, Text: "branch list failed: " + gitcli.SafeText(err.Error())})})
+	if branchErr != nil {
+		add(CleanupItem{Kind: CleanupGroup, Path: group, Assessment: Assess(CleanupReason{Code: CleanupCheckFailed, Text: "branch list failed: " + gitcli.SafeText(branchErr.Error())})})
 		return out
 	}
 	for _, b := range branches {
-		if b.Name == base.branch || b.Symref != "" {
+		check, ok := ancestry[b.Name]
+		if !ok {
 			continue // the default branch, or an alias whose deletion Git must never follow
 		}
-		merged, err := git.IsAncestor(ctx, path, b.OID, base.ref)
+		v := base.verdicts[b.Name]
+		proven := v.Proven && v.PullRequest.HeadOID == b.OID
 		item := CleanupItem{Kind: DeleteBranch, Path: group, Branch: b.Name, OID: b.OID}
-		var reason CleanupReason
+		var reasons []CleanupReason
 		switch {
-		case err != nil:
-			reason = CleanupReason{Code: CleanupCheckFailed, Text: "merge check failed: " + gitcli.SafeText(err.Error())}
-		case merged && busy.Code != "":
-			reason = busy
-		case merged && checkedOut[b.Name] != "":
-			reason = CleanupReason{Code: CleanupCheckedOutElsewhere, Text: "merged but checked out in " + gitcli.SafeText(filepath.Base(checkedOut[b.Name]))}
-		case merged:
-			reason = CleanupReason{Code: CleanupMerged, Text: "merged into " + base.name}
+		case check.err != nil:
+			reasons = append(reasons, CleanupReason{Code: CleanupCheckFailed, Text: "merge check failed: " + gitcli.SafeText(check.err.Error())})
+		case (check.merged || proven) && busy.Code != "":
+			reasons = append(reasons, busy)
+		case (check.merged || proven) && checkedOut[b.Name] != "":
+			reasons = append(reasons, CleanupReason{Code: CleanupCheckedOutElsewhere, Text: "merged but checked out in " + gitcli.SafeText(filepath.Base(checkedOut[b.Name]))})
+		case check.merged:
+			reasons = append(reasons, CleanupReason{Code: CleanupMerged, Text: "merged into " + base.name})
+		case proven:
+			reasons = append(reasons, CleanupReason{Code: CleanupMergedPullRequest, Text: mergedViaText(*v.PullRequest)})
+			item.PullRequest, item.RestoreFrom = v.PullRequest, v.RestoreFrom
 		case b.Gone:
-			reason = CleanupReason{Code: CleanupUpstreamGone, Text: "upstream gone but not merged into " + base.name + " — squash merge?"}
+			reasons = append(reasons, CleanupReason{Code: CleanupUpstreamGone, Text: "upstream gone but not merged into " + base.name + " — squash merge?"})
+			if note := verdictReason(v); note.Code != "" {
+				reasons = append(reasons, note)
+			}
+		case v.PullRequest != nil && v.PullRequest.State == PullRequestMerged:
+			// Merged on GitHub, but not with this tip: worth the user's review.
+			reasons = append(reasons, CleanupReason{Code: CleanupNotMerged, Text: "not merged into " + base.name}, verdictReason(v))
 		default:
 			continue // ordinary unmerged branch: not a cleanup candidate
 		}
-		item.Assessment = Assess(reason)
+		item.Assessment = Assess(reasons...)
 		add(item)
 	}
 	return out
+}
+
+// mergedViaText states GitHub's merge evidence for an item.
+func mergedViaText(pr PullRequest) string {
+	return fmt.Sprintf("merged via PR #%d into %s on GitHub", pr.Number, gitcli.SafeText(pr.Base))
+}
+
+// verdictReason is the review reason a GitHub verdict adds to an unmerged
+// item: why its pull request proves nothing, or why GitHub could not answer.
+func verdictReason(v MergeVerdict) CleanupReason {
+	switch {
+	case v.Failed:
+		return CleanupReason{Code: CleanupGitHubCheckFailed, Text: v.Note}
+	case !v.Proven && v.Note != "":
+		return CleanupReason{Code: CleanupPullRequestUnproven, Text: v.Note}
+	}
+	return CleanupReason{}
 }
 
 // staleNames lists up to three stale directory names for the review.
@@ -605,7 +688,18 @@ func assessIntegration(ctx context.Context, git CleanupGit, path string, s repos
 		as.add(CleanupMerged, "merged into "+base.name)
 		return
 	}
-	as.add(CleanupNotMerged, "not merged into "+base.name)
+	// GitHub's evidence replaces only "not merged" and "upstream gone": a
+	// squash merge explains both. Every other check below still applies.
+	v := base.verdicts[s.Branch]
+	proven := !s.Detached && v.Proven && v.PullRequest.HeadOID == s.HeadOID
+	if proven {
+		as.add(CleanupMergedPullRequest, mergedViaText(*v.PullRequest))
+	} else {
+		as.add(CleanupNotMerged, "not merged into "+base.name)
+		if note := verdictReason(v); note.Code != "" && !s.Detached {
+			as.add(note.Code, note.Text)
+		}
+	}
 	upstream := gitcli.SafeText(s.Upstream)
 	switch {
 	case s.Detached:
@@ -620,7 +714,9 @@ func assessIntegration(ctx context.Context, git CleanupGit, path string, s repos
 	case s.Upstream == "":
 		as.add(CleanupNoUpstream, "branch has no upstream")
 	case !s.ComparisonKnown:
-		as.add(CleanupUpstreamGone, "upstream "+upstream+" is gone — squash merge?")
+		if !proven {
+			as.add(CleanupUpstreamGone, "upstream "+upstream+" is gone — squash merge?")
+		}
 	case s.Ahead > 0 && s.Behind > 0:
 		as.add(CleanupDiverged, fmt.Sprintf("diverged from %s: %d ahead, %d behind", upstream, s.Ahead, s.Behind))
 	case s.Ahead > 0:
@@ -795,7 +891,27 @@ func deletedBranchMessage(item CleanupItem) string {
 // restoreCommand recreates a deleted branch at its reviewed commit, run from
 // inside the repository.
 func restoreCommand(item CleanupItem) string {
-	return fmt.Sprintf("git branch %s %s", shellQuote(gitcli.SafeText(item.Branch)), item.OID)
+	command := fmt.Sprintf("git branch %s %s", shellQuote(gitcli.SafeText(item.Branch)), item.OID)
+	if fetch := pullRefFetch(item, ""); fetch != "" {
+		command += " || " + fetch
+	}
+	return command
+}
+
+// pullRefFetch fetches a squash-merged branch back from GitHub's permanent
+// pull request ref, for when git gc has dropped its unreachable commits. It
+// is empty for a branch merged into the default branch, whose commits stay
+// reachable. repo names the repository for use from any directory.
+func pullRefFetch(item CleanupItem, repo string) string {
+	if item.PullRequest == nil || item.RestoreFrom == "" {
+		return ""
+	}
+	git := "git"
+	if repo != "" {
+		git += " -C " + shellQuote(repo)
+	}
+	refspec := fmt.Sprintf("refs/pull/%d/head:refs/heads/%s", item.PullRequest.Number, gitcli.SafeText(item.Branch))
+	return fmt.Sprintf("%s fetch %s %s", git, shellQuote(gitcli.SafeText(item.RestoreFrom)), shellQuote(refspec))
 }
 
 // recreateCommand adds a removed worktree back at its reviewed path, on its
@@ -827,10 +943,22 @@ func recreateCommand(item CleanupItem) string {
 func restoreAnywhere(item CleanupItem) string {
 	repo, branch := gitcli.SafeText(item.Group), gitcli.SafeText(item.Branch)
 	command := fmt.Sprintf("git -C %s branch %s %s", shellQuote(repo), shellQuote(branch), item.OID)
+	if fetch := pullRefFetch(item, repo); fetch != "" {
+		command += " || " + fetch
+	}
 	if repo != item.Group || branch != item.Branch {
 		command += "  # names shown escaped; inside the repository run: git branch <name> " + item.OID
 	}
 	return command
+}
+
+// reviewedVerdicts is the evidence an item was reviewed with; revalidation
+// never asks GitHub again.
+func reviewedVerdicts(item CleanupItem) map[string]MergeVerdict {
+	if item.PullRequest == nil {
+		return nil
+	}
+	return map[string]MergeVerdict{item.Branch: {PullRequest: item.PullRequest, Proven: true}}
 }
 
 // revalidateCleanup reassesses an item immediately before it runs, against
@@ -868,7 +996,7 @@ func revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) Cl
 			if !wt.Main && isStale(wt) {
 				return changed("worktree directory went missing since review")
 			}
-			return assessWorktree(ctx, git, wt, cleanupBase{ref: item.Base, name: item.BaseName}, &item)
+			return assessWorktree(ctx, git, wt, cleanupBase{ref: item.Base, name: item.BaseName, verdicts: reviewedVerdicts(item)}, &item)
 		}
 		return changed("worktree no longer exists")
 	case DeleteBranch:
@@ -896,6 +1024,14 @@ func revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) Cl
 			}
 			if b.OID != item.OID {
 				return changed("branch moved since review")
+			}
+			if pr := item.PullRequest; pr != nil {
+				// GitHub is not asked again: a merged pull request stays
+				// merged, and update-ref deletes only at the reviewed commit.
+				if pr.HeadOID != b.OID {
+					return changed("branch moved since review")
+				}
+				return Assess(CleanupReason{Code: CleanupMergedPullRequest, Text: mergedViaText(*pr)})
 			}
 			merged, err := git.IsAncestor(ctx, item.Group, b.OID, item.Base)
 			if err != nil {

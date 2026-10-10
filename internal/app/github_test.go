@@ -288,16 +288,22 @@ func TestMergeVerdict(t *testing.T) {
 		number int
 		proven bool
 		note   string
+		noTip  bool // the branch tip is unknown (empty)
 	}{
-		{"none", nil, 0, false, ""},
-		{"merged with the tip", []PullRequest{merged(42, headA, true)}, 42, true, ""},
-		{"an open one comes first", []PullRequest{{Number: 45, State: PullRequestOpen}, merged(42, headA, true)}, 45, false, "PR #45 is still open"},
-		{"an older merge proves it", []PullRequest{merged(44, other, true), merged(42, headA, true)}, 42, true, ""},
-		{"newer local commits", []PullRequest{merged(42, other, true)}, 42, false, "PR #42 merged at 1111111; this branch is at aaaaaaa"},
-		{"merged elsewhere", []PullRequest{release}, 43, false, "PR #43 merged into release, not the default branch"},
-		{"closed", []PullRequest{{Number: 41, State: PullRequestClosed}}, 41, false, "PR #41 was closed without merging"},
+		{"none", nil, 0, false, "", false},
+		{"merged with the tip", []PullRequest{merged(42, headA, true)}, 42, true, "", false},
+		{"an open one comes first", []PullRequest{{Number: 45, State: PullRequestOpen}, merged(42, headA, true)}, 45, false, "PR #45 is still open", false},
+		{"an older merge proves it", []PullRequest{merged(44, other, true), merged(42, headA, true)}, 42, true, "", false},
+		{"newer local commits", []PullRequest{merged(42, other, true)}, 42, false, "PR #42 merged at 1111111; this branch is at aaaaaaa", false},
+		{"merged elsewhere", []PullRequest{release}, 43, false, "PR #43 merged into release, not the default branch", false},
+		{"no tip proves nothing", []PullRequest{merged(42, "", true)}, 42, false, "PR #42 merged at ; this branch is at ", true},
+		{"closed", []PullRequest{{Number: 41, State: PullRequestClosed}}, 41, false, "PR #41 was closed without merging", false},
 	} {
-		v := mergeVerdict(tc.prs, headA)
+		tip := headA
+		if tc.noTip {
+			tip = ""
+		}
+		v := mergeVerdict(tc.prs, tip)
 		number := 0
 		if v.PullRequest != nil {
 			number = v.PullRequest.Number

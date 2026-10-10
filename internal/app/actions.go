@@ -90,6 +90,7 @@ type Actions struct {
 	lastFetch      map[string]time.Time
 	restoreLog     string     // appended on branch deletion; "" disables
 	logMu          sync.Mutex // serializes appends from concurrent groups
+	github         *GitHub    // merge evidence for Clean up; nil without gh
 }
 
 func NewActions(service ActionGit, workers int) *Actions {
