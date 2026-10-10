@@ -49,6 +49,7 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	workspace := fs.String("workspace", "", "configured workspace name")
 	depth := fs.Int("max-depth", 4, "override maximum descendant depth (root is zero)")
 	noColor := fs.Bool("no-color", false, "disable dashboard color")
+	withGitHub := fs.Bool("github", false, "status: add pull request state from GitHub through gh")
 	fs.Usage = func() {
 		fmt.Fprintln(errOut, "Usage: gitperch [OPTIONS] [ROOT ...]\n       gitperch status [OPTIONS] [ROOT ...]\nTerminal dashboard for local Git repositories.")
 		fs.PrintDefaults()
@@ -132,9 +133,21 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 			fmt.Fprintln(errOut, "--json requires status")
 			return 2
 		}
+		if *withGitHub {
+			fmt.Fprintln(errOut, "--github requires status")
+			return 2
+		}
 		return runTUI(ctx, cfg, ws, *noColor, out, errOut)
 	}
-	snapshot, err := app.Load(ctx, discovery.Options{Roots: ws.Paths, MaxDepth: ws.MaxDepth, IgnoreDirs: ws.IgnoreDirs}, gitcli.Runner{Timeout: time.Duration(cfg.StatusTimeoutSeconds) * time.Second}, cfg.StatusWorkers)
+	read := gitcli.Runner{Timeout: time.Duration(cfg.StatusTimeoutSeconds) * time.Second}
+	var gh *app.GitHub
+	if *withGitHub {
+		if gh, _, err = newGitHub(ctx, cfg, read); err != nil {
+			fmt.Fprintln(errOut, err)
+			return 2
+		}
+	}
+	snapshot, err := app.Load(ctx, discovery.Options{Roots: ws.Paths, MaxDepth: ws.MaxDepth, IgnoreDirs: ws.IgnoreDirs}, read, cfg.StatusWorkers)
 	if err != nil {
 		fmt.Fprintln(errOut, gitcli.SafeText(err.Error()))
 		if ctx.Err() != nil {
@@ -143,6 +156,20 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	rows := snapshot.Rows
+	if gh != nil {
+		gh.LookupAll(ctx, rows)
+		gh.Annotate(rows)
+		failed := 0
+		for _, row := range rows {
+			if row.GitHub != nil && row.GitHub.Error != "" {
+				failed++
+			}
+		}
+		if failed > 0 {
+			// Supplementary data: failed lookups never change the exit code.
+			fmt.Fprintf(errOut, "github: %d pull request lookup(s) failed; see each repository's GitHub error\n", failed)
+		}
+	}
 	if *asJSON {
 		err = app.WriteJSON(out, rows, snapshot.Warnings)
 	} else {

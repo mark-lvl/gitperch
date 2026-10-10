@@ -41,6 +41,7 @@ func WriteJSON(w io.Writer, rows []Row, warnings []discovery.Warning) error {
 
 func WriteTable(w io.Writer, rows []Row) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	fromGitHub := false
 	if _, err := fmt.Fprintln(tw, "REPOSITORY / PATH\tBRANCH\tCHANGES\tUNTRACKED\tCONFLICTS\tAHEAD*\tBEHIND*\tUPSTREAM\tSTATE\tATTENTION"); err != nil {
 		return err
 	}
@@ -96,6 +97,8 @@ func WriteTable(w io.Writer, rows []Row) error {
 		if s.Operation != "" {
 			markers = append(markers, "operation: "+s.Operation)
 		}
+		markers = append(markers, githubMarkers(row)...)
+		fromGitHub = fromGitHub || row.GitHub != nil
 		if _, err := fmt.Fprintf(tw, "%s / %s\t%s\tchanges:%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\n", gitcli.SafeText(row.Name), gitcli.SafeText(row.Path), gitcli.SafeText(branch), s.Changes, s.Untracked, s.Conflicts, ahead, behind, gitcli.SafeText(s.Upstream), gitcli.SafeText(strings.Join(markers, ", ")), attention.Level); err != nil {
 			return err
 		}
@@ -103,6 +106,34 @@ func WriteTable(w io.Writer, rows []Row) error {
 	if err := tw.Flush(); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintln(w, "* Ahead/behind use locally known tracking refs; status does not contact remotes.")
+	if _, err := fmt.Fprintln(w, "* Ahead/behind use locally known tracking refs; status does not contact remotes."); err != nil || !fromGitHub {
+		return err
+	}
+	_, err := fmt.Fprintln(w, "* Pull request data comes from GitHub through gh.")
 	return err
+}
+
+// githubMarkers describe a row's pull request state for the STATE column.
+func githubMarkers(row Row) []string {
+	if row.GitHub == nil {
+		return nil
+	}
+	var markers []string
+	if pr := row.CurrentPullRequest(); pr != nil {
+		state := pr.State
+		if pr.Draft && state == PullRequestOpen {
+			state = "draft"
+		}
+		markers = append(markers, fmt.Sprintf("pr #%d %s", pr.Number, state))
+		if pr.State == PullRequestOpen && pr.Checks == ChecksFailing {
+			markers = append(markers, "checks failing")
+		}
+		if pr.State == PullRequestOpen && pr.Review == ReviewChangesRequested {
+			markers = append(markers, "changes requested")
+		}
+	}
+	if row.GitHub.Error != "" {
+		markers = append(markers, "github: "+row.GitHub.Error)
+	}
+	return markers
 }

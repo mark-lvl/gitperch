@@ -47,3 +47,25 @@ func TestReadOnlyReport(t *testing.T) {
 		t.Fatalf("%+v", report)
 	}
 }
+
+func TestTableShowsPullRequestMarkers(t *testing.T) {
+	plain := []Row{{Repository: repository.Repository{Path: "/r", Name: "r"}, Status: repository.Status{Branch: "main", Upstream: "origin/main", ComparisonKnown: true}}}
+	var out bytes.Buffer
+	if err := WriteTable(&out, plain); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "GitHub") || strings.Contains(out.String(), "pr #") {
+		t.Fatalf("table without GitHub data mentions it:\n%s", out.String())
+	}
+	rows := append(plain, Row{Repository: repository.Repository{Path: "/w", Name: "w"}, Status: repository.Status{Branch: "feat", Upstream: "origin/feat", ComparisonKnown: true},
+		GitHub: &GitHubInfo{Error: "gh is not logged in to github.com — run gh auth login", PullRequests: []PullRequest{{Number: 42, State: PullRequestOpen, Draft: true, Checks: ChecksFailing, Review: ReviewChangesRequested}}}})
+	out.Reset()
+	if err := WriteTable(&out, rows); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"pr #42 draft, checks failing, changes requested, github: gh is not logged in to github.com", "* Pull request data comes from GitHub through gh."} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("table lacks %q:\n%s", want, out.String())
+		}
+	}
+}
