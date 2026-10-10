@@ -47,32 +47,16 @@ func (m *Model) githubLookups() tea.Cmd {
 }
 
 // applyGitHub annotates the rows, which can change attention and therefore
-// order and Focus, then keeps the highlighted repository and drops selected
-// rows the view no longer shows, as a refresh does.
+// order and Focus, then keeps the highlighted repository and the selection as
+// a refresh does.
 func (m *Model) applyGitHub() {
 	path := ""
 	if row := m.highlightedRow(); row != nil {
 		path = row.Path
 	}
+	oldSelection := m.selected
 	m.github.Annotate(m.rows)
-	visible := map[string]bool{}
-	for _, index := range m.visibleRows() {
-		if m.matchesView(m.rows[index]) {
-			visible[m.rows[index].Path] = true
-		}
-	}
-	for selected := range m.selected {
-		if !visible[selected] {
-			delete(m.selected, selected)
-		}
-	}
-	for i, index := range m.visibleRows() {
-		if m.rows[index].Path == path {
-			m.highlight = i
-			break
-		}
-	}
-	m.keepHighlightVisible()
+	m.restoreView(path, oldSelection)
 }
 
 // openPullRequest is the row's current pull request when it is open.

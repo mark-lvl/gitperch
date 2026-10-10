@@ -371,6 +371,11 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	}
 	oldSelection := m.selected
 	m.rows = append([]app.Row(nil), snapshot.Rows...)
+	// Cached GitHub results go on before visibility is computed: a row that is
+	// in Focus only for its pull request must keep its highlight and selection.
+	if m.github != nil {
+		m.github.Annotate(m.rows)
+	}
 	if m.detailCancel != nil {
 		m.detailCancel()
 		m.detailCancel = nil
@@ -397,7 +402,14 @@ func (m *Model) applySnapshot(snapshot app.Snapshot) {
 	for _, warning := range snapshot.Warnings {
 		m.warnings = append(m.warnings, gitcli.SafeText(warning.Path+": "+warning.Message))
 	}
-	// Selection stays visible: a row in a collapsed group is dropped.
+	m.restoreView(oldHighlight, oldSelection)
+}
+
+// restoreView re-applies the highlighted repository and the selection after
+// the rows or their attention changed. The selection stays visible and
+// selectable: a row in a collapsed group or hidden by Focus is dropped. The
+// highlight follows its repository, else returns to the first row.
+func (m *Model) restoreView(oldHighlight string, oldSelection map[string]bool) {
 	m.selected = make(map[string]bool)
 	for _, index := range m.visibleRows() {
 		row := m.rows[index]

@@ -119,9 +119,11 @@ func TestPreviewShowsPullRequestLine(t *testing.T) {
 		t.Fatalf("stale data not labelled:\n%s", view)
 	}
 	// A six-row card, the smallest, keeps its file row and drops the line.
+	m.EnableDetails(func(context.Context, string) (gitcli.RepoDetails, error) { return gitcli.RepoDetails{}, nil })
+	m.detailCache[stale.Path] = detailResult{data: gitcli.RepoDetails{Files: []gitcli.ChangedFile{{Code: " M", Path: "src/first.go"}, {Code: " M", Path: "src/second.go"}}}}
 	for h, want := range map[int]bool{6: false, 7: true} {
 		card := strings.Join(m.selectedPreview(56, h), "\n")
-		if strings.Contains(card, "PR #42") != want || !strings.Contains(card, "Working tree") {
+		if strings.Contains(card, "PR #42") != want || !strings.Contains(card, "src/first.go") || strings.Contains(card, "src/second.go") {
 			t.Fatalf("card of height %d:\n%s", h, card)
 		}
 	}
@@ -215,5 +217,60 @@ func TestOnlyManualRefreshesForceGitHub(t *testing.T) {
 	m.key(key("q"))
 	if m.githubCtx.Err() == nil {
 		t.Fatal("quitting left GitHub lookups running")
+	}
+}
+
+// focusModel is a Focus-scoped dashboard whose GitHub cache already holds the
+// lookups for rows, as after a first refresh.
+func focusModel(t *testing.T, rows []app.Row, checks string) *Model {
+	t.Helper()
+	m := New(context.Background(), func(context.Context) (app.Snapshot, error) { return app.Snapshot{Rows: rows}, nil }, true)
+	g := app.NewGitHub(githubGit{}, &githubPulls{checks: checks}, nil)
+	g.LookupAll(context.Background(), rows)
+	m.EnableGitHub(g)
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
+	m.setScope(1)
+	return m
+}
+
+func TestRefreshKeepsHighlightAndSelectionOfPullRequestOnlyFocusRows(t *testing.T) {
+	// zeta is in Focus only for its failing checks, which the fresh rows of the
+	// next snapshot do not carry yet.
+	m := focusModel(t, githubRows(), "FAILURE")
+	if got := m.visibleRows(); len(got) != 1 || m.rows[got[0]].Name != "zeta" {
+		t.Fatalf("Focus shows %v", got)
+	}
+	m.key(key(" "))
+	if !m.selected["/repos/zeta"] {
+		t.Fatal("zeta not selected")
+	}
+	m.applySnapshot(app.Snapshot{Rows: githubRows()})
+	if row := m.highlightedRow(); row == nil || row.Path != "/repos/zeta" || !m.selected["/repos/zeta"] {
+		t.Fatalf("refresh lost zeta: highlight %d on %+v, selected %v", m.highlight, row, m.selected)
+	}
+
+	// With alpha behind it comes first; the highlight must stay on zeta.
+	rows := githubRows()
+	rows[0].Status.Behind = 1
+	m = focusModel(t, rows, "FAILURE")
+	highlightPath(t, m, "/repos/zeta")
+	if m.highlight != 1 {
+		t.Fatalf("zeta is at %d, want 1", m.highlight)
+	}
+	m.applySnapshot(app.Snapshot{Rows: rows})
+	if row := m.highlightedRow(); row == nil || row.Path != "/repos/zeta" || m.highlight != 1 {
+		t.Fatalf("highlight %d on %+v", m.highlight, row)
+	}
+}
+
+func TestGitHubDataDroppingTheHighlightedRowResetsToTheFirst(t *testing.T) {
+	m := focusModel(t, githubRows(), "FAILURE")
+	m.key(key(" "))
+	m.github = app.NewGitHub(githubGit{}, &githubPulls{checks: "SUCCESS"}, nil)
+	m.github.LookupAll(context.Background(), githubRows())
+	m.applyGitHub() // Focus is empty now
+	if len(m.selected) != 0 || m.highlight != 0 || m.scroll != 0 {
+		t.Fatalf("highlight %d, scroll %d, selected %v", m.highlight, m.scroll, m.selected)
 	}
 }
