@@ -351,3 +351,50 @@ func TestLifecycleWithoutIntegrationSupport(t *testing.T) {
 		t.Fatalf("without integration: %+v %+v", row.Worktree.Integration, l)
 	}
 }
+
+func TestLifecycleAcceptsMergedPullRequest(t *testing.T) {
+	withPR := func(r Row) Row {
+		r.GitHub = &GitHubInfo{PullRequests: []PullRequest{{Number: 42, State: PullRequestMerged, Base: "main", IntoDefaultBranch: true, HeadOID: r.Status.HeadOID}}}
+		return r
+	}
+	quiet := withPR(linkedRow(6*day, notMerged))
+	l := quiet.Lifecycle()
+	if l.State != WorktreeFinished || !slices.Equal(l.Reasons, []Signal{SignalClean, SignalNothingToPush, SignalMergedPullRequest, SignalInactive}) {
+		t.Fatalf("squash-merged and quiet: %+v", l)
+	}
+	if got := quiet.DescribeSignal(SignalMergedPullRequest); got != "merged via PR #42 into main" {
+		t.Fatalf("describe: %q", got)
+	}
+	a := quiet.Attention()
+	if !slices.Equal(a.Reasons, []Reason{ReasonWorktreeFinished}) || !strings.Contains(quiet.Describe(ReasonWorktreeFinished), "merged via PR #42 into main") {
+		t.Fatalf("attention: %+v, %q", a, quiet.Describe(ReasonWorktreeFinished))
+	}
+	// GitHub deleted the remote branch after the merge.
+	gone := quiet
+	gone.Status.ComparisonKnown = false
+	if l := gone.Lifecycle(); l.State != WorktreeFinished || !slices.Equal(l.Reasons, []Signal{SignalClean, SignalMergedPullRequest, SignalInactive}) {
+		t.Fatalf("remote branch deleted: %+v", l)
+	}
+	// Recently active: not finished yet, but its pull request is merged.
+	busy := withPR(linkedRow(time.Hour, notMerged))
+	if l := busy.Lifecycle(); l.State != WorktreeActive {
+		t.Fatalf("active: %+v", l)
+	}
+	if a := busy.Attention(); !slices.Equal(a.Reasons, []Reason{ReasonPRMerged}) || busy.Describe(ReasonPRMerged) != "PR #42 merged into main; nothing newer on this branch" {
+		t.Fatalf("active attention: %+v", a)
+	}
+	// Git's own comparison wins when it shows the merge.
+	both := withPR(linkedRow(6*day, merged))
+	if l := both.Lifecycle(); !slices.Contains(l.Reasons, SignalMerged) || slices.Contains(l.Reasons, SignalMergedPullRequest) {
+		t.Fatalf("merged both ways: %+v", l)
+	}
+}
+
+func TestAttentionReportsMergedPullRequestOnMainWorktree(t *testing.T) {
+	r := Row{Status: tracking(0, 0)}
+	r.Status.Branch, r.Status.Upstream, r.Status.HeadOID = "feat", "origin/feat", strings.Repeat("c", 40)
+	r.GitHub = &GitHubInfo{PullRequests: []PullRequest{{Number: 9, State: PullRequestMerged, Base: "main", IntoDefaultBranch: true, HeadOID: r.Status.HeadOID}}}
+	if a := r.Attention(); a.Level != Medium || !slices.Equal(a.Reasons, []Reason{ReasonPRMerged}) {
+		t.Fatalf("attention: %+v", a)
+	}
+}

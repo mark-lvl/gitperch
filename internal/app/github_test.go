@@ -274,3 +274,57 @@ func TestReportIncludesGitHubOnlyWhenAnnotated(t *testing.T) {
 		}
 	}
 }
+
+func TestMergeVerdict(t *testing.T) {
+	merged := func(number int, head string, intoDefault bool) PullRequest {
+		return PullRequest{Number: number, State: PullRequestMerged, Base: "main", IntoDefaultBranch: intoDefault, HeadOID: head}
+	}
+	release := merged(43, headA, false)
+	release.Base = "release"
+	other := strings.Repeat("1", 40)
+	for _, tc := range []struct {
+		name   string
+		prs    []PullRequest
+		number int
+		proven bool
+		note   string
+	}{
+		{"none", nil, 0, false, ""},
+		{"merged with the tip", []PullRequest{merged(42, headA, true)}, 42, true, ""},
+		{"an open one comes first", []PullRequest{{Number: 45, State: PullRequestOpen}, merged(42, headA, true)}, 45, false, "PR #45 is still open"},
+		{"an older merge proves it", []PullRequest{merged(44, other, true), merged(42, headA, true)}, 42, true, ""},
+		{"newer local commits", []PullRequest{merged(42, other, true)}, 42, false, "PR #42 merged at 1111111; this branch is at aaaaaaa"},
+		{"merged elsewhere", []PullRequest{release}, 43, false, "PR #43 merged into release, not the default branch"},
+		{"closed", []PullRequest{{Number: 41, State: PullRequestClosed}}, 41, false, "PR #41 was closed without merging"},
+	} {
+		v := mergeVerdict(tc.prs, headA)
+		number := 0
+		if v.PullRequest != nil {
+			number = v.PullRequest.Number
+		}
+		if number != tc.number || v.Proven != tc.proven || v.Note != tc.note {
+			t.Errorf("%s: %+v (PR %d)", tc.name, v, number)
+		}
+	}
+}
+
+func TestMergedPullRequestNeedsTheCheckedOutHead(t *testing.T) {
+	row := ghRow("/repo", "feat/a")
+	row.GitHub = &GitHubInfo{PullRequests: []PullRequest{{Number: 42, State: PullRequestMerged, IntoDefaultBranch: true, HeadOID: headA}}}
+	if pr := row.MergedPullRequest(); pr == nil || pr.Number != 42 {
+		t.Fatalf("merged: %+v", pr)
+	}
+	for name, edit := range map[string]func(*Row){
+		"detached":    func(r *Row) { r.Status.Detached, r.Status.Branch = true, "" },
+		"unborn":      func(r *Row) { r.Status.Unborn = true },
+		"moved on":    func(r *Row) { r.Status.HeadOID = strings.Repeat("b", 40) },
+		"no data":     func(r *Row) { r.GitHub = nil },
+		"no head oid": func(r *Row) { r.Status.HeadOID = "" },
+	} {
+		r := row
+		edit(&r)
+		if pr := r.MergedPullRequest(); pr != nil {
+			t.Errorf("%s: %+v", name, pr)
+		}
+	}
+}

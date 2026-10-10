@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -95,6 +96,64 @@ func (r Row) CurrentPullRequest() *PullRequest {
 		return nil
 	}
 	return &r.GitHub.PullRequests[0]
+}
+
+// MergeVerdict says whether GitHub proves a branch's work merged although Git
+// cannot show it: Proven when a pull request merged into its repository's
+// default branch had exactly the branch tip as its head. Otherwise Note
+// explains PullRequest, the pull request that decided; both are empty when
+// the branch has no pull requests.
+type MergeVerdict struct {
+	PullRequest *PullRequest
+	Proven      bool
+	Note        string
+}
+
+// mergeVerdict decides in this order: an open pull request (unproven: work
+// continues), a pull request merged into the default branch whose head is
+// tip (proven), another merged one (unproven, saying why), a closed one.
+func mergeVerdict(prs []PullRequest, tip string) MergeVerdict {
+	find := func(match func(PullRequest) bool) *PullRequest {
+		for i := range prs {
+			if match(prs[i]) {
+				return &prs[i]
+			}
+		}
+		return nil
+	}
+	if pr := find(func(p PullRequest) bool { return p.State == PullRequestOpen }); pr != nil {
+		return MergeVerdict{PullRequest: pr, Note: fmt.Sprintf("PR #%d is still open", pr.Number)}
+	}
+	if pr := find(func(p PullRequest) bool {
+		return p.State == PullRequestMerged && p.IntoDefaultBranch && p.HeadOID == tip
+	}); pr != nil {
+		return MergeVerdict{PullRequest: pr, Proven: true}
+	}
+	if pr := find(func(p PullRequest) bool { return p.State == PullRequestMerged }); pr != nil {
+		note := fmt.Sprintf("PR #%d merged into %s, not the default branch", pr.Number, gitcli.SafeText(pr.Base))
+		if pr.IntoDefaultBranch {
+			note = fmt.Sprintf("PR #%d merged at %s; this branch is at %s", pr.Number, shortOID(pr.HeadOID), shortOID(tip))
+		}
+		return MergeVerdict{PullRequest: pr, Note: note}
+	}
+	if pr := find(func(p PullRequest) bool { return p.State == PullRequestClosed }); pr != nil {
+		return MergeVerdict{PullRequest: pr, Note: fmt.Sprintf("PR #%d was closed without merging", pr.Number)}
+	}
+	return MergeVerdict{}
+}
+
+// MergedPullRequest is GitHub's proof that the checked-out branch is merged:
+// the proven pull request for HEAD, so everything on the branch went in
+// through it and nothing newer exists locally. Nil otherwise.
+func (r Row) MergedPullRequest() *PullRequest {
+	s := r.Status
+	if r.GitHub == nil || s.Detached || s.Unborn || s.Branch == "" || s.HeadOID == "" {
+		return nil
+	}
+	if v := mergeVerdict(r.GitHub.PullRequests, s.HeadOID); v.Proven {
+		return v.PullRequest
+	}
+	return nil
 }
 
 // GitHub lookup cadence; see GitHub.Due.

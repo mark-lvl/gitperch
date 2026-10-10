@@ -81,6 +81,9 @@ const (
 	// branch's open pull request on GitHub (Row.GitHub): someone has to act.
 	ReasonPRChecksFailing    Reason = "pr_checks_failing"
 	ReasonPRChangesRequested Reason = "pr_changes_requested"
+	// ReasonPRMerged: GitHub merged the checked-out branch's pull request
+	// with exactly HEAD, so the branch is done; see Row.MergedPullRequest.
+	ReasonPRMerged Reason = "pr_merged"
 )
 
 // reasonOrder lists reasons from most to least severe; Attention.Reasons
@@ -89,7 +92,7 @@ var reasonOrder = []Reason{
 	ReasonActionFailed, ReasonInspectionFailed, ReasonConflicts, ReasonOperation,
 	ReasonDiverged, ReasonUncommitted, ReasonUntracked, ReasonUnpushed, ReasonDetachedCommits,
 	ReasonBehind, ReasonPRChecksFailing, ReasonPRChangesRequested, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree,
-	ReasonWorktreeFinished, ReasonWorktreeIdle,
+	ReasonPRMerged, ReasonWorktreeFinished, ReasonWorktreeIdle,
 }
 
 // Level is the attention level the reason alone warrants.
@@ -99,7 +102,7 @@ func (r Reason) Level() Level {
 		return Critical
 	case ReasonDiverged, ReasonUncommitted, ReasonUntracked, ReasonUnpushed, ReasonDetachedCommits:
 		return High
-	case ReasonBehind, ReasonPRChecksFailing, ReasonPRChangesRequested, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree, ReasonWorktreeFinished, ReasonWorktreeIdle:
+	case ReasonBehind, ReasonPRChecksFailing, ReasonPRChangesRequested, ReasonTrackingUnknown, ReasonNoUpstream, ReasonNoCommits, ReasonStaleWorktree, ReasonPRMerged, ReasonWorktreeFinished, ReasonWorktreeIdle:
 		return Medium
 	}
 	return Low
@@ -186,13 +189,18 @@ func (r Row) Attention() Attention {
 		}
 	}
 	// Lifecycle reads the same facts, never attention, so the two cannot loop.
-	if l := r.Lifecycle(); l != nil {
+	l := r.Lifecycle()
+	if l != nil {
 		switch l.State {
 		case WorktreeFinished:
 			a = a.With(ReasonWorktreeFinished)
 		case WorktreeIdle:
 			a = a.With(ReasonWorktreeIdle)
 		}
+	}
+	// A linked worktree that already looks finished says so once.
+	if r.MergedPullRequest() != nil && (l == nil || l.State != WorktreeFinished) {
+		a = a.With(ReasonPRMerged)
 	}
 	return a
 }
@@ -236,7 +244,7 @@ func (r Row) Describe(reason Reason) string {
 		return "stale worktree record"
 	case ReasonWorktreeFinished:
 		idle, _ := r.Inactivity()
-		return "linked worktree looks finished: " + r.DescribeSignal(SignalMerged) + ", no HEAD activity for " + span(idle)
+		return "linked worktree looks finished: " + r.DescribeSignal(r.mergeSignal()) + ", no HEAD activity for " + span(idle)
 	case ReasonWorktreeIdle:
 		idle, _ := r.Inactivity()
 		return "linked worktree idle: no HEAD activity for " + span(idle)
@@ -244,6 +252,11 @@ func (r Row) Describe(reason Reason) string {
 		return pullRequestName(r.CurrentPullRequest()) + " checks failing"
 	case ReasonPRChangesRequested:
 		return pullRequestName(r.CurrentPullRequest()) + ": changes requested"
+	case ReasonPRMerged:
+		if pr := r.MergedPullRequest(); pr != nil {
+			return fmt.Sprintf("PR #%d merged into %s; nothing newer on this branch", pr.Number, gitcli.SafeText(pr.Base))
+		}
+		return "pull request merged; nothing newer on this branch"
 	}
 	return gitcli.SafeText(string(reason))
 }

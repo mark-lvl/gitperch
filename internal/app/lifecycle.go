@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"time"
 
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
@@ -76,11 +77,14 @@ const (
 	SignalNothingToPush    Signal = "nothing_to_push"
 	SignalNoUpstream       Signal = "no_upstream"
 	SignalMerged           Signal = "merged"
-	SignalNotMerged        Signal = "not_merged"
-	SignalMergeUnknown     Signal = "merge_unknown"
-	SignalRecentActivity   Signal = "recent_activity"
-	SignalInactive         Signal = "inactive"
-	SignalActivityUnknown  Signal = "activity_unknown"
+	// SignalMergedPullRequest: Git cannot show HEAD merged (a squash or
+	// rebase merge), but GitHub reports it merged; see Row.MergedPullRequest.
+	SignalMergedPullRequest Signal = "merged_pull_request"
+	SignalNotMerged         Signal = "not_merged"
+	SignalMergeUnknown      Signal = "merge_unknown"
+	SignalRecentActivity    Signal = "recent_activity"
+	SignalInactive          Signal = "inactive"
+	SignalActivityUnknown   Signal = "activity_unknown"
 )
 
 // Lifecycle explains a linked worktree's State with the Signals it was
@@ -161,11 +165,14 @@ func (r Row) Lifecycle() *Lifecycle {
 	merged := false
 	switch in := w.Integration; {
 	case s.Unborn:
-	case in == nil || in.Error != "":
-		reasons = append(reasons, SignalMergeUnknown)
-	case in.Merged:
+	case in != nil && in.Error == "" && in.Merged:
 		merged = true
 		reasons = append(reasons, SignalMerged)
+	case r.MergedPullRequest() != nil:
+		merged = true
+		reasons = append(reasons, SignalMergedPullRequest)
+	case in == nil || in.Error != "":
+		reasons = append(reasons, SignalMergeUnknown)
 	default:
 		reasons = append(reasons, SignalNotMerged)
 	}
@@ -236,6 +243,11 @@ func (r Row) DescribeSignal(signal Signal) string {
 		return "nothing to push to " + gitcli.SafeText(s.Upstream)
 	case SignalMerged:
 		return "merged into " + base
+	case SignalMergedPullRequest:
+		if pr := r.MergedPullRequest(); pr != nil {
+			return fmt.Sprintf("merged via PR #%d into %s", pr.Number, gitcli.SafeText(pr.Base))
+		}
+		return "merged via a pull request"
 	case SignalNotMerged:
 		return "not merged into " + base
 	case SignalMergeUnknown:
@@ -253,6 +265,15 @@ func (r Row) DescribeSignal(signal Signal) string {
 		return "no HEAD reflog, so activity is unknown"
 	}
 	return gitcli.SafeText(string(signal))
+}
+
+// mergeSignal is the signal that shows the row merged: Git's own comparison
+// when it shows the merge, else GitHub's pull request.
+func (r Row) mergeSignal() Signal {
+	if in := r.Worktree.integration(); !(in.Merged && in.Error == "") && r.MergedPullRequest() != nil {
+		return SignalMergedPullRequest
+	}
+	return SignalMerged
 }
 
 func (w *WorktreeInfo) integration() Integration {
