@@ -274,3 +274,27 @@ func TestGitHubDataDroppingTheHighlightedRowResetsToTheFirst(t *testing.T) {
 		t.Fatalf("highlight %d, scroll %d, selected %v", m.highlight, m.scroll, m.selected)
 	}
 }
+
+func TestMergedPullRequestStatusAndNextStep(t *testing.T) {
+	head := strings.Repeat("c", 40)
+	row := prRow(app.PullRequest{Number: 42, State: app.PullRequestMerged, Base: "main", IntoDefaultBranch: true, HeadOID: head})
+	row.Status.HeadOID, row.Status.ComparisonKnown = head, false // GitHub deleted the remote branch
+	m := New(context.Background(), nil, true)
+	if label, _ := m.primaryStatus(row); label != "✓ merged #42" {
+		t.Fatalf("label %q", label)
+	}
+	if got := nextStep(row); got != "PR #42 is merged. Switch to main in your shell, then review the branch with Clean up (c)." {
+		t.Fatalf("main worktree: %q", got)
+	}
+	linked := row
+	linked.Worktree = &app.WorktreeInfo{Linked: true, MainPath: "/repos/main"}
+	linked.Status.InspectedAt, linked.Status.LastActivity = captureNow, captureNow.Add(-time.Hour)
+	if got := nextStep(linked); got != "PR #42 is merged into main. Review it with Clean up (c)." {
+		t.Fatalf("linked worktree: %q", got)
+	}
+	dirty := row
+	dirty.Status.Changes = 1
+	if label, _ := m.primaryStatus(dirty); label != "● changed" || strings.Contains(nextStep(dirty), "is merged") {
+		t.Fatalf("uncommitted changes come first: %q, %q", label, nextStep(dirty))
+	}
+}

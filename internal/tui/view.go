@@ -344,7 +344,7 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 	if w := row.Worktree; w != nil && w.Prunable {
 		return "◌ stale · directory missing", amber
 	}
-	state, open := lifecycleState(row), openPullRequest(row)
+	state, open, merged := lifecycleState(row), openPullRequest(row), row.MergedPullRequest()
 	switch {
 	case s.Error != "":
 		return icons.failed + " failed", danger
@@ -364,6 +364,8 @@ func (m *Model) primaryStatus(row app.Row) (string, string) {
 		return icons.clean + " finished?", success
 	case state == app.WorktreeIdle:
 		return "idle " + idleDays(row), amber
+	case merged != nil:
+		return fmt.Sprintf("%s merged #%d", icons.clean, merged.Number), success
 	case s.Detached:
 		return "detached", muted
 	case s.Unborn:
@@ -582,7 +584,7 @@ func syncLabel(row app.Row) (string, string) {
 }
 
 func nextStep(row app.Row) string {
-	s, open := row.Status, openPullRequest(row)
+	s, open, merged := row.Status, openPullRequest(row), row.MergedPullRequest()
 	switch {
 	case s.Error != "":
 		return "Status unavailable. Open diagnostics with d; refresh with r after resolving the error."
@@ -600,6 +602,10 @@ func nextStep(row app.Row) string {
 		return "Looks finished. Press c to review removal; Clean up fetches and rechecks everything first."
 	case lifecycleState(row) == app.WorktreeIdle:
 		return "Idle and clean. Check whether its branch is still needed; Clean up (c) offers removal only once it is merged."
+	case merged != nil && !s.Dirty() && row.Worktree != nil && row.Worktree.Linked:
+		return fmt.Sprintf("PR #%d is merged into %s. Review it with Clean up (c).", merged.Number, gitcli.SafeText(merged.Base))
+	case merged != nil && !s.Dirty():
+		return fmt.Sprintf("PR #%d is merged. Switch to %s in your shell, then review the branch with Clean up (c).", merged.Number, gitcli.SafeText(merged.Base))
 	case s.Upstream == "":
 		return "Configure an upstream in your shell to compare and sync this branch."
 	case !s.ComparisonKnown:

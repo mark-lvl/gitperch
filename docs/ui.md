@@ -80,7 +80,10 @@ terminals. `--no-color`, `NO_COLOR`, and ASCII icons remain supported.
 With gh available ([GitHub pull requests](usage.md#github-pull-requests)), a
 branch whose Git state is otherwise quiet shows its pull request in the status
 column: `× checks #42` and `! changes #42` in amber, and `✓ PR #42` for an open
-pull request with nothing to do. The preview card adds a line under its header,
+pull request with nothing to do. `✓ merged #42` marks a branch whose pull
+request was merged with exactly its HEAD, which also explains a remote branch
+GitHub deleted; a linked worktree like that reads `✓ finished?` once quiet.
+The preview card adds a line under its header,
 such as `PR #42 · open · checks failing · changes requested · 3h ago`, and drops
 it before any changed file when the card is at its smallest. The details
 Overview has a Pull request section with the title, `base ← head`, checks,

@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gitperch status --github` adds the same data: a `github` object per
   repository in JSON and STATE markers in the table. Without the flag,
   `status` still contacts nothing.
+- A branch whose pull request GitHub merged into the default branch with
+  exactly the local commit counts as merged: a quiet linked worktree becomes
+  `✓ finished?` after a squash or rebase merge, other branches show
+  `✓ merged #42` and the `pr_merged` attention reason, and lifecycle JSON
+  gains the `merged_pull_request` signal.
 
 ## [0.4.1-rc.1] - 2026-10-08
 
