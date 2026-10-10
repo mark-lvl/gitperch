@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -36,6 +37,7 @@ type Config struct {
 	StatusTimeoutSeconds int
 	ActionTimeoutSeconds int
 	UI                   UI
+	GitHub               GitHub
 	Workspaces           []Workspace
 	configDir            string
 }
@@ -47,6 +49,18 @@ type UI struct {
 	// RefreshSeconds is the automatic local status refresh interval; 0 disables it.
 	RefreshSeconds int
 }
+
+// GitHub configures the optional GitHub CLI integration.
+type GitHub struct {
+	// Enabled allows gh lookups; true unless [github] enabled = false.
+	Enabled bool
+	// Hosts are GitHub Enterprise Server host names besides github.com,
+	// lower-cased.
+	Hosts []string
+}
+
+// hostName is a bare DNS name: no scheme, port, path or whitespace.
+var hostName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$`)
 
 // Workspace defines discovery settings for a group of roots.
 type Workspace struct {
@@ -117,6 +131,18 @@ func Load(path string, explicit bool) (Config, error) {
 				return Config{}, fmt.Errorf("ui.refresh_seconds must be 0 (off) or between %d and 86400", MinRefreshSeconds)
 			}
 			cfg.UI.RefreshSeconds = int(*seconds)
+		}
+	}
+	if raw.GitHub != nil {
+		if raw.GitHub.Enabled != nil {
+			cfg.GitHub.Enabled = *raw.GitHub.Enabled
+		}
+		for _, host := range raw.GitHub.Hosts {
+			name := strings.ToLower(strings.TrimSuffix(host, "."))
+			if len(name) > 253 || !hostName.MatchString(name) {
+				return Config{}, fmt.Errorf("github.hosts entry %q must be a host name such as github.example.com", host)
+			}
+			cfg.GitHub.Hosts = append(cfg.GitHub.Hosts, name)
 		}
 	}
 	if raw.DefaultWorkspace != nil {
@@ -246,7 +272,7 @@ func (c Config) Resolve(workspace string, roots []string, cwd string) (Workspace
 }
 
 func defaults(configDir string) Config {
-	return Config{UI: UI{Icons: "unicode", RefreshSeconds: DefaultRefreshSeconds}, StatusWorkers: DefaultStatusWorkers, ActionWorkers: DefaultActionWorkers,
+	return Config{UI: UI{Icons: "unicode", RefreshSeconds: DefaultRefreshSeconds}, GitHub: GitHub{Enabled: true}, StatusWorkers: DefaultStatusWorkers, ActionWorkers: DefaultActionWorkers,
 		StatusTimeoutSeconds: DefaultStatusTimeoutSeconds, ActionTimeoutSeconds: DefaultActionTimeoutSeconds,
 		configDir: configDir}
 }
@@ -322,6 +348,7 @@ func cloneWorkspace(w Workspace) Workspace {
 
 type rawConfig struct {
 	UI                   *rawUI         `toml:"ui"`
+	GitHub               *rawGitHub     `toml:"github"`
 	DefaultWorkspace     *string        `toml:"default_workspace"`
 	StatusWorkers        *int64         `toml:"status_workers"`
 	ActionWorkers        *int64         `toml:"action_workers"`
@@ -334,6 +361,11 @@ type rawUI struct {
 	Icons          string `toml:"icons"`
 	DefaultFocus   bool   `toml:"default_focus"`
 	RefreshSeconds *int64 `toml:"refresh_seconds"`
+}
+
+type rawGitHub struct {
+	Enabled *bool    `toml:"enabled"`
+	Hosts   []string `toml:"hosts"`
 }
 
 type rawWorkspace struct {
