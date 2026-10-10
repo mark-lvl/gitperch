@@ -22,6 +22,8 @@ type Row struct {
 	Status    repository.Status `json:"status"`
 	LastFetch time.Time         `json:"last_successful_fetch,omitzero"`
 	Worktree  *WorktreeInfo     `json:"worktree,omitempty"`
+	// GitHub is the branch's pull request state, set only by GitHub.Annotate.
+	GitHub *GitHubInfo `json:"github,omitempty"`
 }
 
 // Selectable reports whether fetch, push and pull can target the row: stale
