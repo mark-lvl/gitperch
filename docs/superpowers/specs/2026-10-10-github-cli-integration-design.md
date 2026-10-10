@@ -1,6 +1,7 @@
 # GitHub CLI integration: pull requests, merge evidence and browser links
 
-Status: approved design, pending implementation plan.
+Status: approved design; implementation plan in
+`docs/superpowers/plans/2026-10-10-github-cli-integration.md`.
 Date: 2026-10-10.
 
 ## Goal
@@ -81,12 +82,12 @@ The only package that runs gh.
   GitHub.
 - `Client{Runner}.PullRequests(ctx, repo Repo, heads []string) (Lookup, error)`
   for 1 to 20 heads:
-  - runs `gh api graphql --hostname <host> -f query=<query> -f owner=<owner>
+  - runs `gh api graphql --hostname=<host> -f query=<query> -f owner=<owner>
     -f name=<name> -f h0=<head> …`. The query text is built from the head
     count alone (aliases `h0…hN`, variables `$h0…$hN`), so names travel only
     in `-f` raw fields. `-F` is never used: it reads a file for `@value` and
     expands `{owner}`-style placeholders;
-  - the query reads the repository's `nameWithOwner`, `url` and
+  - the query reads the repository's `nameWithOwner` and
     `defaultBranchRef`, and for each head
     `pullRequests(headRefName: $hI, first: 10, orderBy: UPDATED_AT DESC)` on
     the repository and on its `parent`, because a fork's pull requests live in
@@ -206,19 +207,20 @@ age.
   color for an open pull request without either. Glyphs come from the icon
   set, so ASCII mode shows `! checks #42` and `ok PR #42`.
 - Preview card: one line under the header when the row has a pull request or
-  a GitHub error, such as `PR #42 open · checks failing · changes requested ·
-  3h ago`, `PR #42 merged into main · 2d ago` or `GitHub: gh is not logged in
-  to github.com — run gh auth login`. Data from an earlier lookup adds
-  `· checked 12m ago`. The card grows by that line; branches without a pull
-  request get none.
+  a GitHub error, such as `PR #42 · open · checks failing · changes requested
+  · 3h ago`, `PR #42 · merged into main · 2d ago` or `GitHub: gh is not logged
+  in to github.com — run gh auth login`. Data from an earlier lookup adds
+  `· checked 12m ago`. The card grows by that line; the smallest card (six
+  rows) drops it so that one changed file still shows, and branches without a
+  pull request get none.
 - Details Overview: a "Pull request" section with the state, title (marked
   draft when it is), `base ← head` with the base repository, checks, review,
   updated or merged age and URL, up to three earlier pull requests of the
   branch, when it was checked and any error. When GitHub has none:
   `none for <branch> on <repository>`.
-- Next step, when Git has nothing more urgent: `PR #42 checks are failing; its
-  link is in details.` and `Reviewers requested changes on PR #42; its link is
-  in details.` Phase 4 changes the endings to `Open it with b.`
+- Next step, when Git has nothing more urgent: `PR #42 checks are failing on
+  GitHub.` and `Reviewers requested changes on PR #42.` Phase 4 appends
+  `Open it with b.`
 
 ### CLI and configuration
 
@@ -295,8 +297,9 @@ ref, and before worktrees are assessed:
    `mergeVerdict` against the branch tip:
    - `PullRequest` is the evidence when `Proven`, otherwise the pull request
      `Note` explains; nil without a verdict;
-   - `Failed` is set, with `Note` `GitHub check failed: …`, when the lookup
-     failed;
+   - `Failed` is set when the lookup failed, with the dashboard's message
+     for it as `Note`, such as
+     `gh is not logged in to github.com — run gh auth login`;
    - `RestoreFrom` is the upstream remote's name when the evidence's base
      repository is the upstream's repository, otherwise the base repository's
      URL.
@@ -367,10 +370,10 @@ The result message keeps its `restore: git branch` prefix.
 - `b` in the workspace and in details, and the palette commands
   `Open pull request #42 in browser` or `Open owner/name on GitHub`, run it
   through `tea.ExecProcess`, so terminal browsers work. On return the status
-  line says `Opened in browser` or shows the error; nothing refreshes. Without
+  line says `Opened in the browser` or shows the error; nothing refreshes. Without
   GitHub data: `No GitHub repository for this branch`.
 - Footer hint `b PR` when the highlighted row has a pull request, a help line,
-  and the phase 1 next steps end with `Open it with b.`
+  and the phase 1 next steps gain `Open it with b.`
 
 ## Error handling
 
