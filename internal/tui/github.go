@@ -214,15 +214,19 @@ func (m *Model) canBrowse(row app.Row) bool {
 }
 
 // openInBrowser runs gh browse with the terminal handed over, since BROWSER
-// may name a terminal browser.
+// may name a terminal browser. Without GitHub, b does nothing, as before
+// the integration.
 func (m *Model) openInBrowser() tea.Cmd {
+	if m.browse == nil {
+		return nil
+	}
 	row := m.highlightedRow()
 	if row == nil {
 		m.message = "Select a repository first"
 		return nil
 	}
 	target, ok := row.BrowseTarget()
-	if !ok || m.browse == nil {
+	if !ok {
 		m.message = "No GitHub repository for this branch"
 		return nil
 	}

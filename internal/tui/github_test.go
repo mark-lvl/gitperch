@@ -305,7 +305,7 @@ func TestBrowserOpensThePullRequest(t *testing.T) {
 	m := New(context.Background(), nil, true)
 	m.applySnapshot(app.Snapshot{Rows: []app.Row{prRow(failingPR)}})
 	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
-	if cmd := m.key(key("b")); cmd != nil || m.message != "No GitHub repository for this branch" {
+	if cmd := m.key(key("b")); cmd != nil || m.message != "" {
 		t.Fatalf("without gh: %v, %q", cmd, m.message)
 	}
 	var opened app.BrowseTarget
@@ -331,5 +331,11 @@ func TestBrowserOpensThePullRequest(t *testing.T) {
 	m.EnableBrowse(func(app.BrowseTarget) (*exec.Cmd, error) { return nil, errors.New("gh is not installed") })
 	if cmd := m.key(key("b")); cmd != nil || m.message != "gh browse: gh is not installed" {
 		t.Fatalf("failed command: %v, %q", cmd, m.message)
+	}
+	plain := prRow()
+	plain.GitHub = nil
+	m.applySnapshot(app.Snapshot{Rows: []app.Row{plain}})
+	if cmd := m.key(key("b")); cmd != nil || m.message != "No GitHub repository for this branch" {
+		t.Fatalf("no GitHub data: %v, %q", cmd, m.message)
 	}
 }
