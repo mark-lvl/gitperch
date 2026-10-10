@@ -226,7 +226,7 @@ func (g *GitHub) MergeEvidence(ctx context.Context, path string, branches []gitc
 			continue
 		}
 		if v.Proven {
-			v.RestoreFrom = restoreSource(t.remote, a.name, *v.PullRequest)
+			v.RestoreFrom = restoreSource(t.remote, t.repo.Host, a.name, *v.PullRequest)
 		}
 		verdicts[b.Name] = v
 	}
@@ -236,12 +236,13 @@ func (g *GitHub) MergeEvidence(ctx context.Context, path string, branches []gitc
 // restoreSource is where a deleted squash-merged branch's commits can be
 // fetched again from GitHub's pull request ref: the upstream remote when the
 // pull request lives in its repository, else the base repository's URL, as
-// for a fork's pull request into its parent.
-func restoreSource(remote, repository string, pr PullRequest) string {
+// for a fork's pull request into its parent. host is the upstream's GitHub
+// host, which the base repository shares.
+func restoreSource(remote, host, repository string, pr PullRequest) string {
 	if strings.EqualFold(pr.BaseRepository, repository) {
 		return remote
 	}
-	return strings.TrimSuffix(pr.URL, fmt.Sprintf("/pull/%d", pr.Number))
+	return "https://" + host + "/" + pr.BaseRepository
 }
 
 // GitHub lookup cadence; see GitHub.Due.
@@ -380,7 +381,21 @@ func (g *GitHub) Lookup(ctx context.Context, group []Row) {
 	for _, row := range group {
 		key := githubKey(row)
 		info := results[key]
-		if old := g.entries[key].info; info != nil && info.Error != "" && old != nil && strings.EqualFold(old.Repository, info.Repository) && old.Branch == info.Branch {
+		prev, seen := g.entries[key]
+		switch old := prev.info; {
+		case info == nil || info.Error == "":
+			// An answer, or no GitHub upstream: stored as is.
+		case info.Repository == "" && seen:
+			// The branch listing failed, so the upstream is unknown: keep
+			// what the last lookup found, with the error attached when that
+			// was a GitHub upstream.
+			info = nil
+			if old != nil {
+				kept := *old
+				kept.Error = results[key].Error
+				info = &kept
+			}
+		case old != nil && strings.EqualFold(old.Repository, info.Repository) && old.Branch == info.Branch:
 			// On error info.Repository is the remote URL's spelling; keep
 			// GitHub's own name for the repository.
 			info.Repository, info.PullRequests, info.CheckedAt = old.Repository, old.PullRequests, old.CheckedAt

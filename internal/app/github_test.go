@@ -182,6 +182,29 @@ func TestGitHubFailedRecheckKeepsEarlierPullRequests(t *testing.T) {
 	}
 }
 
+func TestGitHubFailedBranchListingKeepsEarlierEntries(t *testing.T) {
+	git := fakeGitHubGit{branches: []gitcli.Branch{upstream("feat/a", "origin", "feat/a"), upstream("feat/b", "gitlab", "feat/b")}, urls: githubOrigin}
+	pulls := &fakePulls{prs: map[string][]github.PullRequest{"feat/a": {{Number: 7, State: "OPEN"}}}}
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	first := now
+	gh := NewGitHub(git, pulls, nil)
+	gh.now = func() time.Time { return now }
+	rows := []Row{ghRow("/repo", "feat/a"), ghRow("/repo-b", "feat/b")}
+	gh.LookupAll(context.Background(), rows)
+	gh.git = fakeGitHubGit{err: errors.New("broken refs")}
+	now = now.Add(GitHubTTL)
+	gh.LookupAll(context.Background(), rows)
+	gh.Annotate(rows)
+	info := rows[0].GitHub
+	if info == nil || !strings.Contains(info.Error, "could not read branch upstreams: broken refs") || info.Repository != "acme/widgets" ||
+		len(info.PullRequests) != 1 || info.PullRequests[0].Number != 7 || !info.CheckedAt.Equal(first) {
+		t.Fatalf("GitHub row after a failed branch listing: %+v", info)
+	}
+	if info := rows[1].GitHub; info != nil {
+		t.Fatalf("GitLab row gained a GitHub entry: %+v", info)
+	}
+}
+
 func TestGitHubFailedRecheckMatchesRepositoryNameIgnoringCase(t *testing.T) {
 	// GitHub reports the canonical "acme/widgets"; the remote URL spells it
 	// "Acme/Widgets", which is what a failed lookup knows.

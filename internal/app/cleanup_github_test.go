@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -12,10 +13,10 @@ import (
 	"github.com/mark-lvl/gitperch/internal/github"
 )
 
-// squashRepo is cleanupRepo plus a linked worktree on branch "squashed",
-// pushed and then deleted from origin as GitHub does after a squash merge:
-// Git sees the branch unmerged, with a gone upstream.
-func squashRepo(t *testing.T) (repo, wt, tip string) {
+// liveRepo is cleanupRepo plus a linked worktree on branch "squashed",
+// pushed to origin, where it stays, as after a squash merge that kept the
+// branch: Git sees the branch unmerged, with a live upstream.
+func liveRepo(t *testing.T) (repo, wt, tip string) {
 	t.Helper()
 	repo, _, _ = cleanupRepo(t)
 	wt = filepath.Join(t.TempDir(), "squashed")
@@ -23,8 +24,17 @@ func squashRepo(t *testing.T) (repo, wt, tip string) {
 	actionTestWrite(t, filepath.Join(wt, "feature"), "work\n")
 	actionTestCommit(t, wt, "squashed work")
 	actionGit(t, wt, "push", "-u", "origin", "squashed")
-	actionGit(t, repo, "push", "origin", "--delete", "squashed")
 	return repo, wt, strings.TrimSpace(string(actionGit(t, wt, "rev-parse", "HEAD")))
+}
+
+// squashRepo is liveRepo with the branch then deleted from origin, as GitHub
+// does after a squash merge: Git sees the branch unmerged, with a gone
+// upstream.
+func squashRepo(t *testing.T) (repo, wt, tip string) {
+	t.Helper()
+	repo, wt, tip = liveRepo(t)
+	actionGit(t, repo, "push", "origin", "--delete", "squashed")
+	return repo, wt, tip
 }
 
 // squashGitHub answers as GitHub would if origin were acme/widgets, with prs
@@ -76,6 +86,113 @@ func TestCleanupRemovesSquashMergedWorktreeAndBranch(t *testing.T) {
 	want := "git -C " + repo + " branch squashed " + tip + " || git -C " + repo + " fetch origin 'refs/pull/42/head:refs/heads/squashed'"
 	if restore != want {
 		t.Fatalf("restore %q, want %q", restore, want)
+	}
+}
+
+func TestCleanupRemovesSquashMergedWorkWhoseUpstreamIsLive(t *testing.T) {
+	repo, wt, tip := liveRepo(t)
+	actions := NewActions(gitcli.Service{}, 1)
+	actions.SetGitHub(squashGitHub(nil, map[string][]github.PullRequest{"squashed": {mergedPR(42, tip)}}))
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktree := itemFor(t, preview, RemoveWorktree, wt)
+	if !worktree.Eligible() || !worktree.Assessment.Has(CleanupMergedPullRequest) {
+		t.Fatalf("worktree: %+v", worktree.Assessment)
+	}
+	branch := branchItem(preview, "squashed")
+	if branch == nil || !branch.Eligible() || !branch.Assessment.Has(CleanupMergedPullRequest) || branch.RestoreFrom != "origin" {
+		t.Fatalf("branch: %+v", branch)
+	}
+	results, err := actions.ExecuteCleanup(context.Background(), preview.ID, []string{worktree.ID, branch.ID}, nil)
+	if err != nil || len(results) != 2 {
+		t.Fatalf("results %+v, %v", results, err)
+	}
+	want := "git -C " + repo + " branch squashed " + tip + " || git -C " + repo + " fetch origin 'refs/pull/42/head:refs/heads/squashed'"
+	for _, r := range results {
+		if r.State != Succeeded || r.Item == branch.ID && r.Restore != want {
+			t.Fatalf("result %+v, want restore %q", r, want)
+		}
+	}
+}
+
+func TestCleanupListsBranchMergedOnGitHubAtAnotherCommit(t *testing.T) {
+	repo, wt, tip := liveRepo(t)
+	older := strings.Repeat("1", 40)
+	actions := NewActions(gitcli.Service{}, 1)
+	actions.SetGitHub(squashGitHub(nil, map[string][]github.PullRequest{"squashed": {mergedPR(42, older)}}))
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer actions.Discard(preview.ID)
+	if worktree := itemFor(t, preview, RemoveWorktree, wt); worktree.Eligible() {
+		t.Fatalf("worktree: %+v", worktree.Assessment)
+	}
+	note := "PR #42 merged at 1111111; this branch is at " + tip[:7]
+	b := branchItem(preview, "squashed")
+	if b == nil || b.Eligible() || b.Assessment.Status != CleanupNeedsReview || !b.Assessment.Has(CleanupNotMerged) ||
+		!b.Assessment.Has(CleanupPullRequestUnproven) || !strings.Contains(b.Assessment.Summary(), note) {
+		t.Fatalf("branch: %+v", b)
+	}
+}
+
+func TestCleanupKeepsProvenBranchWhileAWorktreeIsRebasing(t *testing.T) {
+	repo, _, _ := cleanupRepo(t)
+	actionGit(t, repo, "checkout", "-b", "done")
+	actionTestWrite(t, filepath.Join(repo, "done"), "work\n")
+	actionTestCommit(t, repo, "done work")
+	actionGit(t, repo, "push", "-u", "origin", "done")
+	actionGit(t, repo, "checkout", "main")
+	actionGit(t, repo, "push", "origin", "--delete", "done")
+	tip := strings.TrimSpace(string(actionGit(t, repo, "rev-parse", "done")))
+	startConflictRebase(t, conflictRebaseSetup(t, repo))
+	actions := NewActions(gitcli.Service{}, 1)
+	actions.SetGitHub(squashGitHub(nil, map[string][]github.PullRequest{"done": {mergedPR(7, tip)}}))
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer actions.Discard(preview.ID)
+	if b := branchItem(preview, "done"); b == nil || b.Eligible() || !b.Assessment.Has(CleanupOperation) || !strings.Contains(b.Assessment.Summary(), "rebase in progress in rb") {
+		t.Fatalf("done: %+v", b)
+	}
+}
+
+func TestCleanupRestoresForkPullRequestFromTheBaseRepository(t *testing.T) {
+	repo, wt, tip := squashRepo(t)
+	log := filepath.Join(t.TempDir(), "cleanup.log")
+	actions := NewActions(gitcli.Service{}, 1)
+	actions.SetRestoreLog(log)
+	// origin is the fork me/widgets; the pull request went into acme/widgets.
+	fork := NewGitHub(fakeGitHubGit{urls: map[string]string{"origin": "https://github.com/me/widgets.git"}}, &fakePulls{prs: map[string][]github.PullRequest{"squashed": {mergedPR(42, tip)}}}, nil)
+	actions.SetGitHub(fork)
+	preview, err := actions.PlanCleanup(context.Background(), []string{repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktree := itemFor(t, preview, RemoveWorktree, wt)
+	branch := branchItem(preview, "squashed")
+	if branch == nil || !branch.Eligible() || branch.RestoreFrom != "https://github.com/acme/widgets" {
+		t.Fatalf("branch: %+v", branch)
+	}
+	results, err := actions.ExecuteCleanup(context.Background(), preview.ID, []string{worktree.ID, branch.ID}, nil)
+	if err != nil || len(results) != 2 {
+		t.Fatalf("results %+v, %v", results, err)
+	}
+	want := "git -C " + repo + " branch squashed " + tip + " || git -C " + repo + " fetch 'https://github.com/acme/widgets' 'refs/pull/42/head:refs/heads/squashed'"
+	for _, r := range results {
+		if r.State != Succeeded || r.Item == branch.ID && (r.Restore != want || !r.RestoreLogged) {
+			t.Fatalf("result %+v, want restore %q", r, want)
+		}
+	}
+	data, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n"); len(lines) != 1 || !strings.Contains(lines[0], "\t"+strconv.Quote(repo)+"\t\"squashed\"\t"+tip+"\t"+want) {
+		t.Fatalf("log: %q", data)
 	}
 }
 
@@ -179,7 +296,13 @@ func TestMergeEvidenceAndRestoreSource(t *testing.T) {
 	if v := failing.MergeEvidence(context.Background(), "/repo", []gitcli.Branch{upstream("fix", "origin", "fix")})["fix"]; !v.Failed || v.Note != "GitHub API rate limit reached; gitperch checks again later" {
 		t.Fatalf("failed lookup: %+v", v)
 	}
-	if got := restoreSource("origin", "acme/widgets", PullRequest{BaseRepository: "ACME/widgets"}); got != "origin" {
+	if got := restoreSource("origin", "github.com", "acme/widgets", PullRequest{BaseRepository: "ACME/widgets"}); got != "origin" {
 		t.Fatalf("same repository: %q", got)
+	}
+	// The base repository's URL comes from the host and name, whatever the
+	// pull request's URL looks like.
+	odd := PullRequest{Number: 7, BaseRepository: "acme/widgets", URL: "https://ghe.example.com/acme/widgets/pull/7/files"}
+	if got := restoreSource("origin", "ghe.example.com", "me/widgets", odd); got != "https://ghe.example.com/acme/widgets" {
+		t.Fatalf("fork: %q", got)
 	}
 }

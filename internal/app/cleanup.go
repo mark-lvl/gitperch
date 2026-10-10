@@ -1027,10 +1027,8 @@ func revalidateCleanup(ctx context.Context, git CleanupGit, item CleanupItem) Cl
 			}
 			if pr := item.PullRequest; pr != nil {
 				// GitHub is not asked again: a merged pull request stays
-				// merged, and update-ref deletes only at the reviewed commit.
-				if pr.HeadOID != b.OID {
-					return changed("branch moved since review")
-				}
+				// merged, its head is the reviewed commit, and update-ref
+				// deletes only at that commit.
 				return Assess(CleanupReason{Code: CleanupMergedPullRequest, Text: mergedViaText(*pr)})
 			}
 			merged, err := git.IsAncestor(ctx, item.Group, b.OID, item.Base)
