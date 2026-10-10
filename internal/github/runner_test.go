@@ -55,7 +55,15 @@ func TestRunUsesNeutralDirectoryAndHardenedEnvironment(t *testing.T) {
 	t.Setenv("GH_REPO", "someone/else")
 	t.Setenv("GH_DEBUG", "api")
 	t.Setenv("GIT_DIR", "/elsewhere/.git")
+	t.Setenv("GH_HOST", "ghe.example.com")
+	t.Setenv("GH_PAGER", "less")
+	t.Setenv("PAGER", "less")
+	t.Setenv("DEBUG", "1")
+	t.Setenv("CLICOLOR_FORCE", "1")
 	t.Setenv("GH_TOKEN", "kept-token")
+	t.Setenv("HTTPS_PROXY", "http://proxy.example:3128")
+	t.Setenv("BROWSER", "w3m")
+	t.Setenv("GH_BROWSER", "firefox")
 	t.Chdir(t.TempDir())
 	out, err := (Runner{Executable: gh}).Run(context.Background(), "api", "graphql")
 	if err != nil || string(out.Stdout) != "ok\n" {
@@ -69,12 +77,13 @@ func TestRunUsesNeutralDirectoryAndHardenedEnvironment(t *testing.T) {
 		t.Fatalf("gh ran in %q, want %q", got, want)
 	}
 	env := "\n" + recorded(t, dir, "env")
-	for _, absent := range []string{"GH_FORCE_TTY=", "GH_REPO=", "GH_DEBUG=", "GIT_DIR="} {
+	for _, absent := range []string{"GH_FORCE_TTY=", "GH_REPO=", "GH_DEBUG=", "GIT_DIR=", "GH_HOST=", "GH_PAGER=", "PAGER=", "DEBUG=", "CLICOLOR_FORCE="} {
 		if strings.Contains(env, "\n"+absent) {
 			t.Errorf("environment kept %s", absent)
 		}
 	}
-	for _, present := range []string{"GH_PROMPT_DISABLED=1", "GH_NO_UPDATE_NOTIFIER=1", "NO_COLOR=1", "CLICOLOR=0", "GH_TOKEN=kept-token"} {
+	for _, present := range []string{"GH_PROMPT_DISABLED=1", "GH_NO_UPDATE_NOTIFIER=1", "NO_COLOR=1", "CLICOLOR=0", "GH_TOKEN=kept-token",
+		"HTTPS_PROXY=http://proxy.example:3128", "BROWSER=w3m", "GH_BROWSER=firefox"} {
 		if !strings.Contains(env, "\n"+present+"\n") {
 			t.Errorf("environment lacks %s", present)
 		}

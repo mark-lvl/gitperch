@@ -134,6 +134,7 @@ func TestPullRequestsClassifiesErrors(t *testing.T) {
 		"not found":    {`{"data":{"repository":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve"}]}`, 1, ErrRepositoryNotFound, ""},
 		"rate limited": {`{"data":{"repository":null},"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`, 1, ErrRateLimited, ""},
 		"other":        {`{"data":{"repository":null},"errors":[{"type":"FORBIDDEN","message":"Resource protected\u001b[31m"}]}`, 1, nil, `Resource protected\x1b[31m`},
+		"no message":   {`{"data":{"repository":null},"errors":[{"type":"FORBIDDEN"}]}`, 1, nil, "GitHub API error FORBIDDEN"},
 		"not logged":   {"", 4, ErrNotAuthenticated, ""},
 		"garbage":      {"<html>", 1, nil, "gh api: exit status 1: first problem"},
 		"empty answer": {`{"data":{}}`, 0, nil, "unexpected gh api output"},

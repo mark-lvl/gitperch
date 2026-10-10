@@ -94,7 +94,11 @@ func (c Client) PullRequests(ctx context.Context, repo Repo, heads []string) (Lo
 				return Lookup{}, ErrRateLimited
 			}
 		}
-		return Lookup{}, errors.New(gitcli.SafeText(response.Errors[0].Message))
+		message := response.Errors[0].Message
+		if message == "" {
+			message = "GitHub API error " + response.Errors[0].Type
+		}
+		return Lookup{}, errors.New(gitcli.SafeText(strings.TrimSpace(message)))
 	}
 	return collect(*response.Data.Repository, heads), nil
 }
