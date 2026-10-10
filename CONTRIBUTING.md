@@ -54,7 +54,7 @@ demo workspace, render captures and the auto-rebuilding launcher.
   task and test views need real integrations, not placeholders.
 - **Domain logic independent of the TUI.** Keep Git and planning code in
   `internal/` packages that the TUI only calls.
-- **Git via argument arrays.** Never build shell command strings.
+- **Git and gh via argument arrays.** Never build shell command strings. Tests use fake gh executables and never run the real gh.
 - **Small and dependable.** Avoid speculative frameworks and new dependencies;
   pin any dependency you add in `go.mod`/`go.sum`.
 

@@ -9,8 +9,9 @@
 - `make dist` uses GNU tar for reproducible archives, so build release
   archives on Linux.
 - Optional: [LazyGit](https://github.com/jesseduffield/lazygit) for the
-  in-dashboard LazyGit launcher, and Python with `pillow` and `pyte` to
-  regenerate PNG render captures.
+  in-dashboard LazyGit launcher, the [GitHub CLI](https://cli.github.com) for
+  pull request status, and Python with `pillow` and `pyte` to regenerate PNG
+  render captures.
 
 ## Common tasks
 
@@ -73,6 +74,8 @@ missing-upstream, failed-remote and linked-worktree scenarios.
 
 - Tests that mutate Git state use temporary repositories and local bare
   remotes. Never point tests at personal or work remotes.
+- Tests never run the real `gh` or contact GitHub (CI runners have gh
+  installed): they write fake `gh` executables or use in-memory fakes.
 - `testdata/git-status` holds real porcelain v2 output; set
   `GITPERCH_UPDATE_FIXTURES=1` to recapture it.
 - TUI render captures live in `docs/captures`. See
@@ -95,6 +98,7 @@ internal/app/        status loading, action plans and execution
 internal/config/     TOML configuration and workspace resolution
 internal/discovery/  repository discovery with depth and symlink safety
 internal/git/        Git CLI runner, porcelain parsing and sync commands
+internal/github/     gh runner, remote URL parsing and pull request queries
 internal/repository/ repository identity and status model
 internal/tui/        Bubble Tea v2 interface
 scripts/             demo, dev launcher, capture rendering and release tooling
@@ -102,5 +106,5 @@ testdata/            recorded Git output used by tests
 docs/                user guides, design notes, render captures and logo files
 ```
 
-Domain logic stays independent of the TUI, and Git is always invoked through
-argument arrays, never through a shell.
+Domain logic stays independent of the TUI, and Git and gh are always invoked
+through argument arrays, never through a shell.

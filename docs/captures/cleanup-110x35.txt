@@ -22,9 +22,9 @@
 │      │     squash merge?                                                                            │      │
 │      │                                                                                              │      │
 │      │ Space toggle · ↑↓ move · ↵ clean up · Esc cancel                                             │      │
-│      ╰──────────────────────────────────────────────────────────────────────────────────────────────╯      │
-│ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ ╭────╰──────────────────────────────────────────────────────────────────────────────────────────────╯────╮ │
 │ │ ▰ design-system  feat/tokens → origin/feat/tokens                                               2m ago │ │
+│ │ PR #128 · open · checks failing · changes requested · 1h ago                                           │ │
 │ │ ↑3 ahead · locally known refs                                                                          │ │
 │ │ Working tree · 2 files                                                                                 │ │
 │ │ M  src/theme/tokens.go                                                                          +8 -2  │ │

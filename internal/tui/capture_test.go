@@ -24,6 +24,10 @@ func captureRows() []app.Row {
 			rows[i].Status.LastActivity = captureNow.Add(-age)
 		}
 	}
+	// design-system's branch has an open pull request with failing checks.
+	rows[1].GitHub = &app.GitHubInfo{Host: "github.com", Repository: "acme/design-system", Branch: "feat/tokens", CheckedAt: captureNow.Add(-2 * time.Minute),
+		PullRequests: []app.PullRequest{{Number: 128, Title: "Add semantic theme tokens", URL: "https://github.com/acme/design-system/pull/128", State: app.PullRequestOpen,
+			BaseRepository: "acme/design-system", Base: "main", IntoDefaultBranch: true, Checks: app.ChecksFailing, Review: app.ReviewChangesRequested, UpdatedAt: captureNow.Add(-time.Hour)}}}
 	// design-system owns two linked worktrees: one likely finished, one stale.
 	main := rows[1].Path
 	rows[1].Worktree = &app.WorktreeInfo{Main: true, MainPath: main}

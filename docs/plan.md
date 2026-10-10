@@ -51,6 +51,12 @@ Staging, commits, diffs, conflict resolution, rebasing, force push, deletion, au
 > [the worktree and branch cleanup design](superpowers/specs/2026-10-06-worktree-and-branch-cleanup-design.md).
 > Everything else excluded here, including force removal, stays excluded.
 
+> Update 2026-10-10: read-only pull request state through the GitHub CLI,
+> and Clean up accepting a pull request merged with exactly the local commit,
+> are in scope under
+> [the GitHub CLI integration design](superpowers/specs/2026-10-10-github-cli-integration-design.md).
+> Creating, merging or commenting on pull requests stays excluded.
+
 Bare repositories are not dashboard targets. Submodules contribute to their parent status but are not recursively managed. A nested repository can be included by explicitly configuring it as a root.
 
 ## 4. Technology and structure

@@ -75,6 +75,18 @@ ANSI cell measurement handles wide characters and colored strings. Bubble Tea
 converts theme colors to the detected terminal profile, including 256/16-color
 terminals. `--no-color`, `NO_COLOR`, and ASCII icons remain supported.
 
+## Pull requests
+
+With gh available ([GitHub pull requests](usage.md#github-pull-requests)), a
+branch whose Git state is otherwise quiet shows its pull request in the status
+column: `× checks #42` and `! changes #42` in amber, and `✓ PR #42` for an open
+pull request with nothing to do. The preview card adds a line under its header,
+such as `PR #42 · open · checks failing · changes requested · 3h ago`, and drops
+it before any changed file when the card is at its smallest. The details
+Overview has a Pull request section with the title, `base ← head`, checks,
+review, URL, up to three earlier pull requests of the branch and when GitHub
+was asked. While lookups run, the header shows `checking GitHub`.
+
 ## Worktrees in the list
 
 A repository with linked worktrees shows a badge while collapsed, for example
@@ -189,10 +201,11 @@ application dependencies.
 
 ## Deliberately unavailable
 
-Agents, semantic agent messages/waiting states, tests, pull requests and tasks have
+Agents, semantic agent messages/waiting states, tests and tasks have
 no real backend integration here, so no fabricated counters, columns, tabs or
-buttons appear. The reference mockup's AGENT column, agent badge and Agent tab,
-Commit, Open pull request, Sync all and Start agent are therefore absent, and `a`
+buttons appear. Pull requests come only from gh and are read-only: gitperch
+never creates, merges or comments on them. The reference mockup's AGENT column, agent badge and Agent tab,
+Commit, Create pull request, Sync all and Start agent are therefore absent, and `a`
 and `s` keep their existing select-all and sort bindings. The detail-loader and command registry are the seams for later
 integration. Stage/commit/conflict resolution are available through the real shell
 or optional LazyGit, not new embedded mutation workflows. Line counts are fetched

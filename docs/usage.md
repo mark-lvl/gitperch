@@ -16,7 +16,8 @@ The table shows independent changes, untracked entries, conflicts, branch, upstr
 and locally known ahead/behind counts. `?` means no valid comparison is available;
 it never means synchronized. `changes:N` counts tracked status entries once even
 when both the index and worktree changed. Status performs no remote fetch and
-uses Git's no-optional-locks mode. JSON schema version 1 has deterministic repository
+uses Git's no-optional-locks mode; `--github` adds pull request state (see
+[GitHub pull requests](#github-pull-requests)). JSON schema version 1 has deterministic repository
 ordering, raw path identity, inspection timestamps, and per-repository errors.
 Terminal output escapes control characters and redacts credentials in URLs.
 
@@ -30,7 +31,7 @@ worktrees of one repository are judged independently.
 | --- | --- |
 | critical | `inspection_failed`, `conflicts`, `operation_in_progress` (merge, rebase, cherry-pick, revert, bisect), `action_failed` (dashboard only: a fetch, push or pull failed or has an unknown outcome) |
 | high | `uncommitted_changes` (staged or unstaged), `untracked_files`, `unpushed_commits`, `diverged`, `detached_commits` (a detached HEAD no branch, remote-tracking branch or tag contains) |
-| medium | `behind_upstream`, `no_upstream`, `tracking_unknown` (the upstream's local tracking ref is missing), `no_commits`, `stale_worktree`, `worktree_finished` and `worktree_idle` (a linked worktree's [lifecycle](#worktree-lifecycle)) |
+| medium | `behind_upstream`, `no_upstream`, `tracking_unknown` (the upstream's local tracking ref is missing), `no_commits`, `stale_worktree`, `worktree_finished` and `worktree_idle` (a linked worktree's [lifecycle](#worktree-lifecycle)), and with [GitHub pull requests](#github-pull-requests) `pr_checks_failing` and `pr_changes_requested` (the branch's open pull request) |
 | low | Nothing to do: clean and synchronized, a detached HEAD a ref contains, a locked or bare worktree |
 
 The level is the most severe reason. Levels above low count as needing
@@ -38,7 +39,8 @@ attention in the dashboard header, Focus and collapsed-group badges; attention
 order (`s`) sorts by level, then name and path. The table's `ATTENTION` column
 and each JSON repository's `attention` object (`{"level": "high", "reasons":
 ["uncommitted_changes", "unpushed_commits"]}`, reasons most severe first and
-`[]` at low) carry the same result. Attention describes Git state; it does not
+`[]` at low) carry the same result. Attention describes Git state, plus the
+branch's pull request when gh is available; it does not
 decide what to do, and age alone never raises it: only a clean linked
 worktree with nothing unfinished can become `worktree_idle`.
 
@@ -421,6 +423,55 @@ after revalidation, and configured Git hooks still run.
 TOML config. A deadline limits how long gitperch waits; it cannot guarantee
 that a remote did not receive a push before the connection ended.
 
+## GitHub pull requests
+
+With the [GitHub CLI](https://cli.github.com) (`gh`) installed and logged in,
+gitperch shows each branch's pull request next to its Git status. gh does all
+authentication, GitHub Enterprise included; gitperch never reads a token. The
+integration needs Git 2.36 or newer and is off without gh or with
+`[github] enabled = false`:
+
+```toml
+[github]
+enabled = true                  # default
+hosts = ["github.example.com"]  # GitHub Enterprise Server hosts besides github.com
+```
+
+A branch is looked up when its upstream's remote URL names `github.com` (or
+`www.github.com`, `ssh.github.com`) or a configured host. SSH host aliases
+from `~/.ssh/config` are not resolved, and triangular setups, which push
+somewhere other than the upstream, are not matched. gitperch reads the
+upstream's remote and branch from Git and asks GitHub once per repository,
+through `gh api graphql`, for the pull requests whose head is exactly that
+branch of that repository, including pull requests from a fork into its
+parent; the same branch name in someone else's fork never matches. gh runs
+outside your repositories and sends GitHub the repository owners, names and
+branch names.
+
+The dashboard looks branches up in the background after each scan and reuses
+a result for 5 minutes. `r`, returning from a shell or LazyGit, and a finished
+batch recheck sooner, at most every 30 seconds per branch; automatic refresh
+never forces a recheck. A failed lookup shows why, such as
+`gh is not logged in to github.com — run gh auth login`, and keeps the
+earlier result with its age. GitHub data never adds workspace warnings or
+changes an exit code.
+
+`gitperch status --github` looks every branch up before printing; without the
+flag `status` contacts nothing. It exits 2 when GitHub use is disabled, gh is
+missing or Git is older than 2.36. Failed lookups are reported per repository
+and on one stderr line, and leave the exit code alone. The table's STATE
+column adds markers such as `pr #42 open, checks failing`, and JSON adds a
+`github` object per repository (schema version still 1):
+
+| Field | Meaning |
+| --- | --- |
+| `host`, `repository`, `branch` | The upstream on GitHub, such as `github.com`, `acme/widgets` and `feat/x` |
+| `pull_requests` | Up to five, open first, then the most recently updated: `number`, `title`, `url`, `state` (`open`, `merged`, `closed`), `draft`, `base_repository`, `base`, `into_default_branch`, `head_oid`, `review` (`approved`, `changes_requested`, `review_required`), `checks` (`passing`, `failing`, `pending`), `merged_at`, `updated_at` |
+| `checked_at` | When the pull requests were read |
+| `error` | Why the latest lookup failed, if it did |
+
+gitperch never creates, merges, approves or comments on pull requests.
+
 ## Authentication and limits
 
 Background Git commands have no interactive terminal or askpass prompt. Normal
@@ -431,7 +482,8 @@ appears as a per-repository action failure. Git hooks and helpers run with your
 normal user permissions; gitperch is not a sandbox for untrusted repositories.
 
 The dashboard does not stage, commit, stash, reset, clean, rebase, resolve
-conflicts, create branches, configure upstreams, or force push. It does not
+conflicts, create branches, configure upstreams, force push, or create, merge
+or comment on pull requests. It does not
 force-remove worktrees or delete unmerged work; the only branches it deletes
 are fully merged ones, after review. It does not support triangular push workflows, multiple push URLs, arbitrary push
 refspecs, or headless bulk mutation. See [plan.md](plan.md) for the full v0.1

@@ -24,6 +24,9 @@ go run ./cmd/gitperch status --json .
   `internal/config`; the TUI (`internal/tui`) only renders and dispatches.
 - Invoke Git only through the runner in `internal/git` with argument arrays.
   Never interpolate into shell strings.
+- Invoke gh only through the runner in `internal/github`, with argument arrays
+  and values in `-f` fields (never `-F`). gitperch only reads from GitHub.
+  Tests use fake gh executables, never the real gh.
 - Never add Git mutations beyond fetch, push of reviewed commits and
   fast-forward-only pull without an agreed design. No force push, reset,
   stash, clean, commit or rebase.

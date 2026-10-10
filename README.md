@@ -77,6 +77,9 @@ works less like a directory browser and more like an **attention list**.
   multi-select.
 - **Scriptable status**: `gitperch status` prints a plain table or versioned
   JSON for scripts, CI and agent tooling.
+- **Pull requests** (optional, with [gh](https://cli.github.com)): each
+  branch's pull request, review and CI checks in the dashboard and in
+  `gitperch status --github`.
 
 ## Conservative by design
 
@@ -214,6 +217,9 @@ ignore_dirs = ["node_modules", "vendor", "target", ".cache", ".next", "dist", "b
 [ui]
 icons = "unicode"     # or "ascii", "nerd"
 refresh_seconds = 30  # automatic local status refresh; 0 turns it off
+
+[github]
+enabled = true        # use gh, when installed and logged in, for pull requests
 ```
 
 Pick a workspace with `gitperch --workspace agents`. The

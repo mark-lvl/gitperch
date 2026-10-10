@@ -31,9 +31,9 @@
 │                                                                                                                                                              │
 │                                                                                                                                                              │
 │                                                                                                                                                              │
-│                                                                                                                                                              │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ ▰ design-system  feat/tokens → origin/feat/tokens                                                                                                 2m ago │ │
+│ │ PR #128 · open · checks failing · changes requested · 1h ago                                                                                             │ │
 │ │ ↑3 ahead · locally known refs                                                                                                                            │ │
 │ │ Working tree · 3 files                                                              Recent commits                                                       │ │
 │ │ M  src/theme/tokens.go                                                     +8 -2  │ 29ac81  Add semantic theme tokens                            12m ago │ │

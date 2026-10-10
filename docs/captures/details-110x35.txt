@@ -5,9 +5,16 @@
                 │  feat/tokens → origin/feat/tokens
  Changes    [2] │  ● changed  ↑3 ahead · locally known refs
                 │
- Commits        │  Working tree
+ Commits        │  Pull request · open
+                │  #128 Add semantic theme tokens
+ Worktree       │  main ← feat/tokens · acme/design-system
+                │  Checks failing · Changes requested · updated 1h ago
+                │  https://github.com/acme/design-system/pull/128
+                │  Checked 2m ago
+                │
+                │  Working tree
                 │  M  src/theme/tokens.go                                                              +8 -2
- Worktree       │  ?  tests/theme_test.go
+                │  ?  tests/theme_test.go
                 │
                 │  Recent commits
                 │  29ac81  Add semantic theme tokens                                                  12m ago
@@ -17,18 +24,11 @@
                 │  - 2 uncommitted files
                 │  - 1 untracked file
                 │  - 3 commits ahead of origin/feat/tokens
+                │  - PR #128 checks failing
+                │  - PR #128: changes requested
                 │
                 │  Next step
                 │  Press p to review a push. Only committed changes are included.
-                │
-                │
-                │
-                │
-                │
-                │
-                │
-                │
-                │
                 │
                 │
                 │

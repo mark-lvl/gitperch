@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- With the GitHub CLI (`gh`) installed and logged in, the dashboard shows each
+  branch's pull request: open, draft, merged or closed, its review decision
+  and CI checks. They appear in the status column (`× checks #42`,
+  `! changes #42`, `✓ PR #42`), on a preview line and in a Pull request
+  section of the details. Failing checks and requested changes raise medium
+  attention (`pr_checks_failing`, `pr_changes_requested`). Lookups run in the
+  background, are reused for five minutes and are never forced by automatic
+  refresh. `[github] enabled = false` turns them off and `[github] hosts`
+  adds GitHub Enterprise hosts.
+- `gitperch status --github` adds the same data: a `github` object per
+  repository in JSON and STATE markers in the table. Without the flag,
+  `status` still contacts nothing.
+
 ## [0.4.1-rc.1] - 2026-10-08
 
 ### Fixed
