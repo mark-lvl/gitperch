@@ -334,3 +334,22 @@ func TestMergedPullRequestNeedsTheCheckedOutHead(t *testing.T) {
 		}
 	}
 }
+
+func TestBrowseTarget(t *testing.T) {
+	row := ghRow("/repo", "feat/a")
+	if _, ok := row.BrowseTarget(); ok {
+		t.Fatal("a row without GitHub data has a page")
+	}
+	row.GitHub = &GitHubInfo{Host: "github.com", Repository: "me/widgets", Branch: "feat/a", PullRequests: []PullRequest{}}
+	if got, ok := row.BrowseTarget(); !ok || got != (BrowseTarget{Host: "github.com", Repository: "me/widgets", Branch: "feat/a"}) {
+		t.Fatalf("pushed branch: %+v", got)
+	}
+	row.Status.ComparisonKnown = false // the remote branch is gone
+	if got, _ := row.BrowseTarget(); got.Branch != "" {
+		t.Fatalf("gone branch: %+v", got)
+	}
+	row.GitHub.PullRequests = []PullRequest{{Number: 7, BaseRepository: "acme/widgets"}}
+	if got, _ := row.BrowseTarget(); got != (BrowseTarget{Host: "github.com", Repository: "acme/widgets", Number: 7}) {
+		t.Fatalf("fork pull request: %+v", got)
+	}
+}

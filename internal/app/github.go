@@ -98,6 +98,36 @@ func (r Row) CurrentPullRequest() *PullRequest {
 	return &r.GitHub.PullRequests[0]
 }
 
+// BrowseTarget is the GitHub page b opens for a row; see Row.BrowseTarget.
+type BrowseTarget struct {
+	Host       string
+	Repository string // owner/name
+	Number     int    // a pull request; 0 for the repository
+	Branch     string // with Number 0: the branch page, "" for the repository's
+}
+
+// BrowseTarget is the row's current pull request on the repository that holds
+// it, else its upstream repository at the branch once the branch is pushed.
+// False without GitHub data.
+func (r Row) BrowseTarget() (BrowseTarget, bool) {
+	g := r.GitHub
+	if g == nil || g.Repository == "" {
+		return BrowseTarget{}, false
+	}
+	t := BrowseTarget{Host: g.Host, Repository: g.Repository}
+	if pr := r.CurrentPullRequest(); pr != nil {
+		t.Number = pr.Number
+		if pr.BaseRepository != "" {
+			t.Repository = pr.BaseRepository
+		}
+		return t, true
+	}
+	if r.Status.ComparisonKnown {
+		t.Branch = g.Branch
+	}
+	return t, true
+}
+
 // MergeVerdict says whether GitHub proves a branch's work merged although Git
 // cannot show it: Proven when a pull request merged into its repository's
 // default branch had exactly the branch tip as its head. Otherwise Note
