@@ -482,3 +482,46 @@ using temporary repositories and local bare remotes.
 - CI status of the default branch, review-request inboxes and notifications.
 - Deleting remote branches.
 - Headless Clean up.
+
+## Follow-ups
+
+Left open after the merge (2026-10-10). None blocks a release; the first is
+the one to do before one.
+
+- [ ] Smoke-test against real GitHub: `gitperch status --github` on an own
+  repository, a fork with a pull request into its parent and a squash-merged
+  branch, then the dashboard and Clean up once. Tests only use fake gh.
+- [ ] Captures: decide on the Clean up overlay border that now overlaps the
+  preview card in `cleanup-110x35`, and whether fixtures should show
+  `✓ merged #42` and the `b PR` hint.
+
+Behaviour:
+
+- [ ] Restore fallback: `git fetch <src> refs/pull/N/head:refs/heads/X` can
+  fast-forward a branch X the user re-created; fetch only when X is absent.
+- [ ] Escaped branch names: the restore hint omits the fetch fallback and the
+  fallback refspec uses the escaped name.
+- [ ] Changing a branch's upstream (`git branch -u`) keeps the old upstream's
+  pull requests until the 5-minute TTL; key the cache by upstream too.
+- [ ] Forks: the parent lookup reads `first: 10` pull requests per head, so a
+  fork's pull request on a common branch name can be missed (it is then not
+  shown; nothing is proven wrongly).
+- [ ] `b` opens a merged or closed pull request when the branch has no open
+  one; decide whether the repository page fits better.
+- [ ] Terminal browsers started by `b` inherit `NO_COLOR=1` and `CLICOLOR=0`.
+- [ ] Remotes set to `.` or to a bare URL are treated as no GitHub upstream.
+- [ ] Failed-recheck retention compares repository names, not remote identity,
+  so a renamed repository drops its earlier pull requests.
+- [ ] Errors: classify GitHub's REST-shaped secondary rate limit; only one
+  review and check-rollup state is read per pull request.
+
+Tests and code:
+
+- [ ] Untested: the two-slot bound and separate common-directory groups, forced
+  rechecks from the palette, child exit, batch completion and `r` in details,
+  open-PR suppression outside `mergeVerdict`, and the old-Git gate below
+  `newGitHub`.
+- [ ] The gh runner repeats the Git runner's bounded-output skeleton
+  (`limitedBuffer`, deadline handling); both also neither kill a process at the
+  output limit nor order `ctx.Err` against a successful exit.
+- [ ] The `hN` alias format is spelled in two places in `internal/github`.
