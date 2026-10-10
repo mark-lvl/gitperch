@@ -158,6 +158,12 @@ func runContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	rows := snapshot.Rows
 	if gh != nil {
 		gh.LookupAll(ctx, rows)
+		if ctx.Err() != nil {
+			// A cancelled lookup records nothing; a report now would look
+			// like repositories without GitHub upstreams.
+			fmt.Fprintln(errOut, gitcli.SafeText(ctx.Err().Error()))
+			return 130
+		}
 		gh.Annotate(rows)
 		failed := 0
 		for _, row := range rows {

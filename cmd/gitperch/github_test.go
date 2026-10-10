@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mark-lvl/gitperch/internal/app"
 	"github.com/mark-lvl/gitperch/internal/config"
@@ -105,6 +106,37 @@ func TestStatusGitHubFailedLookupKeepsExitCode(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "not found or not accessible") {
 		t.Fatalf("report lacks the error:\n%s", &out)
+	}
+}
+
+func TestStatusGitHubCancelledExits130(t *testing.T) {
+	root := githubWorkspace(t)
+	dir := t.TempDir()
+	started := filepath.Join(dir, "started")
+	script := "#!/bin/sh\n: > '" + started + "'\nexec sleep 30\n"
+	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		// Cancel once gh runs, as Ctrl-C during the lookup would.
+		for {
+			if _, err := os.Stat(started); err == nil {
+				cancel()
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}()
+	var out, errOut bytes.Buffer
+	if code := runContext(ctx, []string{"status", "--github", root}, &out, &errOut); code != 130 || errOut.String() != "context canceled\n" || out.Len() != 0 {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, &out, &errOut)
 	}
 }
 
