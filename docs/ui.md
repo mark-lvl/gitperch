@@ -129,6 +129,7 @@ the whole group, including stale ones, with branch, state and path. The
 | c | Clean up: review stale worktree records, merged clean worktrees and merged branches (Git 2.36+); Space toggles, Enter runs, Esc cancels |
 | o | Open an interactive shell in the selected worktree |
 | g | Open LazyGit; palette lists it only when installed |
+| b | Open the branch's pull request, or its GitHub repository, in the browser through `gh browse`; listed only with gh |
 | r | Refresh workspace and invalidate cached details |
 | s | Toggle name/attention sorting while preserving highlighted path |
 | ? | Scrollable help grouped by context |

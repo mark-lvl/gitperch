@@ -10,9 +10,11 @@ import (
 	"github.com/mark-lvl/gitperch/internal/config"
 	"github.com/mark-lvl/gitperch/internal/discovery"
 	gitcli "github.com/mark-lvl/gitperch/internal/git"
+	"github.com/mark-lvl/gitperch/internal/github"
 	"github.com/mark-lvl/gitperch/internal/tui"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -42,9 +44,13 @@ func runTUI(ctx context.Context, cfg config.Config, ws config.Workspace, noColor
 	model.EnableDetails(read.Details)
 	model.EnablePatch(read.Patch)
 	// Without gh, Git 2.36 or [github] enabled, the dashboard never runs gh.
-	if gh, _, err := newGitHub(ctx, cfg, read); err == nil {
+	if gh, runner, err := newGitHub(ctx, cfg, read); err == nil {
 		model.EnableGitHub(gh)
 		actions.SetGitHub(gh)
+		model.EnableBrowse(func(t app.BrowseTarget) (*exec.Cmd, error) {
+			owner, name, _ := strings.Cut(t.Repository, "/")
+			return runner.BrowseCommand(github.Repo{Host: t.Host, Owner: owner, Name: name}, t.Number, t.Branch)
+		})
 	}
 	model.Configure(strings.Join(ws.Paths, ", "), cfg.UI.Icons, cfg.UI.DefaultFocus)
 	model.SetAutoRefresh(time.Duration(cfg.UI.RefreshSeconds) * time.Second)

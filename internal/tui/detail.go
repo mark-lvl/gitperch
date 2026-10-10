@@ -323,6 +323,9 @@ func (m *Model) detailActions(row app.Row) string {
 	if m.lazyGitAvailable {
 		hints = append(hints, hint{"g", "LazyGit", 2})
 	}
+	if m.canBrowse(row) {
+		hints = append(hints, hint{"b", "Browser", 2})
+	}
 	s := row.Status
 	if m.actions != nil && s.Error == "" && s.Operation == "" && s.Conflicts == 0 && !s.Detached && !s.Unborn && s.Upstream != "" && s.ComparisonKnown {
 		if s.Ahead > 0 && s.Behind == 0 {

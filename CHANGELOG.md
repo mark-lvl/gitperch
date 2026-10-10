@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   worktrees, and for branches Clean up already lists, a pull request that
   proves nothing (still open, merged at another commit or into another
   branch, closed) or a failed check is added as a review reason.
+- `b`, and the command palette, open the highlighted branch's pull request,
+  or its GitHub repository, in the browser through `gh browse`.
 
 ## [0.4.1-rc.1] - 2026-10-08
 

@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"errors"
+	"os/exec"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -139,7 +141,7 @@ func TestDetailsShowPullRequestSection(t *testing.T) {
 	m.details = true
 	view := m.View().Content
 	for _, want := range []string{"Pull request · draft", "#42 Add tokens (draft)", "main ← feat/x · acme/widgets", "Checks failing · Changes requested · updated 3h ago",
-		"https://github.com/acme/widgets/pull/42", "Earlier: #40 merged into main", "Checked 2m ago", "PR #42 checks failing", "PR #42 checks are failing on GitHub."} {
+		"https://github.com/acme/widgets/pull/42", "Earlier: #40 merged into main", "Checked 2m ago", "PR #42 checks failing", "PR #42 checks are failing on GitHub. Open it with b."} {
 		if !strings.Contains(view, want) {
 			t.Errorf("details lack %q", want)
 		}
@@ -296,5 +298,38 @@ func TestMergedPullRequestStatusAndNextStep(t *testing.T) {
 	dirty.Status.Changes = 1
 	if label, _ := m.primaryStatus(dirty); label != "● changed" || strings.Contains(nextStep(dirty), "is merged") {
 		t.Fatalf("uncommitted changes come first: %q, %q", label, nextStep(dirty))
+	}
+}
+
+func TestBrowserOpensThePullRequest(t *testing.T) {
+	m := New(context.Background(), nil, true)
+	m.applySnapshot(app.Snapshot{Rows: []app.Row{prRow(failingPR)}})
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 35})
+	if cmd := m.key(key("b")); cmd != nil || m.message != "No GitHub repository for this branch" {
+		t.Fatalf("without gh: %v, %q", cmd, m.message)
+	}
+	var opened app.BrowseTarget
+	m.EnableBrowse(func(target app.BrowseTarget) (*exec.Cmd, error) {
+		opened = target
+		return exec.Command("true"), nil
+	})
+	if cmd := m.key(key("b")); cmd == nil || opened != (app.BrowseTarget{Host: "github.com", Repository: "acme/widgets", Number: 42}) {
+		t.Fatalf("b: %v, %+v", cmd, opened)
+	}
+	m.Update(browserExitedMsg{})
+	if m.message != "Opened in the browser" || m.loading {
+		t.Fatalf("after return: %q, loading %v", m.message, m.loading)
+	}
+	if !strings.Contains(m.footer(), "[b] PR") {
+		t.Fatalf("footer: %q", m.footer())
+	}
+	m.palette, m.paletteQuery = true, "browser"
+	if items := m.paletteCommands(); len(items) == 0 || items[0].label != "Open pull request #42 in browser" {
+		t.Fatalf("palette: %+v", items)
+	}
+	m.palette = false
+	m.EnableBrowse(func(app.BrowseTarget) (*exec.Cmd, error) { return nil, errors.New("gh is not installed") })
+	if cmd := m.key(key("b")); cmd != nil || m.message != "gh browse: gh is not installed" {
+		t.Fatalf("failed command: %v, %q", cmd, m.message)
 	}
 }

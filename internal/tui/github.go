@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -195,4 +196,49 @@ func (m *Model) pullRequestLines(row app.Row) []string {
 		checked += " · GitHub: " + gitcli.SafeText(g.Error)
 	}
 	return append(lines, m.style(checked, muted, false))
+}
+
+// browseCommand builds the gh command that opens a GitHub page.
+type browseCommand func(app.BrowseTarget) (*exec.Cmd, error)
+
+// browserExitedMsg reports that gh browse returned; nothing is refreshed.
+type browserExitedMsg struct{ err error }
+
+// EnableBrowse lets b open the highlighted row's pull request or repository.
+func (m *Model) EnableBrowse(open func(app.BrowseTarget) (*exec.Cmd, error)) { m.browse = open }
+
+// canBrowse reports whether b works for row.
+func (m *Model) canBrowse(row app.Row) bool {
+	_, ok := row.BrowseTarget()
+	return ok && m.browse != nil
+}
+
+// openInBrowser runs gh browse with the terminal handed over, since BROWSER
+// may name a terminal browser.
+func (m *Model) openInBrowser() tea.Cmd {
+	row := m.highlightedRow()
+	if row == nil {
+		m.message = "Select a repository first"
+		return nil
+	}
+	target, ok := row.BrowseTarget()
+	if !ok || m.browse == nil {
+		m.message = "No GitHub repository for this branch"
+		return nil
+	}
+	cmd, err := m.browse(target)
+	if err != nil {
+		m.message = "gh browse: " + gitcli.SafeText(err.Error())
+		return nil
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg { return browserExitedMsg{err: err} })
+}
+
+// browseLabel names what b opens for row in the command palette.
+func browseLabel(row app.Row) string {
+	target, _ := row.BrowseTarget()
+	if target.Number > 0 {
+		return fmt.Sprintf("Open pull request #%d in browser", target.Number)
+	}
+	return "Open " + gitcli.SafeText(target.Repository) + " on GitHub"
 }

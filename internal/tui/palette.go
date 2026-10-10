@@ -29,6 +29,9 @@ func (m *Model) commands() []command {
 	if m.lazyGitAvailable {
 		commands = append(commands, command{"lazygit", "Open LazyGit · " + name})
 	}
+	if m.canBrowse(*row) {
+		commands = append(commands, command{"browse", browseLabel(*row)})
+	}
 	if m.actions != nil {
 		target := name
 		if len(m.selected) > 0 {
@@ -150,6 +153,8 @@ func (m *Model) executeCommand(id string) tea.Cmd {
 		return m.launchShell()
 	case "lazygit":
 		return m.launchLazyGit()
+	case "browse":
+		return m.openInBrowser()
 	case "refresh":
 		m.forceGitHub()
 		return m.refresh()
@@ -276,6 +281,8 @@ func (m *Model) commandHint(id string) string {
 		return "Interactive shell in the highlighted repository"
 	case "lazygit":
 		return "Open the installed Git interface"
+	case "browse":
+		return "Uses gh and your configured browser"
 	case "fetch":
 		return "Update remote-tracking refs"
 	case "push":
@@ -334,6 +341,8 @@ func (m *Model) commandIcon(id string) (string, string) {
 		return "$", success
 	case "lazygit":
 		return m.symbols().branch, branchColor
+	case "browse":
+		return "↗", accent
 	case "fetch":
 		return "⇣", accent
 	case "push":

@@ -99,8 +99,9 @@ type Model struct {
 	github             *app.GitHub // nil: no pull request lookups
 	githubCtx          context.Context
 	githubCancel       context.CancelFunc
-	githubPending      int  // lookups in flight
-	githubForce        bool // the next snapshot rechecks GitHub
+	githubPending      int           // lookups in flight
+	githubForce        bool          // the next snapshot rechecks GitHub
+	browse             browseCommand // nil: b is unavailable
 }
 
 type snapshotMsg struct {
@@ -310,6 +311,12 @@ func (m *Model) Update(msg tea.Msg) (model tea.Model, cmd tea.Cmd) {
 			return m, m.scheduleAutoRefresh()
 		}
 		return m, m.refresh()
+	case browserExitedMsg:
+		if msg.err != nil {
+			m.message = "gh browse: " + gitcli.SafeText(msg.err.Error())
+		} else {
+			m.message = "Opened in the browser"
+		}
 	case childExitedMsg:
 		if msg.err != nil {
 			m.message = "Child process: " + msg.err.Error()
@@ -520,6 +527,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return m.launchShell()
 		case "g":
 			return m.launchLazyGit()
+		case "b":
+			return m.openInBrowser()
 		case "r":
 			m.forceGitHub()
 			return m.refresh()
@@ -775,6 +784,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.launchShell()
 	case "g":
 		return m.launchLazyGit()
+	case "b":
+		return m.openInBrowser()
 	}
 	return nil
 }

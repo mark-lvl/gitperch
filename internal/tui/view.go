@@ -621,9 +621,9 @@ func nextStep(row app.Row) string {
 	case s.Dirty():
 		return "Review local changes in your shell or LazyGit. Tracking refs are up to date."
 	case open != nil && open.Checks == app.ChecksFailing:
-		return fmt.Sprintf("PR #%d checks are failing on GitHub.", open.Number)
+		return fmt.Sprintf("PR #%d checks are failing on GitHub. Open it with b.", open.Number)
 	case open != nil && open.Review == app.ReviewChangesRequested:
-		return fmt.Sprintf("Reviewers requested changes on PR #%d.", open.Number)
+		return fmt.Sprintf("Reviewers requested changes on PR #%d. Open it with b.", open.Number)
 	default:
 		return "Worktree is clean and locally known tracking refs are up to date. Select and fetch to check the remote."
 	}
@@ -718,6 +718,9 @@ func (m *Model) footer() string {
 			}
 		}
 	}
+	if row := m.highlightedRow(); row != nil && row.CurrentPullRequest() != nil && m.canBrowse(*row) {
+		hints = append(hints, hint{"b", "PR", 4})
+	}
 	hints = append(hints, hint{"Space", "Select", 4})
 	if m.cleanupSupported && m.actions != nil {
 		hints = append(hints, hint{"c", "Clean up", 5})
@@ -741,6 +744,15 @@ func (m *Model) helpContent() []string {
 		" Search/view changes clear selection. Push/pull use the highlighted row when none are selected.",
 		"", " GLOBAL COMMANDS", " : / Ctrl+K    Fuzzy command palette · arrows choose · Enter runs", " ?             Help · q quit · Ctrl+C interrupt", "", " AGENT ACTIONS", " No agent integration is configured in this application.", "", " Sync counts use locally known refs. Fetch checks the remote.", " ↑ ahead · ↓ behind · unknown never means up to date.",
 		" Esc cancels the confirmation popup; during a batch it requests cancellation.", " Esc clears search, then dismisses results. q quits; Ctrl+C interrupts.",
+	}
+	if m.browse != nil {
+		// Documented only where gh can open pages.
+		for i, line := range lines {
+			if strings.HasPrefix(line, " g ") {
+				lines = slices.Insert(lines, i+1, " b             Open the pull request, or the GitHub repository, in the browser (gh)")
+				break
+			}
+		}
 	}
 	if m.cleanupSupported {
 		// Documented only where Clean up is offered.

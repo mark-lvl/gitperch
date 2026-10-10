@@ -119,8 +119,9 @@ commits. Narrower terminals stack content vertically. The compact frame follows
 the content, and the command palette floats over the workspace. Short
 terminals hide the preview first. The recommended minimum is 60×12.
 
-Use arrows/j/k to navigate, Enter for repository details, `d` for changes, and
-`o` for a shell. Details have Overview, Changes, Commits, and Worktree sections;
+Use arrows/j/k to navigate, Enter for repository details, `d` for changes,
+`o` for a shell, and `b` to open the branch's pull request (or GitHub
+repository) in the browser through gh. Details have Overview, Changes, Commits, and Worktree sections;
 Tab switches sections and arrows/PgUp/PgDn scroll. `:` or Ctrl+K opens the fuzzy
 action palette; arrows choose, Enter executes, and Esc closes it. `/` filters by
 name/path/branch with arrow navigation and Enter to open a result. `?` opens help.

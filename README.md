@@ -197,6 +197,7 @@ Inside the dashboard:
 | `p` / `l` | Push / fast-forward pull (after one confirmation) |
 | `c` | Review worktree and branch cleanup |
 | `o` / `g` | Open a shell / lazygit in the repository |
+| `b` | Open the pull request, or the GitHub repository, in the browser (gh) |
 | `r` | Refresh |
 | `?` / `q` | Help / quit |
 
